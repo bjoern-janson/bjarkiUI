@@ -381,6 +381,33 @@ local function shrinkLevel(text)
     text._bjarkiUISized = true
 end
 
+local hiddenLevelRings = setmetatable({}, { __mode = "k" })
+
+local function hideLevelRing(ring)
+    if not ring or not ring.Hide then return end
+    pcall(ring.Hide, ring)
+
+    if hiddenLevelRings[ring] or not hooksecurefunc then return end
+    hiddenLevelRings[ring] = true
+    hooksecurefunc(ring, "Show", function(self)
+        if self._bjarkiUIHidingLevelRing then return end
+        self._bjarkiUIHidingLevelRing = true
+        pcall(self.Hide, self)
+        self._bjarkiUIHidingLevelRing = nil
+    end)
+end
+
+local function applyPlainLevelRings()
+    local player = _G.PlayerFrame
+    local playerMain = player and player.PlayerFrameContent and player.PlayerFrameContent.PlayerFrameContentMain
+    hideLevelRing(playerMain and playerMain.LevelBackgroundCircle)
+
+    for _, frame in ipairs({ _G.TargetFrame, _G.FocusFrame }) do
+        local main = frame and frame.TargetFrameContent and frame.TargetFrameContent.TargetFrameContentMain
+        hideLevelRing(main and main.LevelBackgroundCircle)
+    end
+end
+
 local function applyStaticFonts()
     local target, focus = _G.TargetFrame, _G.FocusFrame
     shrinkLevel(_G.PlayerLevelText)
@@ -388,6 +415,7 @@ local function applyStaticFonts()
         and target.TargetFrameContent.TargetFrameContentMain.LevelText)
     shrinkLevel(focus and focus.TargetFrameContent and focus.TargetFrameContent.TargetFrameContentMain
         and focus.TargetFrameContent.TargetFrameContentMain.LevelText)
+    applyPlainLevelRings()
 end
 
 local function anchorCombatText()
