@@ -1,4 +1,4 @@
-bjarkiUI 0.2.14-ultralight
+bjarkiUI 0.2.15-ultralight
 
 Always-on personal unit-frame presentation for WoW: Forever.
 
@@ -12,9 +12,12 @@ Always-on personal unit-frame presentation for WoW: Forever.
 - Player combat feedback anchored 3 px above PersonalResourceDisplayFrame.
 - Player secondary names removed on Player/Target/Focus/ToT/FoT, player nameplates, and chat sender decoration.
 - Outgoing world damage text raised to WorldTextScreenY_v2=0.0425 and WorldTextCritScreenY_v2=0.0550.
+- Embeds the canonical `bjarkiUI` Edit Mode export. If no character-specific layout with that name exists, it is imported and activated once through Blizzard's Edit Mode APIs; subsequent manual edits are left alone.
 
 No SavedVariables. No slash commands. No portrait/aura code.
 
 v0.2.14-ultralight hardens class-color fallback, tagged-NPC grey handling, chat sender evidence, and red-warning attenuation without changing portrait/aura ownership.
 
-Current source corresponds to v0.2.14-ultralight.
+v0.2.15-ultralight embeds the canonical Edit Mode layout as a one-time character-specific import named `bjarkiUI`. Existing `bjarkiUI` layouts are never overwritten, and Edit Mode updates reapply only addon-owned presentation.
+
+Current source corresponds to v0.2.15-ultralight.
