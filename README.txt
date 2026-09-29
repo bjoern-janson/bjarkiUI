@@ -1,4 +1,4 @@
-bjarkiUI 0.2.13-ultralight
+bjarkiUI 0.2.14-ultralight
 
 Always-on personal unit-frame presentation for WoW: Forever.
 
@@ -7,7 +7,7 @@ Always-on personal unit-frame presentation for WoW: Forever.
 - Brighter/more saturated class colors on player-unit health bars.
 - NPC unit-frame bars mirror useful nameplate state: tap-denied/tagged grey, engaged non-friendly red, otherwise selection color.
 - Own-pet health bars are green on PetFrame and whenever target/focus/derived units resolve to the player's pet.
-- Subtle red warning treatment: player combat pulse 45%, secondary player threat flash 15%, target/focus/pet threat flashes 45%, pet attack-mode highlight 27%.
+- Subtle red warning treatment preserves the accepted v0.2.13 visual strength through one stable vertex-alpha channel; repeated Show/SetAlpha paths no longer compound it. Pet attack-mode highlight remains 27%.
 - Player/target/focus level numerals reduced by 1 font point.
 - Player combat feedback anchored 3 px above PersonalResourceDisplayFrame.
 - Player secondary names removed on Player/Target/Focus/ToT/FoT, player nameplates, and chat sender decoration.
@@ -15,4 +15,6 @@ Always-on personal unit-frame presentation for WoW: Forever.
 
 No SavedVariables. No slash commands. No portrait/aura code.
 
-Current source corresponds to the tested v0.2.13-ultralight build.
+v0.2.14-ultralight hardens class-color fallback, tagged-NPC grey handling, chat sender evidence, and red-warning attenuation without changing portrait/aura ownership.
+
+Current source corresponds to v0.2.14-ultralight.
