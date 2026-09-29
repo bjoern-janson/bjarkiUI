@@ -11,6 +11,62 @@ local PET_ATTACK_SCALE = 0.27
 local WORLD_TEXT_SCREEN_Y = "0.0425"
 local WORLD_TEXT_CRIT_SCREEN_Y = "0.0550"
 
+local EDIT_MODE_LAYOUT_NAME = "bjarkiUI"
+local EDIT_MODE_LAYOUT_STRING = [=[4 0 59 0 0 1 8 6 MicroMenuContainer -4.5 -4.0 -1 ##$$%/&('%)#+$,$ 0 1 1 7 7 UIParent 0.0 0.0 -1 ##$$%/&('%(#,# 0 2 1 7 7 UIParent 0.0 0.0 -1 ##$$%/&('%(#,# 0 3 1 5 5 UIParent -5.0 -77.0 -1 #$$$%/&('%(#,# 0 4 1 5 5 UIParent -5.0 -77.0 -1 #$$$%/&('%(#,# 0 5 1 1 4 UIParent 0.0 0.0 -1 ##$$%/&('%(#,$ 0 6 1 1 4 UIParent 0.0 -50.0 -1 ##$$%/&('%(#,$ 0 7 1 1 4 UIParent 0.0 -100.0 -1 ##$$%/&('%(#,$ 0 10 1 7 7 UIParent 0.0 -4.0 -1 ##$$&('% 0 11 1 7 7 UIParent 0.0 -4.0 -1 ##$$&('%,# 0 12 1 7 7 UIParent 0.0 -4.0 -1 ##$$&('% 1 -1 0 4 4 UIParent 0.0 -276.0 -1 #%$#%$ 2 -1 1 2 2 UIParent 0.0 0.0 -1 ##$#%(&( 3 0 0 0 0 UIParent 278.0 -164.0 -1 $#3% 3 1 0 1 1 UIParent -294.0 -164.0 -1 %#3% 3 2 0 4 4 UIParent 342.0 -164.0 -1 %#&$3% 3 3 0 0 0 UIParent 512.0 -420.0 -1 '$(#)#-G.5/#1$3#5#6,7-7$8(9, 3 4 1 0 2 CompactRaidFrameManager 0.0 -5.0 -1 ,#-=.+/#0#1#2(3#5#6(7-7$8(9( 3 5 1 5 5 UIParent 0.0 0.0 -1 &$*$3# 3 6 1 5 5 UIParent 0.0 0.0 -1 -=.+/#4$5#6(7-7$8(9( 3 7 0 1 7 PlayerFrame 34.0 25.0 -1 3% 4 -1 1 7 7 UIParent 0.0 -4.0 -1 # 5 -1 1 7 7 UIParent 0.0 -4.0 -1 # 6 0 0 1 1 UIParent 244.0 -100.0 -1 ##$#%#&.())( 6 1 0 2 8 BuffFrame -16.0 -4.0 -1 ##$#%#'+())(-# 6 2 1 1 1 UIParent 0.0 -25.0 -1 ##$#%$&.(()(+#,-,$ 7 -1 1 7 7 UIParent 0.0 -4.0 -1 # 8 -1 0 3 3 UIParent 34.0 -228.0 -1 #'$A%$&i 9 -1 1 7 7 UIParent 0.0 -4.0 -1 # 10 -1 1 0 0 UIParent 16.0 -116.0 -1 # 11 -1 1 8 8 UIParent -9.0 85.0 -1 # 12 -1 1 2 2 UIParent -110.0 -275.0 -1 #K$#%# 13 -1 1 7 7 UIParent 116.5 6.0 -1 ##$#%) 14 -1 1 6 8 MicroMenuContainer 7.0 -4.0 -1 ##$#%( 15 0 1 7 7 UIParent 0.0 0.0 -1 &- 15 1 1 7 7 UIParent 0.0 17.0 -1 &- 16 -1 1 5 5 UIParent 0.0 0.0 -1 #( 17 -1 1 1 1 UIParent 0.0 -100.0 -1 ## 18 -1 1 5 5 UIParent 0.0 0.0 -1 #- 19 -1 1 7 7 UIParent 0.0 0.0 -1 ## 20 0 1 7 7 UIParent 0.0 310.0 -1 ##$/%$&('%(-($)#+$,$-$ 20 1 1 7 7 UIParent 0.0 240.0 -1 ##$*%$&('%(-($)#+$,$-$ 20 2 1 7 7 UIParent 0.0 370.0 -1 ##$$%$&('((-($)#+$,$-$ 20 3 1 7 7 UIParent 420.0 430.0 -1 #$$$%#&('((-($)#*#+$,$-$.-.$ 21 -1 0 4 4 UIParent 0.0 -180.0 -1 ##%#&#'((()#*-*$+#,#-#.$/(0#1# 22 0 1 8 7 UIParent -457.0 336.0 -1 #$$$%#&('((#)U*$+%,$-#.#/U0% 22 1 1 1 1 UIParent 0.0 -40.0 -1 &('()U*#+% 22 2 1 1 1 UIParent 0.0 -90.0 -1 &('()U*#+% 22 3 1 1 1 UIParent 0.0 -130.0 -1 &('()U*#+% 23 -1 1 0 0 UIParent 0.0 0.0 -1 ##$#%$&7&%'7(%)U+$,$-$.(/U 24 -1 1 1 1 UIParent 0.0 -182.0 -1 # 25 -1 1 5 7 UIParent -28.0 128.0 -1 # 26 0 1 5 3 MainActionBar 30.0 5.0 -1 #$ 26 1 1 3 5 BagsBar -30.0 5.0 -1 #$ 27 -1 1 4 4 Minimap -68.0 -68.0 -1 #+ 28 -1 1 4 4 UIParent 0.0 0.0 -1 #& 29 0 1 7 7 UIParent 0.0 450.0 -1 #($U%$&K'#(#)# 29 1 1 7 7 UIParent 0.0 425.0 -1 #($U%$&K'#(#)# 29 2 1 7 7 UIParent 0.0 400.0 -1 #($U%$&K'#(#)#]=]
+local editModeLayoutChecked = false
+
+local function installEditModeLayout()
+    if editModeLayoutChecked then return end
+    if not C_EditMode or not C_EditMode.GetLayouts or not C_EditMode.ConvertStringToLayoutInfo
+        or not C_EditMode.SaveLayouts or not Enum or not Enum.EditModeLayoutType
+    then
+        return
+    end
+
+    local ok, layouts = pcall(C_EditMode.GetLayouts)
+    if not ok or type(layouts) ~= "table" or type(layouts.layouts) ~= "table" then return end
+
+    for _, saved in ipairs(layouts.layouts) do
+        if type(saved) == "table" and saved.layoutName == EDIT_MODE_LAYOUT_NAME then
+            -- Presence is the one-time-install marker. Once created, the layout
+            -- belongs to the player and normal Edit Mode changes are respected.
+            editModeLayoutChecked = true
+            return
+        end
+    end
+
+    local converted, layoutInfo = pcall(C_EditMode.ConvertStringToLayoutInfo, EDIT_MODE_LAYOUT_STRING)
+    if not converted or type(layoutInfo) ~= "table" then return end
+
+    local layoutType = Enum.EditModeLayoutType.Character
+    local count = 0
+    for _, saved in ipairs(layouts.layouts) do
+        if type(saved) == "table" and saved.layoutType == layoutType then count = count + 1 end
+    end
+    local maximum = Constants and Constants.EditModeConsts and Constants.EditModeConsts.EditModeMaxLayoutsPerType
+    if type(maximum) == "number" and count >= maximum then return end
+
+    layoutInfo.layoutName = EDIT_MODE_LAYOUT_NAME
+    layoutInfo.layoutType = layoutType
+    table.insert(layouts.layouts, layoutInfo)
+    local newIndex = #layouts.layouts
+
+    local saved = pcall(C_EditMode.SaveLayouts, layouts)
+    if not saved then
+        table.remove(layouts.layouts, newIndex)
+        return
+    end
+
+    -- Match Blizzard's own import lifecycle: save the new layout, then announce
+    -- it as an imported layout and activate it.
+    if C_EditMode.OnLayoutAdded then
+        pcall(C_EditMode.OnLayoutAdded, newIndex, true, true)
+    elseif C_EditMode.SetActiveLayout then
+        pcall(C_EditMode.SetActiveLayout, newIndex)
+    end
+    editModeLayoutChecked = true
+end
+
 local function applyWorldTextPosition()
     local setter = C_CVar and C_CVar.SetCVar
     if not setter then return end
@@ -456,19 +512,26 @@ end
 local events = CreateFrame("Frame")
 for _, event in ipairs({
     "PLAYER_LOGIN", "PLAYER_ENTERING_WORLD", "PLAYER_TARGET_CHANGED", "PLAYER_FOCUS_CHANGED",
-    "UNIT_TARGET", "UNIT_DISPLAYPOWER", "UNIT_NAME_UPDATE",
+    "EDIT_MODE_LAYOUTS_UPDATED", "UNIT_TARGET", "UNIT_DISPLAYPOWER", "UNIT_NAME_UPDATE",
 }) do events:RegisterEvent(event) end
 
 events:SetScript("OnEvent", function(_, event, unit)
     if event == "PLAYER_LOGIN" then
+        installEditModeLayout()
         applyWorldTextPosition()
         installHooks()
         applyStaticFonts()
         anchorCombatText()
         applyAll()
     elseif event == "PLAYER_ENTERING_WORLD" then
+        installEditModeLayout()
         applyWorldTextPosition()
         applyStaticFonts()
+        anchorCombatText()
+        applyAll()
+    elseif event == "EDIT_MODE_LAYOUTS_UPDATED" then
+        -- Keep addon-owned presentation attached to Blizzard's newly applied
+        -- frame positions, including manual Edit Mode changes.
         anchorCombatText()
         applyAll()
     elseif event == "PLAYER_TARGET_CHANGED" then
