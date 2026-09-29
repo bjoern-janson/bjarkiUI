@@ -1,8 +1,11 @@
 local PRD_ATLAS = "UI-HUD-CoolDownManager-Bar"
 local CLASS_SATURATION = 1.18
 local CLASS_BRIGHTNESS = 1.08
-local RED_WARNING_SCALE = 0.45
-local PLAYER_EXTRA_THREAT_SCALE = 0.15
+-- Preserve the accepted visual strength of the old alpha*vertex-alpha stack,
+-- but apply it once through vertex alpha so repeated Show/SetAlpha paths cannot
+-- compound the attenuation.
+local RED_WARNING_SCALE = 0.45 * 0.45
+local PLAYER_EXTRA_THREAT_SCALE = 0.15 * 0.15
 local PET_ATTACK_SCALE = 0.27
 
 local WORLD_TEXT_SCREEN_Y = "0.0425"
@@ -164,13 +167,28 @@ local function applyHealthColor(bar, unit)
     if isPlayerUnit(unit) then
         local colors = CUSTOM_CLASS_COLORS or RAID_CLASS_COLORS
         local color = colors and colors[classToken(unit)]
-        if not color then return end
-        local r, g, b = color.r, color.g, color.b
-        local maximum = math.max(r, g, b)
-        r = math.min(1, (maximum + (r - maximum) * CLASS_SATURATION) * CLASS_BRIGHTNESS)
-        g = math.min(1, (maximum + (g - maximum) * CLASS_SATURATION) * CLASS_BRIGHTNESS)
-        b = math.min(1, (maximum + (b - maximum) * CLASS_SATURATION) * CLASS_BRIGHTNESS)
-        pcall(bar.SetStatusBarColor, bar, r, g, b, 1)
+        if color then
+            local r, g, b = color.r, color.g, color.b
+            local maximum = math.max(r, g, b)
+            r = math.min(1, (maximum + (r - maximum) * CLASS_SATURATION) * CLASS_BRIGHTNESS)
+            g = math.min(1, (maximum + (g - maximum) * CLASS_SATURATION) * CLASS_BRIGHTNESS)
+            b = math.min(1, (maximum + (b - maximum) * CLASS_SATURATION) * CLASS_BRIGHTNESS)
+            pcall(bar.SetStatusBarColor, bar, r, g, b, 1)
+            return
+        end
+
+        -- Player identity can remain readable while class identity is protected.
+        -- Never leave a previous unit's tint behind in that state.
+        if UnitSelectionColor then
+            local ok, r, g, b, a = pcall(UnitSelectionColor, unit)
+            if ok and not isSecret(r) and not isSecret(g) and not isSecret(b)
+                and type(r) == "number" and type(g) == "number" and type(b) == "number" then
+                if type(a) ~= "number" or isSecret(a) then a = 1 end
+                pcall(bar.SetStatusBarColor, bar, r, g, b, a)
+                return
+            end
+        end
+        pcall(bar.SetStatusBarColor, bar, 0.5, 0.5, 0.5, 1)
         return
     end
 
@@ -196,7 +214,7 @@ local function applyHealthColor(bar, unit)
 
     local tapDenied = readableBool(UnitIsTapDenied, unit)
     local playerControlled = readableBool(UnitPlayerControlled, unit)
-    if tapDenied == true and playerControlled == false then
+    if tapDenied == true and playerControlled ~= true then
         -- Matches Blizzard compact/nameplate convention for an NPC whose tap
         -- belongs elsewhere.
         pcall(bar.SetStatusBarColor, bar, 0.9, 0.9, 0.9, 1)
@@ -274,6 +292,16 @@ local function senderIsPlayer(event, guid)
         local ok, value = pcall(C_PlayerInfo.GUIDIsPlayer, guid)
         if ok and not isSecret(value) and type(value) == "boolean" then return value end
     end
+    if type(guid) == "string" and not isSecret(guid) then
+        return guid:match("^Player%-") ~= nil
+    end
+
+    -- SAY/YELL/EMOTE can be emitted by NPCs. Without readable GUID evidence,
+    -- leave those decorations untouched rather than guessing the sender type.
+    if event == "CHAT_MSG_SAY" or event == "CHAT_MSG_YELL"
+        or event == "CHAT_MSG_EMOTE" or event == "CHAT_MSG_TEXT_EMOTE" then
+        return false
+    end
     return PLAYER_CHAT_EVENTS[event] == true
 end
 
@@ -319,38 +347,6 @@ end
 
 local textureScaleGuards = setmetatable({}, { __mode = "k" })
 
-local function installAlphaScale(texture, scale, predicate)
-    if not texture or not texture.SetAlpha or not hooksecurefunc then return end
-    local state = textureScaleGuards[texture] or {}
-    textureScaleGuards[texture] = state
-    if state.alphaInstalled then return end
-    state.alphaInstalled = true
-
-    local function apply(alpha)
-        if state.alphaGuard or type(alpha) ~= "number" then return end
-        if predicate and not predicate() then return end
-        state.alphaGuard = true
-        pcall(texture.SetAlpha, texture, alpha * scale)
-        state.alphaGuard = false
-    end
-
-    if texture.GetAlpha then
-        local ok, alpha = pcall(texture.GetAlpha, texture)
-        if ok then apply(alpha) end
-    end
-
-    pcall(hooksecurefunc, texture, "SetAlpha", function(_self, alpha)
-        apply(alpha)
-    end)
-
-    if texture.Show and texture.GetAlpha then
-        pcall(hooksecurefunc, texture, "Show", function()
-            local ok, alpha = pcall(texture.GetAlpha, texture)
-            if ok then apply(alpha) end
-        end)
-    end
-end
-
 local function installVertexAlphaScale(texture, scale, predicate)
     if not texture or not texture.SetVertexColor or not hooksecurefunc then return end
     local state = textureScaleGuards[texture] or {}
@@ -377,24 +373,6 @@ local function installVertexAlphaScale(texture, scale, predicate)
     end)
 end
 
-local function capTextureAlpha(texture, cap)
-    if not texture or not texture.GetAlpha or not texture.SetAlpha then return end
-    local ok, alpha = pcall(texture.GetAlpha, texture)
-    if ok and type(alpha) == "number" and alpha > cap then
-        pcall(texture.SetAlpha, texture, cap)
-    end
-end
-
-local function capTextureVertexAlpha(texture, cap)
-    if not texture or not texture.GetVertexColor or not texture.SetVertexColor then return end
-    local ok, r, g, b, a = pcall(texture.GetVertexColor, texture)
-    if not ok then return end
-    local alpha = type(a) == "number" and a or 1
-    if alpha > cap then
-        pcall(texture.SetVertexColor, texture, r or 1, g or 1, b or 1, cap)
-    end
-end
-
 local function installThreatScaling()
     local player, target, focus = _G.PlayerFrame, _G.TargetFrame, _G.FocusFrame
     local playerFlash = player and player.PlayerFrameContainer and player.PlayerFrameContainer.FrameFlash
@@ -404,16 +382,11 @@ local function installThreatScaling()
     local targetFlash = target and target.TargetFrameContainer and target.TargetFrameContainer.Flash
     local focusFlash = focus and focus.TargetFrameContainer and focus.TargetFrameContainer.Flash
 
-    -- Player has two red layers. Keep the threat flash secondary so it does not
-    -- stack into a near-stock-strength ring over the normal combat pulse.
-    installAlphaScale(playerFlash, PLAYER_EXTRA_THREAT_SCALE)
+    -- One stable vertex-alpha multiplier preserves the accepted visual strength
+    -- without compounding every time Blizzard shows or re-alphaes the texture.
     installVertexAlphaScale(playerFlash, PLAYER_EXTRA_THREAT_SCALE)
-
-    installAlphaScale(targetFlash, RED_WARNING_SCALE)
     installVertexAlphaScale(targetFlash, RED_WARNING_SCALE)
-    installAlphaScale(focusFlash, RED_WARNING_SCALE)
     installVertexAlphaScale(focusFlash, RED_WARNING_SCALE)
-    installAlphaScale(_G.PetFrameFlash, RED_WARNING_SCALE)
     installVertexAlphaScale(_G.PetFrameFlash, RED_WARNING_SCALE)
     installVertexAlphaScale(_G.PetAttackModeTexture, PET_ATTACK_SCALE)
 
@@ -426,23 +399,7 @@ local function installThreatScaling()
 
     -- StatusTexture also carries non-red states (for example resting), so only
     -- attenuate it while Blizzard has actually colored it red.
-    installAlphaScale(playerStatus, RED_WARNING_SCALE, playerStatusIsRed)
     installVertexAlphaScale(playerStatus, RED_WARNING_SCALE, playerStatusIsRed)
-
-    -- Animation groups can change effective alpha without a direct Lua setter.
-    -- A tiny post-update cap preserves the accepted old visual on those paths.
-    if player and player.HookScript then
-        pcall(player.HookScript, player, "OnUpdate", function()
-            if playerStatus and playerStatus.IsShown and playerStatus:IsShown() and playerStatusIsRed() then
-                capTextureAlpha(playerStatus, RED_WARNING_SCALE)
-                capTextureVertexAlpha(playerStatus, RED_WARNING_SCALE)
-            end
-            if playerFlash and playerFlash.IsShown and playerFlash:IsShown() then
-                capTextureAlpha(playerFlash, PLAYER_EXTRA_THREAT_SCALE)
-                capTextureVertexAlpha(playerFlash, PLAYER_EXTRA_THREAT_SCALE)
-            end
-        end)
-    end
 end
 
 local function installHooks()
