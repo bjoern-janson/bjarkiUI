@@ -27,7 +27,7 @@ v0.2.17-ultralight tones down the target/focus threat ring before the player is 
 
 v0.2.18-ultralight fixes the pre-combat discriminator: full target/focus warning strength now requires both player and observed unit to report combat, rather than player combat state alone.
 
-Current source corresponds to v0.2.18-ultralight.
+Current source corresponds to v0.2.19-ultralight.
 
 
 v0.2.19-ultralight makes combat-pet health bars universally green using positive `UnitIsOtherPlayersPet` identity plus the existing local-pet path. It also scopes `UNIT_TARGET`, `UNIT_DISPLAYPOWER`, and `UNIT_NAME_UPDATE` to the six unit tokens bjarkiUI actually paints, avoiding unrelated populated-area event traffic. No polling is added.
