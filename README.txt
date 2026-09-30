@@ -1,4 +1,4 @@
-bjarkiUI 0.2.16-ultralight
+bjarkiUI 0.2.17-ultralight
 
 Always-on personal unit-frame presentation for WoW: Forever.
 
@@ -7,7 +7,7 @@ Always-on personal unit-frame presentation for WoW: Forever.
 - Brighter/more saturated class colors on player-unit health bars.
 - NPC unit-frame bars mirror useful nameplate state: tap-denied/tagged grey, engaged non-friendly red, otherwise selection color.
 - Own-pet health bars are green on PetFrame and whenever target/focus/derived units resolve to the player's pet.
-- Subtle red warning treatment preserves the accepted v0.2.13 visual strength through one stable vertex-alpha channel; repeated Show/SetAlpha paths no longer compound it. Pet attack-mode highlight remains 27%.
+- Subtle red warning treatment preserves the accepted in-combat strength through one stable vertex-alpha channel. Target/focus threat rings use a quieter 0.08 multiplier before player combat begins, then return to the existing 0.2025 in-combat strength. Pet attack-mode highlight remains 27%.
 - Player/target/focus level numerals reduced by 1 font point.
 - Player/target/focus LevelBackgroundCircle regions are kept hidden, preserving the plain level numeral while leaving high-level/skull and classification art alone.
 - Player combat feedback anchored 3 px above PersonalResourceDisplayFrame.
@@ -23,4 +23,6 @@ v0.2.15-ultralight embeds the canonical Edit Mode layout as a one-time character
 
 v0.2.16-ultralight makes the plain level-number treatment explicit on player/target/focus by hiding only Blizzard's LevelBackgroundCircle region.
 
-Current source corresponds to v0.2.16-ultralight.
+v0.2.17-ultralight tones down the target/focus threat ring before the player is in combat, while preserving the accepted in-combat warning strength.
+
+Current source corresponds to v0.2.17-ultralight.
