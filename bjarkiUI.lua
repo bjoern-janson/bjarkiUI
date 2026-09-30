@@ -5,6 +5,7 @@ local CLASS_BRIGHTNESS = 1.08
 -- but apply it once through vertex alpha so repeated Show/SetAlpha paths cannot
 -- compound the attenuation.
 local RED_WARNING_SCALE = 0.45 * 0.45
+local PRECOMBAT_TARGET_THREAT_SCALE = 0.08
 local PLAYER_EXTRA_THREAT_SCALE = 0.15 * 0.15
 local PET_ATTACK_SCALE = 0.27
 
@@ -441,9 +442,15 @@ local function installVertexAlphaScale(texture, scale, predicate)
     local function apply(r, g, b, a)
         if state.vertexGuard then return end
         if predicate and not predicate() then return end
+        local resolvedScale = scale
+        if type(scale) == "function" then
+            local ok, value = pcall(scale)
+            if ok then resolvedScale = value end
+        end
+        if type(resolvedScale) ~= "number" then resolvedScale = 1 end
         local alpha = type(a) == "number" and a or 1
         state.vertexGuard = true
-        pcall(texture.SetVertexColor, texture, r or 1, g or 0, b or 0, alpha * scale)
+        pcall(texture.SetVertexColor, texture, r or 1, g or 0, b or 0, alpha * resolvedScale)
         state.vertexGuard = false
     end
 
@@ -466,11 +473,22 @@ local function installThreatScaling()
     local targetFlash = target and target.TargetFrameContainer and target.TargetFrameContainer.Flash
     local focusFlash = focus and focus.TargetFrameContainer and focus.TargetFrameContainer.Flash
 
-    -- One stable vertex-alpha multiplier preserves the accepted visual strength
-    -- without compounding every time Blizzard shows or re-alphaes the texture.
+    local function targetThreatScale()
+        if UnitAffectingCombat then
+            local ok, value = pcall(UnitAffectingCombat, "player")
+            if ok and not isSecret(value) and type(value) == "boolean" then
+                return value and RED_WARNING_SCALE or PRECOMBAT_TARGET_THREAT_SCALE
+            end
+        end
+        return RED_WARNING_SCALE
+    end
+
+    -- Keep the accepted in-combat warning strength, but make the same Blizzard
+    -- threat ring much quieter before combat (for example, after right-clicking
+    -- a mob that has not engaged yet).
     installVertexAlphaScale(playerFlash, PLAYER_EXTRA_THREAT_SCALE)
-    installVertexAlphaScale(targetFlash, RED_WARNING_SCALE)
-    installVertexAlphaScale(focusFlash, RED_WARNING_SCALE)
+    installVertexAlphaScale(targetFlash, targetThreatScale)
+    installVertexAlphaScale(focusFlash, targetThreatScale)
     installVertexAlphaScale(_G.PetFrameFlash, RED_WARNING_SCALE)
     installVertexAlphaScale(_G.PetAttackModeTexture, PET_ATTACK_SCALE)
 
