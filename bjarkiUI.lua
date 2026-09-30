@@ -585,7 +585,7 @@ end
 local events = CreateFrame("Frame")
 for _, event in ipairs({
     "PLAYER_LOGIN", "PLAYER_ENTERING_WORLD", "PLAYER_TARGET_CHANGED", "PLAYER_FOCUS_CHANGED",
-    "EDIT_MODE_LAYOUTS_UPDATED", "UNIT_TARGET", "UNIT_DISPLAYPOWER", "UNIT_NAME_UPDATE",
+    "EDIT_MODE_LAYOUTS_UPDATED",
 }) do events:RegisterEvent(event) end
 
 events:SetScript("OnEvent", function(_, event, unit)
@@ -613,24 +613,41 @@ events:SetScript("OnEvent", function(_, event, unit)
     elseif event == "PLAYER_FOCUS_CHANGED" then
         applyUnit("focus"); applyUnit("focustarget")
         applyPrimaryName("focus"); applyPrimaryName("focustarget")
-    elseif event == "UNIT_TARGET" then
-        if unit == "target" then
-            applyUnit("targettarget"); applyPrimaryName("targettarget")
-        elseif unit == "focus" then
-            applyUnit("focustarget"); applyPrimaryName("focustarget")
-        end
-    elseif event == "UNIT_DISPLAYPOWER" then
-        if unit == "player" or unit == "target" or unit == "focus"
-            or unit == "targettarget" or unit == "focustarget" or unit == "pet" then
-            applyUnit(unit)
-        end
-    elseif event == "UNIT_NAME_UPDATE" then
-        if unit == "player" or unit == "target" or unit == "focus"
-            or unit == "targettarget" or unit == "focustarget" then
-            applyPrimaryName(unit)
-        end
     end
 end)
+
+-- UNIT_TARGET can be extremely noisy in populated areas. Only target/focus
+-- can change derived unit tokens bjarkiUI actually paints.
+local unitTargetEvents = CreateFrame("Frame")
+unitTargetEvents:RegisterUnitEvent("UNIT_TARGET", "target", "focus")
+unitTargetEvents:SetScript("OnEvent", function(_, _, unit)
+    if unit == "target" then
+        applyUnit("targettarget"); applyPrimaryName("targettarget")
+    elseif unit == "focus" then
+        applyUnit("focustarget"); applyPrimaryName("focustarget")
+    end
+end)
+
+-- Power/name updates are also scoped to owned unit tokens instead of receiving
+-- unrelated city/nameplate traffic and filtering it afterward.
+local unitPresentationFrames = {}
+local function installUnitPresentationEvents(unitA, unitB)
+    local frame = CreateFrame("Frame")
+    frame:RegisterUnitEvent("UNIT_DISPLAYPOWER", unitA, unitB)
+    frame:RegisterUnitEvent("UNIT_NAME_UPDATE", unitA, unitB)
+    frame:SetScript("OnEvent", function(_, event, unit)
+        if not unit then return end
+        if event == "UNIT_DISPLAYPOWER" then
+            applyUnit(unit)
+        elseif event == "UNIT_NAME_UPDATE" and unit ~= "pet" then
+            applyPrimaryName(unit)
+        end
+    end)
+    unitPresentationFrames[#unitPresentationFrames + 1] = frame
+end
+installUnitPresentationEvents("player", "target")
+installUnitPresentationEvents("focus", "targettarget")
+installUnitPresentationEvents("focustarget", "pet")
 
 -- State-color events are noisy globally, so scope them to only the four NPC-
 -- capable unit tokens bjarkiUI actually paints. Two frames are used because
