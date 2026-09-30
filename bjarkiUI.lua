@@ -473,22 +473,34 @@ local function installThreatScaling()
     local targetFlash = target and target.TargetFrameContainer and target.TargetFrameContainer.Flash
     local focusFlash = focus and focus.TargetFrameContainer and focus.TargetFrameContainer.Flash
 
-    local function targetThreatScale()
-        if UnitAffectingCombat then
-            local ok, value = pcall(UnitAffectingCombat, "player")
-            if ok and not isSecret(value) and type(value) == "boolean" then
-                return value and RED_WARNING_SCALE or PRECOMBAT_TARGET_THREAT_SCALE
+    local function unitThreatScale(unit)
+        return function()
+            if UnitAffectingCombat then
+                local okPlayer, playerInCombat = pcall(UnitAffectingCombat, "player")
+                local okUnit, unitInCombat = pcall(UnitAffectingCombat, unit)
+                if okPlayer and okUnit
+                    and not isSecret(playerInCombat) and not isSecret(unitInCombat)
+                    and type(playerInCombat) == "boolean"
+                    and type(unitInCombat) == "boolean"
+                then
+                    -- Full warning only after both sides are actually in combat.
+                    -- A right-click/auto-attack intent can produce threat state
+                    -- before the target itself has entered combat.
+                    return (playerInCombat and unitInCombat)
+                        and RED_WARNING_SCALE
+                        or PRECOMBAT_TARGET_THREAT_SCALE
+                end
             end
+            return RED_WARNING_SCALE
         end
-        return RED_WARNING_SCALE
     end
 
     -- Keep the accepted in-combat warning strength, but make the same Blizzard
-    -- threat ring much quieter before combat (for example, after right-clicking
-    -- a mob that has not engaged yet).
+    -- threat ring much quieter until both player and observed unit are actually
+    -- in combat with the world.
     installVertexAlphaScale(playerFlash, PLAYER_EXTRA_THREAT_SCALE)
-    installVertexAlphaScale(targetFlash, targetThreatScale)
-    installVertexAlphaScale(focusFlash, targetThreatScale)
+    installVertexAlphaScale(targetFlash, unitThreatScale("target"))
+    installVertexAlphaScale(focusFlash, unitThreatScale("focus"))
     installVertexAlphaScale(_G.PetFrameFlash, RED_WARNING_SCALE)
     installVertexAlphaScale(_G.PetAttackModeTexture, PET_ATTACK_SCALE)
 
