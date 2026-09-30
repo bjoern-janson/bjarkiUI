@@ -168,11 +168,26 @@ local function applyPowerColor(bar, unit)
     pcall(bar.SetStatusBarColor, bar, r, g, b, 1)
 end
 
-local function isLocalPetUnit(unit)
+local function isPetUnit(unit)
     if unit == "pet" then return true end
-    if not unit or not UnitIsUnit then return false end
-    local ok, same = pcall(UnitIsUnit, unit, "pet")
-    return ok and not isSecret(same) and same == true
+    if not unit then return false end
+
+    -- Preserve the exact local-pet identity path for target/focus/derived tokens.
+    if UnitIsUnit then
+        local ok, same = pcall(UnitIsUnit, unit, "pet")
+        if ok and not isSecret(same) and same == true then return true end
+    end
+
+    -- Blizzard exposes positive identity for another player's combat pet.
+    -- Do not infer pet-ness from "non-player" or player-controlled state.
+    if UnitIsOtherPlayersPet then
+        local ok, value = pcall(UnitIsOtherPlayersPet, unit)
+        if ok and not isSecret(value) and type(value) == "boolean" then
+            return value
+        end
+    end
+
+    return false
 end
 
 local function isPlayerUnit(unit)
@@ -204,10 +219,10 @@ end
 local function applyHealthColor(bar, unit)
     if not bar or not bar.SetStatusBarColor or not unit then return end
 
-    -- PetFrame's stock health bar has lockColor=true and relies on its native
-    -- green artwork. Once we replace that artwork with the grayscale PRD atlas,
-    -- explicitly restore the stock green tint.
-    if isLocalPetUnit(unit) then
+    -- Combat pets use Blizzard's stock green health language regardless of
+    -- owner/class/faction. This covers the local PetFrame plus other players'
+    -- pets when observed through target/focus/ToT/FoT.
+    if isPetUnit(unit) then
         if bar.SetStatusBarDesaturated then
             pcall(bar.SetStatusBarDesaturated, bar, true)
         end
