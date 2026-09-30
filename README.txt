@@ -1,4 +1,4 @@
-bjarkiUI 0.2.19-ultralight
+bjarkiUI 0.2.20-ultralight
 
 Always-on personal unit-frame presentation for WoW: Forever.
 
@@ -27,7 +27,9 @@ v0.2.17-ultralight tones down the target/focus threat ring before the player is 
 
 v0.2.18-ultralight fixes the pre-combat discriminator: full target/focus warning strength now requires both player and observed unit to report combat, rather than player combat state alone.
 
-Current source corresponds to v0.2.19-ultralight.
+Current source corresponds to v0.2.20-ultralight.
 
 
 v0.2.19-ultralight makes combat-pet health bars universally green using positive `UnitIsOtherPlayersPet` identity plus the existing local-pet path. It also scopes `UNIT_TARGET`, `UNIT_DISPLAYPOWER`, and `UNIT_NAME_UPDATE` to the six unit tokens bjarkiUI actually paints, avoiding unrelated populated-area event traffic. No polling is added.
+
+v0.2.20-ultralight hardens chat sender and threat vertex-color paths against Forever secret values. Secret GUIDs fail closed before truth/pattern tests; secret color/alpha/scale values are rejected before arithmetic and before the vertex recursion guard is set, preventing one protected update from stranding threat attenuation in a permanently guarded state. No visual constants, frame ownership, layout, or event scope changed.
