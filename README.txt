@@ -30,4 +30,4 @@ v0.2.18-ultralight fixes the pre-combat discriminator: full target/focus warning
 Current source corresponds to v0.2.18-ultralight.
 
 
-v0.2.19-ultralight makes combat-pet health bars universally green using positive `UnitIsOtherPlayersPet` identity plus the existing local-pet path. No new events or polling are added.
+v0.2.19-ultralight makes combat-pet health bars universally green using positive `UnitIsOtherPlayersPet` identity plus the existing local-pet path. It also scopes `UNIT_TARGET`, `UNIT_DISPLAYPOWER`, and `UNIT_NAME_UPDATE` to the six unit tokens bjarkiUI actually paints, avoiding unrelated populated-area event traffic. No polling is added.
