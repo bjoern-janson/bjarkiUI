@@ -360,11 +360,15 @@ local PLAYER_CHAT_EVENTS = {
 }
 
 local function senderIsPlayer(event, guid)
-    if guid and C_PlayerInfo and C_PlayerInfo.GUIDIsPlayer then
+    -- Variadic chat arguments are not covered by the sender-name registry's
+    -- accessibility guarantee. Never truth-test or pattern-match a secret GUID.
+    if isSecret(guid) then return false end
+
+    if guid ~= nil and C_PlayerInfo and C_PlayerInfo.GUIDIsPlayer then
         local ok, value = pcall(C_PlayerInfo.GUIDIsPlayer, guid)
         if ok and not isSecret(value) and type(value) == "boolean" then return value end
     end
-    if type(guid) == "string" and not isSecret(guid) then
+    if type(guid) == "string" then
         return guid:match("^Player%-") ~= nil
     end
 
@@ -380,6 +384,7 @@ end
 local function escapePattern(text) return (text:gsub("(%W)", "%%%1")) end
 local function senderNameFilter(event, decorated, text, sender, language, channel, player2, flags,
                                 zoneID, channelIndex, baseName, languageID, lineID, guid)
+    if isSecret(decorated) or isSecret(sender) or isSecret(guid) then return decorated end
     if type(decorated) ~= "string" or type(sender) ~= "string" or not senderIsPlayer(event, guid) then
         return decorated
     end
@@ -460,12 +465,22 @@ local function installVertexAlphaScale(texture, scale, predicate)
         local resolvedScale = scale
         if type(scale) == "function" then
             local ok, value = pcall(scale)
-            if ok then resolvedScale = value end
+            if ok and not isSecret(value) then resolvedScale = value end
         end
-        if type(resolvedScale) ~= "number" then resolvedScale = 1 end
+        if isSecret(resolvedScale) or type(resolvedScale) ~= "number" then resolvedScale = 1 end
+
+        -- Secret color components can throw on comparison/arithmetic before
+        -- pcall(texture.SetVertexColor, ...) is even entered. Reject them before
+        -- setting the recursion guard so one protected update cannot permanently
+        -- strand this texture in guarded state.
+        if isSecret(r) or isSecret(g) or isSecret(b) or isSecret(a) then return end
+        local red = type(r) == "number" and r or 1
+        local green = type(g) == "number" and g or 0
+        local blue = type(b) == "number" and b or 0
         local alpha = type(a) == "number" and a or 1
+
         state.vertexGuard = true
-        pcall(texture.SetVertexColor, texture, r or 1, g or 0, b or 0, alpha * resolvedScale)
+        pcall(texture.SetVertexColor, texture, red, green, blue, alpha * resolvedScale)
         state.vertexGuard = false
     end
 
@@ -522,7 +537,8 @@ local function installThreatScaling()
     local function playerStatusIsRed()
         if not playerStatus or not playerStatus.GetVertexColor then return false end
         local ok, r, g, b = pcall(playerStatus.GetVertexColor, playerStatus)
-        return ok and type(r) == "number" and type(g) == "number" and type(b) == "number"
+        if not ok or isSecret(r) or isSecret(g) or isSecret(b) then return false end
+        return type(r) == "number" and type(g) == "number" and type(b) == "number"
             and r >= 0.80 and g <= 0.25 and b <= 0.25
     end
 
