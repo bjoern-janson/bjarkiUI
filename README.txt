@@ -1,4 +1,4 @@
-bjarkiUI 0.2.18-ultralight
+bjarkiUI 0.2.19-ultralight
 
 Always-on personal unit-frame presentation for WoW: Forever.
 
@@ -6,7 +6,7 @@ Always-on personal unit-frame presentation for WoW: Forever.
 - Explicit Blizzard power colors after applying the PRD atlas.
 - Brighter/more saturated class colors on player-unit health bars.
 - NPC unit-frame bars mirror useful nameplate state: tap-denied/tagged grey, engaged non-friendly red, otherwise selection color.
-- Own-pet health bars are green on PetFrame and whenever target/focus/derived units resolve to the player's pet.
+- Combat-pet health bars are stock green for both the player's pet and other players' pets when observed on target/focus/ToT/FoT.
 - Subtle red warning treatment preserves the accepted in-combat strength through one stable vertex-alpha channel. Target/focus threat rings use a quieter 0.08 multiplier until both the player and that observed unit report combat, then return to the existing 0.2025 strength. Pet attack-mode highlight remains 27%.
 - Player/target/focus level numerals reduced by 1 font point.
 - Player/target/focus LevelBackgroundCircle regions are kept hidden, preserving the plain level numeral while leaving high-level/skull and classification art alone.
@@ -28,3 +28,6 @@ v0.2.17-ultralight tones down the target/focus threat ring before the player is 
 v0.2.18-ultralight fixes the pre-combat discriminator: full target/focus warning strength now requires both player and observed unit to report combat, rather than player combat state alone.
 
 Current source corresponds to v0.2.18-ultralight.
+
+
+v0.2.19-ultralight makes combat-pet health bars universally green using positive `UnitIsOtherPlayersPet` identity plus the existing local-pet path. No new events or polling are added.
