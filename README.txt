@@ -1,4 +1,4 @@
-bjarkiUI 0.2.45-local
+bjarkiUI 0.2.57-local
 
 Ultralight native-UI presentation for WoW: Forever.
 
@@ -18,3 +18,6 @@ Current checkpoint highlights:
 
 `ARCHITECTURE.md` contains the detailed frame ownership, secret-value, event,
 name-renderer, Edit Mode, threat/rest, and Micro Menu lessons.
+
+
+Current source corresponds to v0.2.57-local.

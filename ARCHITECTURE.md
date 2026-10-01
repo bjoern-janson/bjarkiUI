@@ -6,7 +6,7 @@
 > failure modes, and design constraints learned while building and live-testing
 > bjarkiUI. It is intentionally more detailed than a user-facing README.
 >
-> Current reference build when this document was written: **0.2.45-local**.
+> Current reference build when this document was written: **0.2.57-local**.
 
 ---
 
@@ -421,6 +421,13 @@ This is a useful general pattern:
 
 > If a visual value keeps returning, hook the final renderer, not merely the
 > first population step.
+
+Forever combat adds one more boundary: Damage Meter `sourceName`, `nameText`,
+and the visible FontString text can become secret. For the local-player row,
+`isLocalPlayer` plus independently readable `UnitName("player")` authorizes a
+primary-name replacement without inspecting the secret source name. Never
+compare or pattern-match a secret visible string; even `replacement == visible`
+can taint and error.
 
 ---
 

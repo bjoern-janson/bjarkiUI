@@ -500,61 +500,142 @@ local function installCommunitiesPrimaryNames()
 end
 
 local damageMeterNameHookInstalled = false
+local damageMeterSourceInitHookInstalled = false
 local damageMeterWindowHooks = setmetatable({}, { __mode = "k" })
 local damageMeterNameRegionHooks = setmetatable({}, { __mode = "k" })
 
-local function primaryDamageMeterName(frame)
-    if not frame or frame.isCreature == true then return nil end
-
-    local fullName = frame.sourceName
-    if isSecret(fullName) or type(fullName) ~= "string" then return nil end
-
-    local primary = fullName:match("^%S+")
-    if not primary or primary == fullName then return nil end
-    return fullName, primary
+local function readableLocalPlayerName()
+    if not UnitName then return nil end
+    local ok, name = pcall(UnitName, "player")
+    if not ok or isSecret(name) or type(name) ~= "string" or name == "" then
+        return nil
+    end
+    return name
 end
 
-local function installDamageMeterEntryNameHook(frame)
-    if not frame or damageMeterNameRegionHooks[frame] or not hooksecurefunc then return end
+local function damageMeterPrimaryText(frame, visible)
+    if not frame then return nil end
 
-    local nameRegion = frame.GetName and frame:GetName()
-    if not nameRegion or not nameRegion.SetText then return end
+    local isCreature = frame.isCreature
+    if isSecret(isCreature) then isCreature = nil end
+    if isCreature == true then return nil end
 
-    local state = { guard = false }
-    damageMeterNameRegionHooks[frame] = state
-
-    -- Damage Meter rows are recycled and Blizzard can call UpdateName again long
-    -- after InitEntry. Own the final visible write instead of trying to predict
-    -- every refresh path which can restore sourceName.
-    hooksecurefunc(nameRegion, "SetText", function(self, visible)
-        if state.guard or isSecret(visible) or type(visible) ~= "string" then return end
-
-        local fullName, primary = primaryDamageMeterName(frame)
-        if not fullName then return end
-
-        local replaced, count = visible:gsub(escapePattern(fullName), primary, 1)
-        if count == 0 or replaced == visible then return end
-
-        state.guard = true
-        pcall(self.SetText, self, replaced)
-        state.guard = false
-    end)
-
-    -- Normalize a row that was already populated before the hook attached.
-    if nameRegion.GetText then
-        local ok, visible = pcall(nameRegion.GetText, nameRegion)
-        if ok and not isSecret(visible) and type(visible) == "string" then
-            local fullName, primary = primaryDamageMeterName(frame)
-            if fullName then
-                local replaced, count = visible:gsub(escapePattern(fullName), primary, 1)
-                if count > 0 and replaced ~= visible then
-                    state.guard = true
-                    pcall(nameRegion.SetText, nameRegion, replaced)
-                    state.guard = false
-                end
+    -- Normal path: combat-source name is readable, so preserve Blizzard's full
+    -- formatting and replace only the visible player-name payload.
+    local fullName = frame.sourceName
+    if not isSecret(fullName) and type(fullName) == "string" then
+        local primary = fullName:match("^%S+")
+        if primary and primary ~= fullName
+            and not isSecret(visible) and type(visible) == "string"
+        then
+            local replaced, count = visible:gsub(escapePattern(fullName), primary, 1)
+            if count > 0 and replaced ~= visible then
+                return replaced
             end
         end
     end
+
+    -- Forever can protect combat-source identity while the row is live. For the
+    -- local player's row we do not need to inspect that protected value:
+    -- isLocalPlayer supplies the relation, and UnitName("player") supplies the
+    -- primary display name independently.
+    local isLocalPlayer = frame.isLocalPlayer
+    if isSecret(isLocalPlayer) or isLocalPlayer ~= true then return nil end
+
+    local primary = readableLocalPlayerName()
+    if not primary then return nil end
+
+    -- Prefer preserving Blizzard's current text if it is readable: replace the
+    -- first local-name occurrence plus its secondary token, leaving rank and any
+    -- atlas markup untouched.
+    if not isSecret(visible) and type(visible) == "string" then
+        local escapedPrimary = escapePattern(primary)
+        local replaced, count = visible:gsub(
+            "(" .. escapedPrimary .. ")%s+[^%s]+",
+            "%1",
+            1
+        )
+        if count > 0 and replaced ~= visible then
+            return replaced
+        end
+    end
+
+    -- If the visible/source name itself is protected, reconstruct only the
+    -- Blizzard-owned name label from independently readable local facts.
+    local deathRecapID = frame.deathRecapID
+    if not isSecret(deathRecapID) and type(deathRecapID) == "number"
+        and deathRecapID ~= 0
+    then
+        return primary
+    end
+
+    local index = frame.index
+    if not isSecret(index) and type(index) == "number"
+        and type(DAMAGE_METER_SOURCE_NAME) == "string"
+    then
+        local ok, formatted = pcall(string.format, DAMAGE_METER_SOURCE_NAME, index, primary)
+        if ok and type(formatted) == "string" then
+            return formatted
+        end
+    end
+
+    return primary
+end
+
+local function normalizeDamageMeterEntryName(frame)
+    if not frame or not frame.GetName then return end
+
+    local okRegion, nameRegion = pcall(frame.GetName, frame)
+    if not okRegion or not nameRegion or not nameRegion.SetText then return end
+
+    local visible
+    if nameRegion.GetText then
+        local okVisible, value = pcall(nameRegion.GetText, nameRegion)
+        if okVisible then visible = value end
+    end
+
+    local replacement = damageMeterPrimaryText(frame, visible)
+    if not replacement or isSecret(replacement) then return end
+    -- A Damage Meter FontString can itself be a secret string in combat.
+    -- Never compare against it until its secrecy has been ruled out.
+    if not isSecret(visible) and replacement == visible then return end
+
+    local state = damageMeterNameRegionHooks[frame]
+    if state and state.guard then return end
+
+    if state then state.guard = true end
+    pcall(nameRegion.SetText, nameRegion, replacement)
+    if state then state.guard = false end
+end
+
+local function installDamageMeterEntryNameHook(frame)
+    if not frame or not hooksecurefunc then return end
+
+    if not damageMeterNameRegionHooks[frame] then
+        local okRegion, nameRegion = pcall(frame.GetName, frame)
+        if not okRegion or not nameRegion or not nameRegion.SetText then return end
+
+        local state = { guard = false }
+        damageMeterNameRegionHooks[frame] = state
+
+        -- Own the final visible write. Damage Meter rows are recycled and
+        -- Blizzard can call UpdateName long after row initialization.
+        hooksecurefunc(nameRegion, "SetText", function(self, visible)
+            if state.guard then return end
+
+            local replacement = damageMeterPrimaryText(frame, visible)
+            if not replacement or isSecret(replacement) then return end
+            -- A Damage Meter FontString can itself be a secret string in combat.
+            -- Never compare against it until its secrecy has been ruled out.
+            if not isSecret(visible) and replacement == visible then return end
+
+            state.guard = true
+            pcall(self.SetText, self, replacement)
+            state.guard = false
+        end)
+    end
+
+    normalizeDamageMeterEntryName(frame)
 end
 
 local function hookDamageMeterWindow(sessionWindow)
@@ -588,8 +669,23 @@ local function hookDamageMeterWindow(sessionWindow)
 end
 
 local function installDamageMeterPrimaryNames()
+    if not hooksecurefunc then return end
+
+    -- Catch every future source row at the point where combatSource has just
+    -- populated sourceName/isLocalPlayer. This closes the discovery gap for
+    -- rows created after our initial session-window scan.
+    if not damageMeterSourceInitHookInstalled
+        and _G.DamageMeterSourceEntryMixin
+        and type(_G.DamageMeterSourceEntryMixin.Init) == "function"
+    then
+        hooksecurefunc(_G.DamageMeterSourceEntryMixin, "Init", function(frame)
+            installDamageMeterEntryNameHook(frame)
+        end)
+        damageMeterSourceInitHookInstalled = true
+    end
+
     local meter = _G.DamageMeter
-    if not meter or not hooksecurefunc then return end
+    if not meter then return end
 
     if type(meter.ForEachSessionWindow) == "function" then
         pcall(meter.ForEachSessionWindow, meter, hookDamageMeterWindow)
