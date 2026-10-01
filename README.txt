@@ -1,35 +1,20 @@
-bjarkiUI 0.2.20-ultralight
+bjarkiUI 0.2.45-local
 
-Always-on personal unit-frame presentation for WoW: Forever.
+Ultralight native-UI presentation for WoW: Forever.
 
-- PRD fill atlas on player/target/focus/ToT/FoT/pet health and power bars.
-- Explicit Blizzard power colors after applying the PRD atlas.
-- Brighter/more saturated class colors on player-unit health bars.
-- NPC unit-frame bars mirror useful nameplate state: tap-denied/tagged grey, engaged non-friendly red, otherwise selection color.
-- Combat-pet health bars are stock green for both the player's pet and other players' pets when observed on target/focus/ToT/FoT.
-- Subtle red warning treatment preserves the accepted in-combat strength through one stable vertex-alpha channel. Target/focus threat rings use a quieter 0.08 multiplier until both the player and that observed unit report combat, then return to the existing 0.2025 strength. Pet attack-mode highlight remains 27%.
-- Player/target/focus level numerals reduced by 1 font point.
-- Player/target/focus LevelBackgroundCircle regions are kept hidden, preserving the plain level numeral while leaving high-level/skull and classification art alone.
-- Player combat feedback anchored 3 px above PersonalResourceDisplayFrame.
-- Player secondary names removed on Player/Target/Focus/ToT/FoT, player nameplates, and chat sender decoration.
-- Outgoing world damage text raised to WorldTextScreenY_v2=0.0425 and WorldTextCritScreenY_v2=0.0550.
-- Embeds the canonical `bjarkiUI` Edit Mode export. If no character-specific layout with that name exists, it is imported and activated once through Blizzard's Edit Mode APIs; subsequent manual edits are left alone.
+Current checkpoint highlights:
+- PRD-style fill atlas on tracked health/power bars.
+- Brighter/saturated player class colors; player combat pets remain stock green.
+- ToT/FoT bar color is re-derived after Blizzard reuses/rebinds the small frame.
+- Player combat, target/focus threat, pet cues, and rested border family use a clean 25% highlight scale.
+- Rested state uses a static yellow copy of the native PlayerFrame threat-flash geometry; Blizzard's pulsing StatusTexture stays hidden.
+- Secondary player names are removed from supported unit frames/nameplates/chat, Communities roster/chat, raid-style compact frames, and Blizzard Damage Meter visible text.
+- Damage Meter cleanup hooks the final row-name FontString `SetText` path rather than only row initialization.
+- `/bui levels` toggles player/target/focus level numbers while leaving Blizzard validity rules intact.
+- World damage text uses the configured raised CVar positions.
+- The named `bjarkiUI` Edit Mode layout is imported only when absent; existing user layout ownership is preserved.
+- Micro Menu optical alignment is implemented by shifting the visible `MicroMenu` child down 1 UI unit after Blizzard anchors it. `MicroMenuContainer` remains untouched because it is an anchor root for surrounding bottom UI.
+- No addon-owned cosmetic polling/OnUpdate loop.
 
-No SavedVariables. No slash commands. No portrait/aura code.
-
-v0.2.14-ultralight hardens class-color fallback, tagged-NPC grey handling, chat sender evidence, and red-warning attenuation without changing portrait/aura ownership.
-
-v0.2.15-ultralight embeds the canonical Edit Mode layout as a one-time character-specific import named `bjarkiUI`. Existing `bjarkiUI` layouts are never overwritten, and Edit Mode updates reapply only addon-owned presentation.
-
-v0.2.16-ultralight makes the plain level-number treatment explicit on player/target/focus by hiding only Blizzard's LevelBackgroundCircle region.
-
-v0.2.17-ultralight tones down the target/focus threat ring before the player is in combat, while preserving the accepted in-combat warning strength.
-
-v0.2.18-ultralight fixes the pre-combat discriminator: full target/focus warning strength now requires both player and observed unit to report combat, rather than player combat state alone.
-
-Current source corresponds to v0.2.20-ultralight.
-
-
-v0.2.19-ultralight makes combat-pet health bars universally green using positive `UnitIsOtherPlayersPet` identity plus the existing local-pet path. It also scopes `UNIT_TARGET`, `UNIT_DISPLAYPOWER`, and `UNIT_NAME_UPDATE` to the six unit tokens bjarkiUI actually paints, avoiding unrelated populated-area event traffic. No polling is added.
-
-v0.2.20-ultralight hardens chat sender and threat vertex-color paths against Forever secret values. Secret GUIDs fail closed before truth/pattern tests; secret color/alpha/scale values are rejected before arithmetic and before the vertex recursion guard is set, preventing one protected update from stranding threat attenuation in a permanently guarded state. No visual constants, frame ownership, layout, or event scope changed.
+`ARCHITECTURE.md` contains the detailed frame ownership, secret-value, event,
+name-renderer, Edit Mode, threat/rest, and Micro Menu lessons.
