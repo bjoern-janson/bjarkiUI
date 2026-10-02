@@ -28,6 +28,10 @@ local function visualMembers(frame)
     if type(members) ~= "table" then return nil end
 
     local ordered = {}
+
+    -- Blizzard's native PARTY assignment is:
+    -- Member1=player, Member2=party1, ... Member5=party4.
+    -- Never inspect/rewrite protected unit identity to achieve visual ordering.
     for i = 2, #members do
         if shown(members[i]) then
             ordered[#ordered + 1] = members[i]
@@ -36,6 +40,7 @@ local function visualMembers(frame)
     if shown(members[1]) then
         ordered[#ordered + 1] = members[1]
     end
+
     return ordered
 end
 
@@ -45,8 +50,10 @@ local function reanchorPets(frame, ordered, horizontal)
 
     local anchor = horizontal and ordered[1] or ordered[#ordered]
     local firstShown = true
+
     for _, pet in ipairs(pets) do
         pet:ClearAllPoints()
+
         if horizontal then
             if firstShown then
                 pet:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT")
@@ -56,6 +63,7 @@ local function reanchorPets(frame, ordered, horizontal)
         else
             pet:SetPoint("TOP", anchor, "BOTTOM")
         end
+
         if shown(pet) then
             anchor = pet
             firstShown = false
@@ -66,10 +74,13 @@ end
 local function applyVisualOrder(frame)
     frame = frame or _G.CompactPartyFrame
     if not frame then return end
+
+    -- Full raid groups retain Blizzard's native ordering/layout.
     if IsInRaid and IsInRaid() then
         pending = false
         return
     end
+
     if inCombat() then
         pending = true
         return
@@ -82,6 +93,7 @@ local function applyVisualOrder(frame)
     local edit = _G.EditModeManagerFrame
     local horizontal = edit and edit.ShouldRaidFrameUseHorizontalRaidGroups
         and edit:ShouldRaidFrameUseHorizontalRaidGroups(frame.groupType)
+
     local titleHeight = (frame.title and frame.title.GetHeight and frame.title:GetHeight()) or 0
 
     local first = ordered[1]
@@ -111,6 +123,8 @@ local function applyVisualOrder(frame)
         border:SetPoint("BOTTOMRIGHT", previous, "BOTTOMRIGHT", 2, -3)
     end
 
+    -- Pet frames keep Blizzard's native identity/order; only their presentation
+    -- anchor is rebased to the visually reordered member block.
     reanchorPets(frame, ordered, horizontal)
 end
 
@@ -129,6 +143,9 @@ local function install()
     if not hookedFrames[frame] and hooksecurefunc
         and type(frame.UpdateLayout) == "function" then
         hookedFrames[frame] = true
+
+        -- Native layout/refresh completes first. This hook never calls
+        -- RefreshMembers or UpdateLayout itself.
         hooksecurefunc(frame, "UpdateLayout", function(self)
             if self == frame then
                 applyVisualOrder(frame)
