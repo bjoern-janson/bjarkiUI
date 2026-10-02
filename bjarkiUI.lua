@@ -219,6 +219,19 @@ local function classToken(unit)
     end
 end
 
+local healthColorWrites = setmetatable({}, { __mode = "k" })
+local function setHealthColor(bar, ...)
+    healthColorWrites[bar] = true
+    pcall(bar.SetStatusBarColor, bar, ...)
+    healthColorWrites[bar] = nil
+end
+
+local function clearUnknownDerivedColor(bar, unit)
+    if unit == "targettarget" or unit == "focustarget" then
+        setHealthColor(bar, 0.5, 0.5, 0.5, 1)
+    end
+end
+
 local function applyHealthColor(bar, unit)
     if not bar or not bar.SetStatusBarColor or not unit then return end
 
@@ -240,7 +253,7 @@ local function applyHealthColor(bar, unit)
             r = math.min(1, (maximum + (r - maximum) * CLASS_SATURATION) * CLASS_BRIGHTNESS)
             g = math.min(1, (maximum + (g - maximum) * CLASS_SATURATION) * CLASS_BRIGHTNESS)
             b = math.min(1, (maximum + (b - maximum) * CLASS_SATURATION) * CLASS_BRIGHTNESS)
-            pcall(bar.SetStatusBarColor, bar, r, g, b, 1)
+            setHealthColor(bar, r, g, b, 1)
             return
         end
 
@@ -251,18 +264,18 @@ local function applyHealthColor(bar, unit)
             if ok and not isSecret(r) and not isSecret(g) and not isSecret(b)
                 and type(r) == "number" and type(g) == "number" and type(b) == "number" then
                 if type(a) ~= "number" or isSecret(a) then a = 1 end
-                pcall(bar.SetStatusBarColor, bar, r, g, b, a)
+                setHealthColor(bar, r, g, b, a)
                 return
             end
         end
-        pcall(bar.SetStatusBarColor, bar, 0.5, 0.5, 0.5, 1)
+        setHealthColor(bar, 0.5, 0.5, 0.5, 1)
         return
     end
 
     -- Combat pets use Blizzard's stock green health language regardless of
     -- owner/class/faction. Do this only after ruling out a real player.
     if isPetUnit(unit) then
-        pcall(bar.SetStatusBarColor, bar, 0, 1, 0, 1)
+        setHealthColor(bar, 0, 1, 0, 1)
         return
     end
 
@@ -270,7 +283,8 @@ local function applyHealthColor(bar, unit)
     -- than staying permanently green or merely inheriting reaction color.
     -- This preserves red/yellow/green selection colors while also surfacing
     -- important state such as a tap-denied/tagged NPC becoming grey.
-    if UnitExists and not UnitExists(unit) then return end
+    -- An unreadable/absent new referent must not inherit the old actor's tint.
+    if UnitExists and not UnitExists(unit) then clearUnknownDerivedColor(bar, unit); return end
 
     local function readableBool(fn, ...)
         if not fn then return nil end
@@ -282,7 +296,7 @@ local function applyHealthColor(bar, unit)
     local connected = readableBool(UnitIsConnected, unit)
     local dead = readableBool(UnitIsDead, unit)
     if connected == false or dead == true then
-        pcall(bar.SetStatusBarColor, bar, 0.5, 0.5, 0.5, 1)
+        setHealthColor(bar, 0.5, 0.5, 0.5, 1)
         return
     end
 
@@ -291,7 +305,7 @@ local function applyHealthColor(bar, unit)
     if tapDenied == true and playerControlled ~= true then
         -- Matches Blizzard compact/nameplate convention for an NPC whose tap
         -- belongs elsewhere.
-        pcall(bar.SetStatusBarColor, bar, 0.9, 0.9, 0.9, 1)
+        setHealthColor(bar, 0.9, 0.9, 0.9, 1)
         return
     end
 
@@ -302,21 +316,39 @@ local function applyHealthColor(bar, unit)
     if friend == false and UnitDetailedThreatSituation then
         local ok, _isTanking, threatStatus = pcall(UnitDetailedThreatSituation, "player", unit)
         if ok and not isSecret(threatStatus) and type(threatStatus) == "number" then
-            pcall(bar.SetStatusBarColor, bar, 1, 0, 0, 1)
+            setHealthColor(bar, 1, 0, 0, 1)
             return
         end
     end
 
-    if not UnitSelectionColor then return end
+    if not UnitSelectionColor then clearUnknownDerivedColor(bar, unit); return end
     local ok, r, g, b, a = pcall(UnitSelectionColor, unit)
     if not ok or isSecret(r) or isSecret(g) or isSecret(b)
-        or type(r) ~= "number" or type(g) ~= "number" or type(b) ~= "number" then return end
+        or type(r) ~= "number" or type(g) ~= "number" or type(b) ~= "number" then
+        clearUnknownDerivedColor(bar, unit)
+        return
+    end
     if type(a) ~= "number" or isSecret(a) then a = 1 end
-    pcall(bar.SetStatusBarColor, bar, r, g, b, a)
+    setHealthColor(bar, r, g, b, a)
+end
+
+local derivedColorHooks = setmetatable({}, { __mode = "k" })
+local function installDerivedColorHook(bar, unit)
+    if not bar or derivedColorHooks[bar] or not hooksecurefunc or not bar.SetStatusBarColor then return end
+    if unit ~= "targettarget" and unit ~= "focustarget" then return end
+    derivedColorHooks[bar] = true
+    -- Own the final tint write on these two reusable bars only. Re-resolve the
+    -- current referent; a delayed native color write must not restore an old one.
+    hooksecurefunc(bar, "SetStatusBarColor", function(self)
+        if not healthColorWrites[self] and self == healthBar(unit) then
+            applyHealthColor(self, unit)
+        end
+    end)
 end
 
 local function applyUnit(unit)
     local health, power = healthBar(unit), powerBar(unit)
+    installDerivedColorHook(health, unit)
     applyAtlas(health)
     applyAtlas(power)
     applyHealthColor(health, unit)
@@ -1026,9 +1058,9 @@ local function installHooks()
         hooksecurefunc("UnitFrame_Update", function(frame)
             local unit = trackedFrame(frame)
             if unit then
-                -- TargetOfTargetMixin:Update() finishes with UnitFrame_Update().
-                -- Reapply both bars here so reusable ToT/FoT frames cannot retain
-                -- a tint from their previous referent (notably pet green).
+                -- TargetOfTargetMixin:Update() calls UnitFrame_Update before its
+                -- dead/portrait checks. Reapply after the unit rebind here; the
+                -- two derived bars also guard subsequent native tint writes.
                 applyUnit(unit)
                 applyPrimaryName(unit)
             end
