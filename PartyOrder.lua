@@ -1,15 +1,14 @@
 -- Visual-only compact PARTY ordering.
 --
--- IMPORTANT: do not replace CompactPartyFrame.flowSortFunc and do not call
--- SetFlowSortFunction(). That setter synchronously calls RefreshMembers(), which
--- makes Blizzard's compact-unit refresh execute downstream of addon-tainted
--- code. In Forever, health-bar colors can be secret numbers; Blizzard's own
--- UpdateHealthColor then compares those values and faults under tainted
--- execution.
+-- Blizzard owns unit assignment and compact-frame refresh. This module only
+-- changes the final visual anchors after Blizzard has completed RefreshMembers.
 --
--- Keep Blizzard's native comparator/unit assignment. Once Blizzard has finished
--- its native layout, only rearrange the already-created member-frame anchors:
--- party1, party2, party3, party4, player. This is presentation ownership only.
+-- Desired order:
+-- party1, party2, party3, party4, player
+--
+-- Do not call SetFlowSortFunction(): in Forever that can synchronously enter
+-- Blizzard's compact-unit refresh from addon-tainted execution and fail when
+-- Blizzard compares secret health-color values.
 
 local hookedFrames = setmetatable({}, { __mode = "k" })
 local generatorHooked = false
@@ -29,14 +28,14 @@ local function visualMembers(frame)
 
     local ordered = {}
 
-    -- Blizzard's native PARTY assignment is:
-    -- Member1=player, Member2=party1, ... Member5=party4.
-    -- Never inspect/rewrite protected unit identity to achieve visual ordering.
+    -- Native party assignment is normally:
+    -- Member1=player, Member2=party1, Member3=party2, ...
     for i = 2, #members do
         if shown(members[i]) then
             ordered[#ordered + 1] = members[i]
         end
     end
+
     if shown(members[1]) then
         ordered[#ordered + 1] = members[1]
     end
@@ -49,24 +48,23 @@ local function reanchorPets(frame, ordered, horizontal)
     if type(pets) ~= "table" or #ordered == 0 then return end
 
     local anchor = horizontal and ordered[1] or ordered[#ordered]
-    local firstShown = true
+    local previousShown
 
     for _, pet in ipairs(pets) do
         pet:ClearAllPoints()
 
         if horizontal then
-            if firstShown then
+            if not previousShown then
                 pet:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT")
             else
-                pet:SetPoint("LEFT", anchor, "RIGHT")
+                pet:SetPoint("LEFT", previousShown, "RIGHT")
             end
         else
             pet:SetPoint("TOP", anchor, "BOTTOM")
         end
 
         if shown(pet) then
-            anchor = pet
-            firstShown = false
+            previousShown = pet
         end
     end
 end
@@ -75,7 +73,7 @@ local function applyVisualOrder(frame)
     frame = frame or _G.CompactPartyFrame
     if not frame then return end
 
-    -- Full raid groups retain Blizzard's native ordering/layout.
+    -- This feature is only for raid-style PARTY frames.
     if IsInRaid and IsInRaid() then
         pending = false
         return
@@ -98,6 +96,7 @@ local function applyVisualOrder(frame)
 
     local first = ordered[1]
     first:ClearAllPoints()
+
     if horizontal then
         first:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -titleHeight)
     else
@@ -108,11 +107,13 @@ local function applyVisualOrder(frame)
     for i = 2, #ordered do
         local member = ordered[i]
         member:ClearAllPoints()
+
         if horizontal then
             member:SetPoint("LEFT", previous, "RIGHT", 0, 0)
         else
             member:SetPoint("TOP", previous, "BOTTOM", 0, 0)
         end
+
         previous = member
     end
 
@@ -123,17 +124,17 @@ local function applyVisualOrder(frame)
         border:SetPoint("BOTTOMRIGHT", previous, "BOTTOMRIGHT", 2, -3)
     end
 
-    -- Pet frames keep Blizzard's native identity/order; only their presentation
-    -- anchor is rebased to the visually reordered member block.
     reanchorPets(frame, ordered, horizontal)
 end
 
 local function install()
     if not generatorHooked and hooksecurefunc
-        and type(_G.CompactPartyFrame_Generate) == "function" then
+        and type(_G.CompactPartyFrame_Generate) == "function"
+    then
         generatorHooked = true
-        hooksecurefunc("CompactPartyFrame_Generate", function()
+        hooksecurefunc("CompactPartyFrame_Generate", function(frame)
             install()
+            applyVisualOrder(frame or _G.CompactPartyFrame)
         end)
     end
 
@@ -141,14 +142,21 @@ local function install()
     if not frame then return end
 
     if not hookedFrames[frame] and hooksecurefunc
-        and type(frame.UpdateLayout) == "function" then
+        and type(frame.RefreshMembers) == "function"
+    then
         hookedFrames[frame] = true
 
-        -- Native layout/refresh completes first. This hook never calls
-        -- RefreshMembers or UpdateLayout itself.
-        hooksecurefunc(frame, "UpdateLayout", function(self)
+        -- RefreshMembers has already:
+        --   1. chosen the native unit tokens,
+        --   2. run CompactUnitFrame_SetUpFrame / SetUnit,
+        --   3. updated health/power/name state,
+        --   4. run the native layout,
+        --   5. updated PartyFrame padding.
+        --
+        -- Reanchor only after all of that has returned.
+        hooksecurefunc(frame, "RefreshMembers", function(self)
             if self == frame then
-                applyVisualOrder(frame)
+                applyVisualOrder(self)
             end
         end)
     end
@@ -160,7 +168,6 @@ local events = CreateFrame("Frame")
 for _, event in ipairs({
     "PLAYER_LOGIN",
     "PLAYER_ENTERING_WORLD",
-    "GROUP_ROSTER_UPDATE",
     "EDIT_MODE_LAYOUTS_UPDATED",
     "ADDON_LOADED",
     "PLAYER_REGEN_ENABLED",
@@ -170,6 +177,7 @@ end
 
 events:SetScript("OnEvent", function(_, event)
     install()
+
     if event == "PLAYER_REGEN_ENABLED" and pending then
         applyVisualOrder(_G.CompactPartyFrame)
     end

@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-This document describes the current implementation of **bjarkiUI 0.2.60-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
+This document describes the current implementation of **bjarkiUI 0.2.61-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -126,7 +126,7 @@ Outgoing world combat text uses two CVars:
 
 Incoming player hit text is anchored above the Personal Resource Display using Blizzard's existing combat-text frame.
 
-The previous experimental PRD movement-speed/duel-distance module is not present in 0.2.60.
+The previous experimental PRD movement-speed/duel-distance module is not present in 0.2.61.
 
 ## 8. Party frame ordering
 
@@ -140,17 +140,9 @@ For smaller groups, missing party slots simply disappear and the player remains 
 
 The module does **not** replace Blizzard's party comparator and does **not** call `SetFlowSortFunction()`.
 
-That earlier approach caused Blizzard's compact-unit refresh to run downstream of addon-tainted execution; in Forever, some health-bar color values can be secret, and Blizzard's own color comparison could then error.
+The current implementation lets Blizzard finish `RefreshMembers()` first. A post-hook then reanchors the already-created visible member frames. This means Blizzard keeps the native unit assignment, compact-unit refresh, and normal frame setup; the addon changes only the final out-of-combat anchors.
 
-The current implementation instead:
-
-1. lets Blizzard assign units and finish its normal party-frame layout;
-2. hooks after the native layout;
-3. reanchors only the already-created visible member frames;
-4. performs that reanchoring only out of combat;
-5. leaves full raid ordering native.
-
-Pet-frame anchors are adjusted to remain under the visually reordered party block.
+Full raid ordering is left native. Pet-frame anchors are adjusted to remain under the visually reordered party block.
 
 ## 9. Event model
 
@@ -165,6 +157,8 @@ Examples:
 - `UNIT_PET` refreshes only the local pet presentation.
 
 Optional Blizzard modules such as Communities and Damage Meter are hooked when they load.
+
+`PartyOrder.lua` installs its hook on login/world-entry/module availability and retries deferred visual ordering after leaving combat.
 
 ## 10. Protected and secret values
 
