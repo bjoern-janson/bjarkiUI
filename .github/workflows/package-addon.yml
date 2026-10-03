@@ -1,0 +1,21 @@
+name: Package addon
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stage addon
+        run: |
+          mkdir -p dist/bjarkiUI
+          cp bjarkiUI.lua PartyOrder.lua bjarkiUI.toc bjarkiUI_Camelot.toc dist/bjarkiUI/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bjarkiUI
+          path: dist
+          if-no-files-found: error
