@@ -577,35 +577,54 @@ end
 local communitiesNameHookInstalled = false
 local communitiesChatNameHookInstalled = false
 
-local function shortenCommunityFormattedMessage(formatted, message)
-    if isSecret(formatted) or type(formatted) ~= "string"
-        or type(message) ~= "table" or type(message.author) ~= "table"
-    then
-        return formatted
-    end
+local function shortenCommunityVisibleText(text)
+    if isSecret(text) or type(text) ~= "string" then return text end
 
-    local author = message.author
-    local clubType = author.clubType
-    if clubType ~= Enum.ClubType.Character and clubType ~= Enum.ClubType.Guild then
-        return formatted
-    end
+    -- Communities/Guild character messages use playerCommunity hyperlinks:
+    --   |HplayerCommunity:<full name>:...|h<visible name>|h
+    -- Preserve the full hyperlink payload for whisper/report actions and shorten
+    -- only the already-rendered display text. No secret message table is touched.
+    local result = text:gsub(
+        "(|HplayerCommunity:([^:|]+):.-|h)(.-)(|h)",
+        function(openLink, fullName, display, closeLink)
+            if type(fullName) ~= "string" or type(display) ~= "string" then
+                return openLink .. display .. closeLink
+            end
 
-    local name = author.name
-    if isSecret(name) or type(name) ~= "string" then return formatted end
-    local primary = name:match("^%S+")
-    if not primary or primary == name then return formatted end
+            local primary = fullName:match("^%S+")
+            if not primary or primary == fullName then
+                return openLink .. display .. closeLink
+            end
 
-    -- Keep the full name inside the hyperlink payload so clicks/whispers/report
-    -- actions still resolve the real member. Change only the visible |h...|h text.
-    local result = formatted:gsub("(|H.-|h)(.-)(|h)", function(openLink, display, closeLink)
-        local replaced, count = display:gsub(escapePattern(name), primary, 1)
-        if count > 0 then
-            return openLink .. replaced .. closeLink
-        end
-        return openLink .. display .. closeLink
-    end, 1)
+            local replaced, count = display:gsub(escapePattern(fullName), primary, 1)
+            if count > 0 then
+                return openLink .. replaced .. closeLink
+            end
+            return openLink .. display .. closeLink
+        end,
+        1
+    )
 
     return result
+end
+
+local function applyCommunityVisibleNames(messageFrame)
+    if not messageFrame or type(messageFrame.visibleLines) ~= "table" then return end
+
+    -- This callback runs after ScrollingMessageFrame has finished converting
+    -- native/secret message data into visible FontStrings. Stay strictly on that
+    -- presentation surface; never inspect C_Club message tables here.
+    for _, line in ipairs(messageFrame.visibleLines) do
+        if line and line.GetText and line.SetText then
+            local ok, text = pcall(line.GetText, line)
+            if ok and not isSecret(text) and type(text) == "string" then
+                local shortened = shortenCommunityVisibleText(text)
+                if shortened ~= text then
+                    pcall(line.SetText, line, shortened)
+                end
+            end
+        end
+    end
 end
 
 local function installCommunitiesPrimaryNames()
@@ -638,27 +657,20 @@ local function installCommunitiesPrimaryNames()
         end
     end
 
-    -- The live CommunitiesFrame.Chat receives mixin methods when the frame is
-    -- created. Replacing CommunitiesChatMixin afterward does not update that
-    -- already-created object, so patch the live formatter directly.
     if not communitiesChatNameHookInstalled then
         local communitiesFrame = _G.CommunitiesFrame
         local chat = communitiesFrame and communitiesFrame.Chat
-        if chat and type(chat.FormatMessage) == "function" then
-            local originalFormatMessage = chat.FormatMessage
-
-            chat.FormatMessage = function(self, clubId, streamId, message)
-                local formatted = originalFormatMessage(self, clubId, streamId, message)
-                return shortenCommunityFormattedMessage(formatted, message)
-            end
-
+        local messageFrame = chat and chat.MessageFrame
+        if messageFrame and type(messageFrame.AddOnDisplayRefreshedCallback) == "function" then
+            -- Blizzard's native FormatMessage remains completely untouched.
+            -- Its secret message table is consumed in native execution first;
+            -- bjarkiUI only receives the finished visible ScrollingMessageFrame.
+            messageFrame:AddOnDisplayRefreshedCallback(applyCommunityVisibleNames)
             communitiesChatNameHookInstalled = true
 
-            -- Existing history was formatted before this wrapper existed.
-            -- Rebuild it once so the currently open Guild/Communities tab updates.
-            if type(chat.DisplayChat) == "function" then
-                pcall(chat.DisplayChat, chat)
-            end
+            -- The current display may already contain history when the addon
+            -- installs this callback, so apply once immediately as well.
+            applyCommunityVisibleNames(messageFrame)
         end
     end
 end
