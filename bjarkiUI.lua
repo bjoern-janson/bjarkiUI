@@ -1245,77 +1245,6 @@ local function installDerivedDebuffRefresh()
     derivedDebuffRefreshHookInstalled = true
 end
 
-local compactDebuffBorderHookInstalled = false
-
-local function isCompactPartyOrRaidFrame(frame)
-    local enums = _G.CompactRaidGroupTypeEnum
-    local groupType = frame and frame.groupType
-    return type(enums) == "table"
-        and (groupType == enums.Party or groupType == enums.Raid)
-end
-
-local function suppressCompactDebuffBorderGeometry(frame, explicitAuraSize, refreshSettings)
-    if not isCompactPartyOrRaidFrame(frame) then return end
-
-    local auraSize = explicitAuraSize
-    if (type(auraSize) ~= "number" or isSecret(auraSize))
-        and frame.GetDebuffAuraSize
-    then
-        local ok, value = pcall(frame.GetDebuffAuraSize, frame)
-        if ok and not isSecret(value) and type(value) == "number" then
-            auraSize = value
-        end
-    end
-    if type(auraSize) ~= "number" or isSecret(auraSize) or auraSize <= 0 then return end
-
-    -- Private aura buttons are forbidden to addon code, so hiding DebuffBorder
-    -- after PrivateAuraMixin:Update is not a reliable ownership boundary. Feed
-    -- the secure renderer a border scale that makes its own border geometry 0x0:
-    --   borderSize = auraWidth + (5 * borderScale)
-    frame.debuffBorderScale = -(auraSize / 5)
-
-    if refreshSettings and not (InCombatLockdown and InCombatLockdown())
-        and frame.TriggerPrivateAuraSettingsUpdate
-    then
-        pcall(frame.TriggerPrivateAuraSettingsUpdate, frame)
-    end
-end
-
-local function refreshExistingCompactDebuffBorders()
-    local party = _G.CompactPartyFrame
-    local members = party and party.memberUnitFrames
-    if type(members) == "table" then
-        for _, frame in ipairs(members) do
-            suppressCompactDebuffBorderGeometry(frame, nil, true)
-        end
-    end
-
-    local raid = _G.CompactRaidFrameContainer
-    if raid and type(raid.ApplyToFrames) == "function" then
-        pcall(raid.ApplyToFrames, raid, "normal", function(frame)
-            suppressCompactDebuffBorderGeometry(frame, nil, true)
-        end)
-    end
-end
-
-local function installCompactDebuffBorderSuppression()
-    if not compactDebuffBorderHookInstalled and hooksecurefunc then
-        local mixin = _G.PrivateAuraAnchorSettingsContainerMixin
-        if type(mixin) == "table" and type(mixin.SetDebuffAuraSize) == "function" then
-            -- ApplyAuraLayout writes border scale first, then aura size, then asks
-            -- the secure private-aura renderer to update. Overriding the ordinary
-            -- Lua field here reaches that renderer without touching forbidden
-            -- PrivateAura frames.
-            hooksecurefunc(mixin, "SetDebuffAuraSize", function(self, auraSize)
-                suppressCompactDebuffBorderGeometry(self, auraSize, false)
-            end)
-            compactDebuffBorderHookInstalled = true
-        end
-    end
-
-    refreshExistingCompactDebuffBorders()
-end
-
 local legacyNotificationSuppressed = setmetatable({}, { __mode = "k" })
 
 local function isLegacyMicroButton(button)
@@ -1460,7 +1389,6 @@ events:SetScript("OnEvent", function(_, event, unit)
             installGuildNotificationPipSuppression()
             suppressLegacyNotificationPip()
         elseif unit == "Blizzard_PrivateAurasUI" then
-            installCompactDebuffBorderSuppression()
         end
         return
     elseif event == "PLAYER_LOGIN" then
@@ -1470,7 +1398,6 @@ events:SetScript("OnEvent", function(_, event, unit)
         installLossOfControlPresentation()
         installHooks()
         installDerivedDebuffRefresh()
-        installCompactDebuffBorderSuppression()
         installMicroMenuChildOffset()
         installGuildNotificationPipSuppression()
         applyStaticFonts()
@@ -1482,7 +1409,6 @@ events:SetScript("OnEvent", function(_, event, unit)
         anchorUIErrorsFrame()
         installLossOfControlPresentation()
         installDerivedDebuffRefresh()
-        installCompactDebuffBorderSuppression()
         installMicroMenuChildOffset()
         installGuildNotificationPipSuppression()
         applyStaticFonts()
