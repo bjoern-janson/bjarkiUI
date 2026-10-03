@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-This document describes the current implementation of **bjarkiUI 0.2.78-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
+This document describes the current implementation of **bjarkiUI 0.2.79-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -301,3 +301,26 @@ paths and adds read-only diagnostics.
   Blizzard method cannot prevent the other from being retried later;
 - `/bui audit` reports hook state, derived-frame availability, and compact-party
   `debuffBorderScale` values without repairing or mutating them.
+
+
+## 20. Protected-input and party-order hardening
+
+Version 0.2.79 tightens presentation ownership without changing the intended
+visual layout.
+
+- Blizzard-provided unit-token fields are checked for secrecy/readability before
+  comparison, pattern matching, or use as unit API arguments.
+- compact-party ordering treats the assigned unit token as the warrant for
+  reordering. If a shown member's token is inaccessible, the addon leaves the
+  native layout untouched instead of inferring identity from frame position.
+- party-frame visibility, Edit Mode state, raid state, and title height are read
+  through guarded helpers rather than assumed to be ordinary values.
+- post-hooks on Blizzard party layout writers no longer reanchor frames inside
+  the native update call stack. They coalesce one repair for the next tick,
+  where live membership and combat state are checked again.
+- reconnect/disconnect recovery uses that same deferred path instead of a
+  separate scheduling mechanism.
+
+The maintenance invariant is that **presentation authority follows readable
+identity and runs outside Blizzard's protected state-transition stack whenever
+possible**.
