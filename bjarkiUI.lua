@@ -1531,7 +1531,15 @@ events:SetScript("OnEvent", function(_, event, unit)
         elseif unit == "Blizzard_MicroMenu" then
             installGuildNotificationPipSuppression()
             suppressLegacyNotificationPip()
-        elseif unit == "Blizzard_PrivateAurasUI" then
+        elseif unit == "Blizzard_PrivateAurasUI"
+            or unit == "Blizzard_CompactRaidFrames"
+            or unit == "Blizzard_CompactUnitFrame"
+            or unit == "Blizzard_CompactRaidFrameContainer"
+            or unit == "Blizzard_CompactPartyFrames"
+        then
+            -- Compact-frame functions can become available after bjarkiUI's
+            -- PLAYER_LOGIN path. Retry at the module boundary rather than
+            -- claiming the hook is installed while the native writer is absent.
             installCompactDebuffBorderNeutralization()
         end
         return
