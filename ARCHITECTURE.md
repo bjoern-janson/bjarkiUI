@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-This document describes the current implementation of **bjarkiUI 0.2.77-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
+This document describes the current implementation of **bjarkiUI 0.2.78-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -285,3 +285,19 @@ No `CompactUnitFrame` fields, private-aura settings, aura tables, health values,
 or heal-prediction state are read or modified. Because private aura frames are
 pooled, a border hidden by bjarkiUI is restored to alpha 1 if that same Texture is
 later reused on a non-compact presentation.
+
+
+## 19. Conservative hardening and audit
+
+Version 0.2.78 makes no new presentation claims. It narrows two UNKNOWN-state
+paths and adds read-only diagnostics.
+
+- tap-denied NPC coloring now requires an explicit readable
+  `UnitPlayerControlled == false`; UNKNOWN no longer authorizes an NPC tint;
+- Damage Meter normal name shortening requires an explicit readable
+  `isCreature == false`; secret/UNKNOWN creature status falls through to the
+  independently warranted local-player path only;
+- Loss of Control post-hooks track installation independently, so one unavailable
+  Blizzard method cannot prevent the other from being retried later;
+- `/bui audit` reports hook state, derived-frame availability, and compact-party
+  `debuffBorderScale` values without repairing or mutating them.

@@ -1,3 +1,4 @@
+local BJARKI_UI_VERSION = "0.2.78-local"
 local PRD_ATLAS = "UI-HUD-CoolDownManager-Bar"
 local CLASS_SATURATION = 1.18
 local CLASS_BRIGHTNESS = 1.08
@@ -90,7 +91,8 @@ local function anchorUIErrorsFrame()
     pcall(frame.SetPoint, frame, "TOP", UIParent, "TOP", 0, UI_ERRORS_Y)
 end
 
-local lossOfControlHooksInstalled = false
+local lossOfControlSetUpHookInstalled = false
+local lossOfControlSetTimeHookInstalled = false
 
 local function stripLossOfControlPresentation()
     local frame = _G.LossOfControlFrame
@@ -153,14 +155,15 @@ local function installLossOfControlPresentation()
     local frame = _G.LossOfControlFrame
     if not frame then return end
 
-    if not lossOfControlHooksInstalled and hooksecurefunc then
-        if type(frame.SetUpDisplay) == "function" then
+    if hooksecurefunc then
+        if not lossOfControlSetUpHookInstalled and type(frame.SetUpDisplay) == "function" then
             hooksecurefunc(frame, "SetUpDisplay", stripLossOfControlPresentation)
+            lossOfControlSetUpHookInstalled = true
         end
-        if type(frame.SetTime) == "function" then
+        if not lossOfControlSetTimeHookInstalled and type(frame.SetTime) == "function" then
             hooksecurefunc(frame, "SetTime", stripLossOfControlPresentation)
+            lossOfControlSetTimeHookInstalled = true
         end
-        lossOfControlHooksInstalled = true
     end
 
     stripLossOfControlPresentation()
@@ -437,7 +440,7 @@ local function applyHealthColor(bar, unit)
 
     local tapDenied = readableBool(UnitIsTapDenied, unit)
     local playerControlled = readableBool(UnitPlayerControlled, unit)
-    if tapDenied == true and playerControlled ~= true then
+    if tapDenied == true and playerControlled == false then
         -- Matches Blizzard compact/nameplate convention for an NPC whose tap
         -- belongs elsewhere.
         setHealthColor(bar, 0.9, 0.9, 0.9, 1)
@@ -697,20 +700,22 @@ local function damageMeterPrimaryText(frame, visible)
     if not frame then return nil end
 
     local isCreature = frame.isCreature
-    if isSecret(isCreature) then isCreature = nil end
-    if isCreature == true then return nil end
+    local creatureReadable = not isSecret(isCreature) and type(isCreature) == "boolean"
+    if creatureReadable and isCreature == true then return nil end
 
-    -- Normal path: combat-source name is readable, so preserve Blizzard's full
-    -- formatting and replace only the visible player-name payload.
-    local fullName = frame.sourceName
-    if not isSecret(fullName) and type(fullName) == "string" then
-        local primary = fullName:match("^%S+")
-        if primary and primary ~= fullName
-            and not isSecret(visible) and type(visible) == "string"
-        then
-            local replaced, count = visible:gsub(escapePattern(fullName), primary, 1)
-            if count > 0 and replaced ~= visible then
-                return replaced
+    -- Normal path is authorized only by an explicit readable non-creature
+    -- witness. UNKNOWN must not silently become "player enough to rewrite".
+    if creatureReadable and isCreature == false then
+        local fullName = frame.sourceName
+        if not isSecret(fullName) and type(fullName) == "string" then
+            local primary = fullName:match("^%S+")
+            if primary and primary ~= fullName
+                and not isSecret(visible) and type(visible) == "string"
+            then
+                local replaced, count = visible:gsub(escapePattern(fullName), primary, 1)
+                if count > 0 and replaced ~= visible then
+                    return replaced
+                end
             end
         end
     end
@@ -1538,3 +1543,65 @@ petStateEvents:RegisterUnitEvent("UNIT_PET", "player")
 petStateEvents:SetScript("OnEvent", function()
     applyUnit("pet")
 end)
+
+-- Read-only diagnostics. This intentionally reports state without repairing it.
+local function printUIAudit()
+    local function out(message)
+        if DEFAULT_CHAT_FRAME then
+            DEFAULT_CHAT_FRAME:AddMessage("|cff74c7ecbjarkiUI|r: " .. tostring(message))
+        end
+    end
+
+    out("audit version=" .. BJARKI_UI_VERSION)
+    out("hooks locSetup=" .. tostring(lossOfControlSetUpHookInstalled)
+        .. " locTime=" .. tostring(lossOfControlSetTimeHookInstalled)
+        .. " derivedDebuffs=" .. tostring(derivedDebuffRefreshHookInstalled)
+        .. " compactBorder=" .. tostring(compactDebuffBorderAtlasHookInstalled)
+        .. " communitiesRoster=" .. tostring(communitiesNameHookInstalled)
+        .. " communitiesChat=" .. tostring(communitiesChatNameHookInstalled)
+        .. " damageMeter=" .. tostring(damageMeterNameHookInstalled)
+        .. " damageMeterInit=" .. tostring(damageMeterSourceInitHookInstalled))
+
+    for _, unit in ipairs({ "targettarget", "focustarget" }) do
+        local frame = smallFrame(unit)
+        local bar = healthBar(unit)
+        out(unit
+            .. " frame=" .. tostring(frame ~= nil)
+            .. " healthBar=" .. tostring(bar ~= nil)
+            .. " derivedColorHook=" .. tostring(bar and derivedColorHooks[bar] == true))
+    end
+
+    local party = _G.CompactPartyFrame
+    local members = party and party.memberUnitFrames
+    if type(members) == "table" then
+        for index, frame in ipairs(members) do
+            local scale = frame and frame.debuffBorderScale
+            local state
+            if isSecret(scale) then
+                state = "secret"
+            elseif type(scale) == "number" then
+                state = tostring(scale)
+                if scale < 0 then state = state .. " WARNING_NEGATIVE" end
+            else
+                state = tostring(scale)
+            end
+            out("partyMember" .. index .. " debuffBorderScale=" .. state)
+        end
+    end
+end
+
+local previousBJarkiUISlash = SlashCmdList.BJARKIUI
+SlashCmdList.BJARKIUI = function(message)
+    local command = tostring(message or ""):lower():match("^%s*(%S*)")
+    if command == "audit" then
+        printUIAudit()
+        return
+    elseif command == "" or command == "help" then
+        print("bjarkiUI: /bui levels [on|off] | audit")
+        return
+    end
+    if previousBJarkiUISlash then
+        previousBJarkiUISlash(message)
+    end
+end
+
