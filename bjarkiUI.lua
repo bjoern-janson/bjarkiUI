@@ -1245,6 +1245,58 @@ local function installDerivedDebuffRefresh()
     derivedDebuffRefreshHookInstalled = true
 end
 
+local compactDebuffBorderAtlasHookInstalled = false
+
+local function isCompactPartyRaidAuraBorder(borderRegion)
+    if not borderRegion or not borderRegion.GetParent then return false end
+
+    local okAura, auraFrame = pcall(borderRegion.GetParent, borderRegion)
+    if not okAura or not auraFrame or not auraFrame.GetParent then return false end
+
+    local okContainer, container = pcall(auraFrame.GetParent, auraFrame)
+    if not okContainer or not container or not container.GetName then return false end
+
+    local okName, name = pcall(container.GetName, container)
+    if not okName or isSecret(name) or type(name) ~= "string" then return false end
+
+    return name:match("^CompactPartyFrameMember%d+$") ~= nil
+        or name:match("^CompactRaidGroup%d+Member%d+$") ~= nil
+        or name:match("^CompactRaidFrame%d+$") ~= nil
+end
+
+local function installCompactDebuffBorderNeutralization()
+    if compactDebuffBorderAtlasHookInstalled or not hooksecurefunc
+        or type(AuraUtil) ~= "table"
+        or type(AuraUtil.SetAuraBorderAtlas) ~= "function"
+    then
+        return
+    end
+
+    -- Stay at the final presentation write. Blizzard has already consumed the
+    -- secret aura/dispel data and selected an atlas before this post-hook runs.
+    -- We inspect only the fixed frame ancestry and replace the colored atlas
+    -- with Blizzard's own neutral/default debuff border. No compact-frame Lua
+    -- fields, private aura settings, or secret aura tables are modified.
+    hooksecurefunc(AuraUtil, "SetAuraBorderAtlas", function(borderRegion)
+        if not isCompactPartyRaidAuraBorder(borderRegion)
+            or not borderRegion.SetAtlas
+        then
+            return
+        end
+
+        local ignoreAtlasSize = TextureKitConstants
+            and TextureKitConstants.IgnoreAtlasSize
+        pcall(
+            borderRegion.SetAtlas,
+            borderRegion,
+            "ui-debuff-border-default-noicon",
+            ignoreAtlasSize
+        )
+    end)
+
+    compactDebuffBorderAtlasHookInstalled = true
+end
+
 local legacyNotificationSuppressed = setmetatable({}, { __mode = "k" })
 
 local function isLegacyMicroButton(button)
@@ -1389,6 +1441,7 @@ events:SetScript("OnEvent", function(_, event, unit)
             installGuildNotificationPipSuppression()
             suppressLegacyNotificationPip()
         elseif unit == "Blizzard_PrivateAurasUI" then
+            installCompactDebuffBorderNeutralization()
         end
         return
     elseif event == "PLAYER_LOGIN" then
@@ -1398,6 +1451,7 @@ events:SetScript("OnEvent", function(_, event, unit)
         installLossOfControlPresentation()
         installHooks()
         installDerivedDebuffRefresh()
+        installCompactDebuffBorderNeutralization()
         installMicroMenuChildOffset()
         installGuildNotificationPipSuppression()
         applyStaticFonts()
@@ -1409,6 +1463,7 @@ events:SetScript("OnEvent", function(_, event, unit)
         anchorUIErrorsFrame()
         installLossOfControlPresentation()
         installDerivedDebuffRefresh()
+        installCompactDebuffBorderNeutralization()
         installMicroMenuChildOffset()
         installGuildNotificationPipSuppression()
         applyStaticFonts()
