@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.78-local"
+local BJARKI_UI_VERSION = "0.2.79-local"
 local PRD_ATLAS = "UI-HUD-CoolDownManager-Bar"
 local CLASS_SATURATION = 1.18
 local CLASS_BRIGHTNESS = 1.08
