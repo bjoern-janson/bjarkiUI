@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-This document describes the current implementation of **bjarkiUI 0.2.72-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
+This document describes the current implementation of **bjarkiUI 0.2.77-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -203,3 +203,85 @@ native display/timer writers and reduces the visible presentation to the spell
 icon only. The red line textures, black backing, ability label, timer frame,
 numeric countdown, and seconds label are hidden after native updates. The icon
 is reanchored to the exact center of the existing Loss of Control frame.
+
+
+## 14. Derived-frame repair notes
+
+Version 0.2.73 hardens Target-of-Target / Focus-of-Target presentation in three places:
+
+- derived health colors fail closed to neutral grey while player/pet identity witnesses are unreadable or disagree, instead of reusing an incorrect semantic tint;
+- native ToT/FoT debuffs are restored when Blizzard's global `showDispelDebuffs` option would otherwise filter friendly derived units down to `HARMFUL|RAID`;
+- compact Party/Raid debuff borders are suppressed by feeding the secure private-aura renderer zero border geometry through its ordinary frame settings, rather than attempting to hide forbidden `PrivateAuraMixin` regions after render.
+
+
+## 15. Party-order lifecycle recovery
+
+Version 0.2.74 keeps the custom raid-style party order stable across member
+relogs, disconnect/reconnect transitions, and other compact-frame lifecycle
+changes.
+
+Two native paths are covered explicitly:
+
+- CompactPartyFrame caches `UpdateLayout` as `updateLayoutFunc` during OnLoad,
+  so bjarkiUI post-hooks that actual cached native writer rather than relying on
+  the public method alone.
+- individual compact member frames can hide/show while a unit token disappears
+  and returns; their visibility transitions now trigger a bounded visual-order
+  reapply out of combat.
+
+Blizzard still owns unit assignment and compact-frame refresh. The addon only
+reasserts anchors after native lifecycle/layout writes.
+
+
+## 16. Communities chat secret-message boundary
+
+Version 0.2.75 removes the direct wrapper around
+`CommunitiesFrame.Chat:FormatMessage`.
+
+Forever can supply `FormatMessage` with a secret message table. Calling the
+native formatter from an addon-owned replacement taints that execution before
+Blizzard indexes the secret table.
+
+Guild/Communities secondary-name shortening now happens only after Blizzard's
+native ScrollingMessageFrame has completed rendering. bjarkiUI registers an
+`AddOnDisplayRefreshedCallback`, reads only accessible visible FontString text,
+preserves the complete `playerCommunity` hyperlink payload, and shortens only
+the hyperlink's display text.
+
+The C_Club message table and native formatter remain untouched.
+
+
+## 17. Compact-frame taint rollback
+
+Version 0.2.76 removes the 0.2.73 compact Party/Raid debuff-border suppression.
+
+The previous implementation wrote a synthetic negative `debuffBorderScale` directly
+onto Blizzard compact unit frames so the secure private-aura renderer would compute
+a zero-sized border. That writes addon-owned state into a compact frame later used
+by native secret-health/heal-prediction code, and can taint Blizzard's
+`CompactUnitFrame_OnUpdate` path.
+
+The addon no longer modifies compact aura-renderer settings or private-aura border
+geometry. Colored debuff borders therefore remain native for now rather than
+trading a cosmetic change for secret-value taint.
+
+Party-order reconnect recovery also no longer installs `OnShow`/`OnHide`
+scripts on compact member frames. `UNIT_CONNECTION` is observed by a separate
+addon event frame and the visual reanchor is deferred to the next tick, outside
+Blizzard's compact-unit update stack.
+
+
+## 18. Compact debuff border presentation
+
+Version 0.2.77 restores the requested removal of compact Party/Raid debuff borders
+without writing addon-owned values into Blizzard compact-frame Lua state.
+
+The addon post-hooks Blizzard's final `AuraUtil.SetAuraBorderAtlas` presentation
+write. After Blizzard has already consumed the secret aura/dispel data, bjarkiUI
+identifies compact Party/Raid aura textures only from their fixed frame ancestry
+and sets that border Texture's alpha to zero.
+
+No `CompactUnitFrame` fields, private-aura settings, aura tables, health values,
+or heal-prediction state are read or modified. Because private aura frames are
+pooled, a border hidden by bjarkiUI is restored to alpha 1 if that same Texture is
+later reused on a non-compact presentation.

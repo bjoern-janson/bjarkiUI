@@ -264,41 +264,74 @@ local function applyPowerColor(bar, unit)
     pcall(bar.SetStatusBarColor, bar, r, g, b, 1)
 end
 
-local function isPetUnit(unit)
-    if unit == "pet" then return true end
-    if not unit then return false end
+local function petUnitState(unit)
+    if unit == "pet" then return true, true end
+    if not unit then return nil, false end
 
-    -- Preserve the exact local-pet identity path for target/focus/derived tokens.
+    local localReadable = false
     if UnitIsUnit then
         local ok, same = pcall(UnitIsUnit, unit, "pet")
-        if ok and not isSecret(same) and same == true then return true end
+        if ok and not isSecret(same) and type(same) == "boolean" then
+            localReadable = true
+            if same then return true, true end
+        end
     end
 
-    -- Blizzard exposes positive identity for another player's combat pet.
-    -- Do not infer pet-ness from "non-player" or player-controlled state.
+    local otherReadable = false
     if UnitIsOtherPlayersPet then
         local ok, value = pcall(UnitIsOtherPlayersPet, unit)
         if ok and not isSecret(value) and type(value) == "boolean" then
-            return value
+            otherReadable = true
+            if value then return true, true end
         end
     end
 
-    return false
+    -- Negative pet identity requires both available identity paths to be readable.
+    -- Otherwise a reused ToT/FoT frame stays UNKNOWN instead of being painted as
+    -- an NPC while its referent is still transitioning.
+    if localReadable and (not UnitIsOtherPlayersPet or otherReadable) then
+        return false, true
+    end
+    return nil, false
 end
 
-local function isPlayerUnit(unit)
-    if not unit then return false end
+local function isPetUnit(unit)
+    local value, readable = petUnitState(unit)
+    return readable and value or false
+end
+
+local function playerUnitState(unit)
+    if not unit then return nil, false end
+
+    local apiValue, apiReadable
     if UnitIsPlayer then
         local ok, value = pcall(UnitIsPlayer, unit)
-        if ok and not isSecret(value) and type(value) == "boolean" then return value end
+        if ok and not isSecret(value) and type(value) == "boolean" then
+            apiValue, apiReadable = value, true
+        end
     end
+
+    local guidValue, guidReadable
     if UnitGUID then
         local ok, guid = pcall(UnitGUID, unit)
         if ok and not isSecret(guid) and type(guid) == "string" then
-            return guid:match("^Player%-") ~= nil
+            guidValue, guidReadable = guid:match("^Player%-") ~= nil, true
         end
     end
-    return false
+
+    -- Reused derived frames can briefly expose disagreeing identity witnesses.
+    -- Do not commit a semantic tint until the readable witnesses agree.
+    if apiReadable and guidReadable and apiValue ~= guidValue then
+        return nil, false
+    end
+    if guidReadable then return guidValue, true end
+    if apiReadable then return apiValue, true end
+    return nil, false
+end
+
+local function isPlayerUnit(unit)
+    local value, readable = playerUnitState(unit)
+    return readable and value or false
 end
 
 local function classToken(unit)
@@ -328,6 +361,16 @@ end
 local function applyHealthColor(bar, unit)
     if not bar or not bar.SetStatusBarColor or not unit then return end
 
+    local derived = unit == "targettarget" or unit == "focustarget"
+    local exists = readableBool(UnitExists, unit)
+    if exists == false then
+        clearUnknownDerivedColor(bar, unit)
+        return
+    elseif derived and exists == nil then
+        clearUnknownDerivedColor(bar, unit)
+        return
+    end
+
     -- The PRD atlas is colorized by the StatusBar tint. Keep the fill grayscale
     -- so Blizzard/source artwork cannot leak its own hue into our class/reaction tint.
     if bar.SetStatusBarDesaturated then
@@ -337,7 +380,8 @@ local function applyHealthColor(bar, unit)
     -- Positive player identity outranks pet identity. This matters most for the
     -- reusable ToT/FoT frames: a stale/transitioning pet observation must never
     -- be allowed to paint a real player green.
-    if isPlayerUnit(unit) then
+    local player, playerReadable = playerUnitState(unit)
+    if playerReadable and player then
         local colors = CUSTOM_CLASS_COLORS or RAID_CLASS_COLORS
         local color = colors and colors[classToken(unit)]
         if color then
@@ -363,12 +407,19 @@ local function applyHealthColor(bar, unit)
         end
         setHealthColor(bar, 0.5, 0.5, 0.5, 1)
         return
+    elseif derived and not playerReadable then
+        clearUnknownDerivedColor(bar, unit)
+        return
     end
 
     -- Combat pets use Blizzard's stock green health language regardless of
     -- owner/class/faction. Do this only after ruling out a real player.
-    if isPetUnit(unit) then
+    local pet, petReadable = petUnitState(unit)
+    if petReadable and pet then
         setHealthColor(bar, 0, 1, 0, 1)
+        return
+    elseif derived and not petReadable then
+        clearUnknownDerivedColor(bar, unit)
         return
     end
 
@@ -377,8 +428,6 @@ local function applyHealthColor(bar, unit)
     -- This preserves red/yellow/green selection colors while also surfacing
     -- important state such as a tap-denied/tagged NPC becoming grey.
     -- An unreadable/absent new referent must not inherit the old actor's tint.
-    if UnitExists and not UnitExists(unit) then clearUnknownDerivedColor(bar, unit); return end
-
     local connected = readableBool(UnitIsConnected, unit)
     local dead = readableBool(UnitIsDead, unit)
     if connected == false or dead == true then
@@ -528,35 +577,54 @@ end
 local communitiesNameHookInstalled = false
 local communitiesChatNameHookInstalled = false
 
-local function shortenCommunityFormattedMessage(formatted, message)
-    if isSecret(formatted) or type(formatted) ~= "string"
-        or type(message) ~= "table" or type(message.author) ~= "table"
-    then
-        return formatted
-    end
+local function shortenCommunityVisibleText(text)
+    if isSecret(text) or type(text) ~= "string" then return text end
 
-    local author = message.author
-    local clubType = author.clubType
-    if clubType ~= Enum.ClubType.Character and clubType ~= Enum.ClubType.Guild then
-        return formatted
-    end
+    -- Communities/Guild character messages use playerCommunity hyperlinks:
+    --   |HplayerCommunity:<full name>:...|h<visible name>|h
+    -- Preserve the full hyperlink payload for whisper/report actions and shorten
+    -- only the already-rendered display text. No secret message table is touched.
+    local result = text:gsub(
+        "(|HplayerCommunity:([^:|]+):.-|h)(.-)(|h)",
+        function(openLink, fullName, display, closeLink)
+            if type(fullName) ~= "string" or type(display) ~= "string" then
+                return openLink .. display .. closeLink
+            end
 
-    local name = author.name
-    if isSecret(name) or type(name) ~= "string" then return formatted end
-    local primary = name:match("^%S+")
-    if not primary or primary == name then return formatted end
+            local primary = fullName:match("^%S+")
+            if not primary or primary == fullName then
+                return openLink .. display .. closeLink
+            end
 
-    -- Keep the full name inside the hyperlink payload so clicks/whispers/report
-    -- actions still resolve the real member. Change only the visible |h...|h text.
-    local result = formatted:gsub("(|H.-|h)(.-)(|h)", function(openLink, display, closeLink)
-        local replaced, count = display:gsub(escapePattern(name), primary, 1)
-        if count > 0 then
-            return openLink .. replaced .. closeLink
-        end
-        return openLink .. display .. closeLink
-    end, 1)
+            local replaced, count = display:gsub(escapePattern(fullName), primary, 1)
+            if count > 0 then
+                return openLink .. replaced .. closeLink
+            end
+            return openLink .. display .. closeLink
+        end,
+        1
+    )
 
     return result
+end
+
+local function applyCommunityVisibleNames(messageFrame)
+    if not messageFrame or type(messageFrame.visibleLines) ~= "table" then return end
+
+    -- This callback runs after ScrollingMessageFrame has finished converting
+    -- native/secret message data into visible FontStrings. Stay strictly on that
+    -- presentation surface; never inspect C_Club message tables here.
+    for _, line in ipairs(messageFrame.visibleLines) do
+        if line and line.GetText and line.SetText then
+            local ok, text = pcall(line.GetText, line)
+            if ok and not isSecret(text) and type(text) == "string" then
+                local shortened = shortenCommunityVisibleText(text)
+                if shortened ~= text then
+                    pcall(line.SetText, line, shortened)
+                end
+            end
+        end
+    end
 end
 
 local function installCommunitiesPrimaryNames()
@@ -566,7 +634,8 @@ local function installCommunitiesPrimaryNames()
         local mixin = _G.CommunitiesMemberListEntryMixin
         if type(mixin) == "table" and type(mixin.SetMember) == "function" then
             hooksecurefunc(mixin, "SetMember", function(self, memberInfo)
-                if type(memberInfo) ~= "table" or not self or not self.NameFrame
+                if isSecret(memberInfo) or type(memberInfo) ~= "table"
+                    or not self or not self.NameFrame
                     or not self.NameFrame.Name or not self.NameFrame.Name.SetText then
                     return
                 end
@@ -576,7 +645,10 @@ local function installCommunitiesPrimaryNames()
                 local primary = name:match("^%S+")
                 if not primary then return end
 
-                if memberInfo.timerunningSeasonID and TimerunningUtil and TimerunningUtil.AddTinyIcon then
+                local seasonID = memberInfo.timerunningSeasonID
+                if not isSecret(seasonID) and seasonID
+                    and TimerunningUtil and TimerunningUtil.AddTinyIcon
+                then
                     local ok, decorated = pcall(TimerunningUtil.AddTinyIcon, primary)
                     if ok and type(decorated) == "string" and not isSecret(decorated) then
                         primary = decorated
@@ -589,27 +661,20 @@ local function installCommunitiesPrimaryNames()
         end
     end
 
-    -- The live CommunitiesFrame.Chat receives mixin methods when the frame is
-    -- created. Replacing CommunitiesChatMixin afterward does not update that
-    -- already-created object, so patch the live formatter directly.
     if not communitiesChatNameHookInstalled then
         local communitiesFrame = _G.CommunitiesFrame
         local chat = communitiesFrame and communitiesFrame.Chat
-        if chat and type(chat.FormatMessage) == "function" then
-            local originalFormatMessage = chat.FormatMessage
-
-            chat.FormatMessage = function(self, clubId, streamId, message)
-                local formatted = originalFormatMessage(self, clubId, streamId, message)
-                return shortenCommunityFormattedMessage(formatted, message)
-            end
-
+        local messageFrame = chat and chat.MessageFrame
+        if messageFrame and type(messageFrame.AddOnDisplayRefreshedCallback) == "function" then
+            -- Blizzard's native FormatMessage remains completely untouched.
+            -- Its secret message table is consumed in native execution first;
+            -- bjarkiUI only receives the finished visible ScrollingMessageFrame.
+            messageFrame:AddOnDisplayRefreshedCallback(applyCommunityVisibleNames)
             communitiesChatNameHookInstalled = true
 
-            -- Existing history was formatted before this wrapper existed.
-            -- Rebuild it once so the currently open Guild/Communities tab updates.
-            if type(chat.DisplayChat) == "function" then
-                pcall(chat.DisplayChat, chat)
-            end
+            -- The current display may already contain history when the addon
+            -- installs this callback, so apply once immediately as well.
+            applyCommunityVisibleNames(messageFrame)
         end
     end
 end
@@ -1137,33 +1202,96 @@ local function installHooks()
     installThreatScaling()
 end
 
-local compactDebuffBorderHookInstalled = false
+local derivedDebuffRefreshHookInstalled = false
+local derivedDebuffRefreshGuard = false
 
-local function installCompactDebuffBorderSuppression()
-    if compactDebuffBorderHookInstalled or not hooksecurefunc then return end
-    if type(_G.PrivateAuraMixin) ~= "table"
-        or type(_G.PrivateAuraMixin.Update) ~= "function"
-        or type(_G.CompactRaidGroupTypeEnum) ~= "table"
+local function installDerivedDebuffRefresh()
+    if derivedDebuffRefreshHookInstalled or not hooksecurefunc
+        or type(AuraUtil) ~= "table" or type(AuraUtil.RefreshAuras) ~= "function"
     then
         return
     end
 
-    hooksecurefunc(_G.PrivateAuraMixin, "Update", function(self, _auraInfo, _unit, anchorInfo)
-        local settings = anchorInfo and anchorInfo.containerSettings
-        local groupType = settings and settings.groupType
-        if groupType ~= _G.CompactRaidGroupTypeEnum.Party
-            and groupType ~= _G.CompactRaidGroupTypeEnum.Raid
-        then
-            return
-        end
+    hooksecurefunc(AuraUtil, "RefreshAuras", function(frame, unit, numAuras, suffix, checkCVar, showBuffs)
+        if derivedDebuffRefreshGuard or checkCVar ~= true or showBuffs ~= false then return end
+        if frame ~= smallFrame("targettarget") and frame ~= smallFrame("focustarget") then return end
 
-        local border = self and self.DebuffBorder
-        if border and border.Hide then
-            pcall(border.Hide, border)
+        -- Blizzard's ToT/FoT refresh obeys showDispelDebuffs. When that option is
+        -- enabled on a friendly derived unit, the native HARMFUL|RAID filter can
+        -- make ordinary debuffs disappear entirely. Keep the global setting for
+        -- other frames, but restore the full harmful list on ToT/FoT.
+        local filterActive = false
+        if CVarCallbackRegistry and CVarCallbackRegistry.GetCVarValueBool then
+            local ok, value = pcall(
+                CVarCallbackRegistry.GetCVarValueBool,
+                CVarCallbackRegistry,
+                "showDispelDebuffs"
+            )
+            filterActive = ok and value == true
+        elseif GetCVarBool then
+            local ok, value = pcall(GetCVarBool, "showDispelDebuffs")
+            filterActive = ok and value == true
+        end
+        if not filterActive then return end
+
+        local assistable = readableBool(UnitCanAssist, "player", unit)
+        if assistable ~= true then return end
+
+        derivedDebuffRefreshGuard = true
+        pcall(AuraUtil.RefreshAuras, frame, unit, numAuras, suffix, false, false)
+        derivedDebuffRefreshGuard = false
+    end)
+
+    derivedDebuffRefreshHookInstalled = true
+end
+
+local compactDebuffBorderAtlasHookInstalled = false
+local compactHiddenDebuffBorders = setmetatable({}, { __mode = "k" })
+
+local function isCompactPartyRaidAuraBorder(borderRegion)
+    if not borderRegion or not borderRegion.GetParent then return false end
+
+    local okAura, auraFrame = pcall(borderRegion.GetParent, borderRegion)
+    if not okAura or not auraFrame or not auraFrame.GetParent then return false end
+
+    local okContainer, container = pcall(auraFrame.GetParent, auraFrame)
+    if not okContainer or not container or not container.GetName then return false end
+
+    local okName, name = pcall(container.GetName, container)
+    if not okName or isSecret(name) or type(name) ~= "string" then return false end
+
+    return name:match("^CompactPartyFrameMember%d+$") ~= nil
+        or name:match("^CompactRaidGroup%d+Member%d+$") ~= nil
+        or name:match("^CompactRaidFrame%d+$") ~= nil
+end
+
+local function installCompactDebuffBorderNeutralization()
+    if compactDebuffBorderAtlasHookInstalled or not hooksecurefunc
+        or type(AuraUtil) ~= "table"
+        or type(AuraUtil.SetAuraBorderAtlas) ~= "function"
+    then
+        return
+    end
+
+    -- Stay at the final presentation write. Blizzard has already consumed the
+    -- secret aura/dispel data before this post-hook runs. We inspect only fixed
+    -- frame ancestry and change the final Texture alpha; compact-frame fields,
+    -- private-aura settings, and secret aura tables remain untouched.
+    hooksecurefunc(AuraUtil, "SetAuraBorderAtlas", function(borderRegion)
+        if not borderRegion or not borderRegion.SetAlpha then return end
+
+        if isCompactPartyRaidAuraBorder(borderRegion) then
+            pcall(borderRegion.SetAlpha, borderRegion, 0)
+            compactHiddenDebuffBorders[borderRegion] = true
+        elseif compactHiddenDebuffBorders[borderRegion] then
+            -- Private aura frames are pooled. Restore the border if Blizzard
+            -- later reuses the same Texture on a non-compact presentation.
+            pcall(borderRegion.SetAlpha, borderRegion, 1)
+            compactHiddenDebuffBorders[borderRegion] = nil
         end
     end)
 
-    compactDebuffBorderHookInstalled = true
+    compactDebuffBorderAtlasHookInstalled = true
 end
 
 local legacyNotificationSuppressed = setmetatable({}, { __mode = "k" })
@@ -1310,7 +1438,7 @@ events:SetScript("OnEvent", function(_, event, unit)
             installGuildNotificationPipSuppression()
             suppressLegacyNotificationPip()
         elseif unit == "Blizzard_PrivateAurasUI" then
-            installCompactDebuffBorderSuppression()
+            installCompactDebuffBorderNeutralization()
         end
         return
     elseif event == "PLAYER_LOGIN" then
@@ -1319,7 +1447,8 @@ events:SetScript("OnEvent", function(_, event, unit)
         anchorUIErrorsFrame()
         installLossOfControlPresentation()
         installHooks()
-        installCompactDebuffBorderSuppression()
+        installDerivedDebuffRefresh()
+        installCompactDebuffBorderNeutralization()
         installMicroMenuChildOffset()
         installGuildNotificationPipSuppression()
         applyStaticFonts()
@@ -1330,7 +1459,8 @@ events:SetScript("OnEvent", function(_, event, unit)
         applyWorldTextPosition()
         anchorUIErrorsFrame()
         installLossOfControlPresentation()
-        installCompactDebuffBorderSuppression()
+        installDerivedDebuffRefresh()
+        installCompactDebuffBorderNeutralization()
         installMicroMenuChildOffset()
         installGuildNotificationPipSuppression()
         applyStaticFonts()

@@ -173,7 +173,7 @@ local function install()
         hookedFrames[frame] = true
 
         if type(frame.RefreshMembers) == "function" then
-            -- RefreshMembers calls the layout function cached during OnLoad.
+            -- GROUP_ROSTER_UPDATE and other roster rebuilds finish here.
             hooksecurefunc(frame, "RefreshMembers", function(self)
                 if self == frame then
                     applyVisualOrder(self)
@@ -181,8 +181,16 @@ local function install()
             end)
         end
 
-        if type(frame.UpdateLayout) == "function" then
-            -- Edit Mode and other native paths can relayout directly later.
+        -- CompactPartyFrame caches UpdateLayout into updateLayoutFunc during
+        -- OnLoad. Native code later calls that cached function directly, so a
+        -- hook on frame.UpdateLayout alone misses some relayouts.
+        if type(frame.updateLayoutFunc) == "function" then
+            hooksecurefunc(frame, "updateLayoutFunc", function(self)
+                if self == frame then
+                    applyVisualOrder(self)
+                end
+            end)
+        elseif type(frame.UpdateLayout) == "function" then
             hooksecurefunc(frame, "UpdateLayout", function(self)
                 if self == frame then
                     applyVisualOrder(self)
@@ -190,6 +198,8 @@ local function install()
             end)
         end
     end
+
+
 
     applyVisualOrder(frame)
 end
@@ -207,4 +217,27 @@ end
 
 events:SetScript("OnEvent", function()
     install()
+end)
+
+-- A reconnect/disconnect can cause Blizzard to touch compact member state
+-- without rebuilding the whole party frame. Reapply anchors on the next tick,
+-- outside Blizzard's UNIT_CONNECTION execution, so we never inject addon code
+-- into the compact unit frame's secret-value update stack.
+local connectionApplyQueued = false
+local connectionEvents = CreateFrame("Frame")
+connectionEvents:RegisterUnitEvent("UNIT_CONNECTION", "player", "party1", "party2", "party3", "party4")
+connectionEvents:SetScript("OnEvent", function()
+    if connectionApplyQueued then return end
+    connectionApplyQueued = true
+
+    local function run()
+        connectionApplyQueued = false
+        install()
+    end
+
+    if C_Timer and C_Timer.After then
+        C_Timer.After(0, run)
+    else
+        run()
+    end
 end)
