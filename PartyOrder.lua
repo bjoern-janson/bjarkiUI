@@ -11,14 +11,35 @@
 -- Blizzard compares secret health-color values.
 
 local hookedFrames = setmetatable({}, { __mode = "k" })
+local queuedFrames = setmetatable({}, { __mode = "k" })
 local generatorHooked = false
 
+local function isSecret(value)
+    if not issecretvalue then return false end
+    local ok, secret = pcall(issecretvalue, value)
+    return ok and secret == true
+end
+
+local function safeBool(fn, ...)
+    if type(fn) ~= "function" then return nil end
+    local ok, value = pcall(fn, ...)
+    if not ok or isSecret(value) or type(value) ~= "boolean" then return nil end
+    return value
+end
+
+local function safeNumberMethod(object, method)
+    if not object or type(method) ~= "function" then return nil end
+    local ok, value = pcall(method, object)
+    if not ok or isSecret(value) or type(value) ~= "number" then return nil end
+    return value
+end
+
 local function inCombat()
-    return InCombatLockdown and InCombatLockdown()
+    return safeBool(InCombatLockdown) == true
 end
 
 local function shown(frame)
-    return frame and frame.IsShown and frame:IsShown()
+    return frame and safeBool(frame.IsShown, frame) == true
 end
 
 local function visualMembers(frame)
@@ -28,9 +49,7 @@ local function visualMembers(frame)
     -- Edit Mode can force empty party slots to display the player repeatedly.
     -- In that preview state the unit token no longer identifies the slot.
     local edit = _G.EditModeManagerFrame
-    if edit and edit.ArePartyFramesForcedShown
-        and edit:ArePartyFramesForcedShown()
-    then
+    if edit and safeBool(edit.ArePartyFramesForcedShown, edit) == true then
         local ordered = {}
         for i = 2, #members do
             if shown(members[i]) then
@@ -108,7 +127,7 @@ local function applyVisualOrder(frame)
     if not frame then return end
 
     -- This feature is only for raid-style PARTY frames.
-    if IsInRaid and IsInRaid() then
+    if safeBool(IsInRaid) == true then
         return
     end
 
@@ -120,10 +139,11 @@ local function applyVisualOrder(frame)
     if not ordered or #ordered == 0 then return end
 
     local edit = _G.EditModeManagerFrame
-    local horizontal = edit and edit.ShouldRaidFrameUseHorizontalRaidGroups
-        and edit:ShouldRaidFrameUseHorizontalRaidGroups(frame.groupType)
+    local horizontal = edit
+        and safeBool(edit.ShouldRaidFrameUseHorizontalRaidGroups, edit, frame.groupType) == true
+        or false
 
-    local titleHeight = (frame.title and frame.title.GetHeight and frame.title:GetHeight()) or 0
+    local titleHeight = safeNumberMethod(frame.title, frame.title and frame.title.GetHeight) or 0
 
     local first = ordered[1]
     first:ClearAllPoints()
@@ -158,6 +178,26 @@ local function applyVisualOrder(frame)
     reanchorPets(frame, ordered, horizontal)
 end
 
+local function queueVisualOrder(frame)
+    frame = frame or _G.CompactPartyFrame
+    if not frame or queuedFrames[frame] then return end
+    queuedFrames[frame] = true
+
+    local function run()
+        queuedFrames[frame] = nil
+        queueVisualOrder(frame)
+    end
+
+    -- Native compact-frame writers can consume protected values. Never perform
+    -- our anchor writes inside their call stack; coalesce all repair onto the
+    -- next tick and re-evaluate the live frame state there.
+    if C_Timer and C_Timer.After then
+        C_Timer.After(0, run)
+    else
+        run()
+    end
+end
+
 local function install()
     if not generatorHooked and hooksecurefunc
         and type(_G.CompactPartyFrame_Generate) == "function"
@@ -176,7 +216,7 @@ local function install()
             -- GROUP_ROSTER_UPDATE and other roster rebuilds finish here.
             hooksecurefunc(frame, "RefreshMembers", function(self)
                 if self == frame then
-                    applyVisualOrder(self)
+                    queueVisualOrder(self)
                 end
             end)
         end
@@ -187,13 +227,13 @@ local function install()
         if type(frame.updateLayoutFunc) == "function" then
             hooksecurefunc(frame, "updateLayoutFunc", function(self)
                 if self == frame then
-                    applyVisualOrder(self)
+                    queueVisualOrder(self)
                 end
             end)
         elseif type(frame.UpdateLayout) == "function" then
             hooksecurefunc(frame, "UpdateLayout", function(self)
                 if self == frame then
-                    applyVisualOrder(self)
+                    queueVisualOrder(self)
                 end
             end)
         end
@@ -220,24 +260,10 @@ events:SetScript("OnEvent", function()
 end)
 
 -- A reconnect/disconnect can cause Blizzard to touch compact member state
--- without rebuilding the whole party frame. Reapply anchors on the next tick,
--- outside Blizzard's UNIT_CONNECTION execution, so we never inject addon code
--- into the compact unit frame's secret-value update stack.
-local connectionApplyQueued = false
+-- without rebuilding the whole party frame. Route it through the same
+-- next-tick coalescer used by native layout hooks.
 local connectionEvents = CreateFrame("Frame")
 connectionEvents:RegisterUnitEvent("UNIT_CONNECTION", "player", "party1", "party2", "party3", "party4")
 connectionEvents:SetScript("OnEvent", function()
-    if connectionApplyQueued then return end
-    connectionApplyQueued = true
-
-    local function run()
-        connectionApplyQueued = false
-        install()
-    end
-
-    if C_Timer and C_Timer.After then
-        C_Timer.After(0, run)
-    else
-        run()
-    end
+    queueVisualOrder(_G.CompactPartyFrame)
 end)
