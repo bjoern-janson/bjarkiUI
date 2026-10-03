@@ -1596,6 +1596,9 @@ SlashCmdList.BJARKIUI = function(message)
     if command == "audit" then
         printUIAudit()
         return
+    elseif command == "" or command == "help" then
+        print("bjarkiUI: /bui levels [on|off] | audit")
+        return
     end
     if previousBJarkiUISlash then
         previousBJarkiUISlash(message)
