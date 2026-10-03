@@ -185,7 +185,7 @@ local function queueVisualOrder(frame)
 
     local function run()
         queuedFrames[frame] = nil
-        queueVisualOrder(frame)
+        applyVisualOrder(frame)
     end
 
     -- Native compact-frame writers can consume protected values. Never perform
@@ -241,7 +241,7 @@ local function install()
 
 
 
-    applyVisualOrder(frame)
+    queueVisualOrder(frame)
 end
 
 local events = CreateFrame("Frame")
