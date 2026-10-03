@@ -184,6 +184,11 @@ local function readableBool(fn, ...)
     return value
 end
 
+local function readableUnitToken(value)
+    if isSecret(value) or type(value) ~= "string" then return nil end
+    return value
+end
+
 local function smallFrame(unit)
     if unit == "targettarget" then
         return (_G.TargetFrame and _G.TargetFrame.totFrame) or _G.TargetFrameToT
@@ -255,7 +260,8 @@ end
 
 local function applyPowerColor(bar, unit)
     if not bar or not bar.SetStatusBarColor or not UnitPowerType then return end
-    unit = bar.unit or unit
+    local barUnit = readableUnitToken(bar.unit)
+    unit = barUnit or readableUnitToken(unit)
     if not unit then return end
 
     local ok, _, token, r, g, b = pcall(UnitPowerType, unit)
@@ -511,8 +517,8 @@ local function applyPrimaryName(unit)
 end
 
 local function applyCompactPrimaryName(frame)
-    local unit = frame and frame.unit
-    if type(unit) ~= "string" then return end
+    local unit = frame and readableUnitToken(frame.unit)
+    if not unit then return end
 
     -- CompactUnitFrame_UpdateName also drives Blizzard raid frames and the
     -- raid-style party frames. Limit this to player-bearing compact surfaces
@@ -1160,7 +1166,8 @@ local function installHooks()
 
     if hooksecurefunc and type(UnitFrameHealthBar_Update) == "function" then
         hooksecurefunc("UnitFrameHealthBar_Update", function(bar, unit)
-            unit = unit or (bar and bar.unit)
+            unit = readableUnitToken(unit)
+                or (bar and readableUnitToken(bar.unit))
             -- Only touch the actual Blizzard unit-frame health bar. PlayerFrame
             -- also owns an AnimatedLossBar which is intentionally red on damage;
             -- styling that auxiliary bar makes the whole health display flash red.
@@ -1172,7 +1179,7 @@ local function installHooks()
     end
     if hooksecurefunc and type(UnitFrameManaBar_UpdateType) == "function" then
         hooksecurefunc("UnitFrameManaBar_UpdateType", function(bar)
-            local unit = bar and bar.unit
+            local unit = bar and readableUnitToken(bar.unit)
             if unit and bar == powerBar(unit) then
                 applyAtlas(bar)
                 applyPowerColor(bar, unit)
