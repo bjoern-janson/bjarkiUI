@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-This document describes the current implementation of **bjarkiUI 0.2.73-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
+This document describes the current implementation of **bjarkiUI 0.2.74-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -212,3 +212,22 @@ Version 0.2.73 hardens Target-of-Target / Focus-of-Target presentation in three 
 - derived health colors fail closed to neutral grey while player/pet identity witnesses are unreadable or disagree, instead of reusing an incorrect semantic tint;
 - native ToT/FoT debuffs are restored when Blizzard's global `showDispelDebuffs` option would otherwise filter friendly derived units down to `HARMFUL|RAID`;
 - compact Party/Raid debuff borders are suppressed by feeding the secure private-aura renderer zero border geometry through its ordinary frame settings, rather than attempting to hide forbidden `PrivateAuraMixin` regions after render.
+
+
+## 15. Party-order lifecycle recovery
+
+Version 0.2.74 keeps the custom raid-style party order stable across member
+relogs, disconnect/reconnect transitions, and other compact-frame lifecycle
+changes.
+
+Two native paths are covered explicitly:
+
+- CompactPartyFrame caches `UpdateLayout` as `updateLayoutFunc` during OnLoad,
+  so bjarkiUI post-hooks that actual cached native writer rather than relying on
+  the public method alone.
+- individual compact member frames can hide/show while a unit token disappears
+  and returns; their visibility transitions now trigger a bounded visual-order
+  reapply out of combat.
+
+Blizzard still owns unit assignment and compact-frame refresh. The addon only
+reasserts anchors after native lifecycle/layout writes.
