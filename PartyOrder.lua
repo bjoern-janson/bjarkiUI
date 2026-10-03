@@ -11,7 +11,6 @@
 -- Blizzard compares secret health-color values.
 
 local hookedFrames = setmetatable({}, { __mode = "k" })
-local hookedMemberFrames = setmetatable({}, { __mode = "k" })
 local generatorHooked = false
 
 local function inCombat()
@@ -200,23 +199,7 @@ local function install()
         end
     end
 
-    -- A relog can briefly make one compact member frame disappear and return
-    -- without reconstructing the whole party frame. Blizzard's visibility path
-    -- does not itself guarantee a Party-frame relayout, so keep our anchor chain
-    -- current when an individual member is shown/hidden.
-    if not inCombat() and type(frame.memberUnitFrames) == "table" then
-        for _, member in ipairs(frame.memberUnitFrames) do
-            if member and not hookedMemberFrames[member] and member.HookScript then
-                hookedMemberFrames[member] = true
-                member:HookScript("OnShow", function()
-                    applyVisualOrder(frame)
-                end)
-                member:HookScript("OnHide", function()
-                    applyVisualOrder(frame)
-                end)
-            end
-        end
-    end
+
 
     applyVisualOrder(frame)
 end
@@ -234,4 +217,27 @@ end
 
 events:SetScript("OnEvent", function()
     install()
+end)
+
+-- A reconnect/disconnect can cause Blizzard to touch compact member state
+-- without rebuilding the whole party frame. Reapply anchors on the next tick,
+-- outside Blizzard's UNIT_CONNECTION execution, so we never inject addon code
+-- into the compact unit frame's secret-value update stack.
+local connectionApplyQueued = false
+local connectionEvents = CreateFrame("Frame")
+connectionEvents:RegisterUnitEvent("UNIT_CONNECTION", "player", "party1", "party2", "party3", "party4")
+connectionEvents:SetScript("OnEvent", function()
+    if connectionApplyQueued then return end
+    connectionApplyQueued = true
+
+    local function run()
+        connectionApplyQueued = false
+        install()
+    end
+
+    if C_Timer and C_Timer.After then
+        C_Timer.After(0, run)
+    else
+        run()
+    end
 end)
