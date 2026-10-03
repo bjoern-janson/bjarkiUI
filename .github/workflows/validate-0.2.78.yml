@@ -1,0 +1,28 @@
+name: Validate bjarkiUI 0.2.78
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [0.2.78-local]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lua 5.1
+        run: sudo apt-get update -qq && sudo apt-get install -y lua5.1
+      - name: Syntax
+        run: |
+          luac5.1 -p bjarkiUI.lua
+          luac5.1 -p PartyOrder.lua
+      - name: Guardrails
+        run: |
+          ! grep -Eq 'debuffBorderScale[[:space:]]*=[[:space:]]*-' bjarkiUI.lua
+          ! grep -q 'PrivateAuraAnchorSettingsContainerMixin' bjarkiUI.lua
+          ! grep -q 'chat.FormatMessage[[:space:]]*=' bjarkiUI.lua
+          ! grep -q 'member:HookScript' PartyOrder.lua
+          ! grep -q 'playerControlled ~= true' bjarkiUI.lua
+          grep -q 'playerControlled == false' bjarkiUI.lua
+          grep -q 'creatureReadable and isCreature == false' bjarkiUI.lua
+          grep -q 'SLASH_BJARKIUI1 = "/bui"' bjarkiUI.lua
