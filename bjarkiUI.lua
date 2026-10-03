@@ -634,7 +634,8 @@ local function installCommunitiesPrimaryNames()
         local mixin = _G.CommunitiesMemberListEntryMixin
         if type(mixin) == "table" and type(mixin.SetMember) == "function" then
             hooksecurefunc(mixin, "SetMember", function(self, memberInfo)
-                if type(memberInfo) ~= "table" or not self or not self.NameFrame
+                if isSecret(memberInfo) or type(memberInfo) ~= "table"
+                    or not self or not self.NameFrame
                     or not self.NameFrame.Name or not self.NameFrame.Name.SetText then
                     return
                 end
@@ -644,7 +645,10 @@ local function installCommunitiesPrimaryNames()
                 local primary = name:match("^%S+")
                 if not primary then return end
 
-                if memberInfo.timerunningSeasonID and TimerunningUtil and TimerunningUtil.AddTinyIcon then
+                local seasonID = memberInfo.timerunningSeasonID
+                if not isSecret(seasonID) and seasonID
+                    and TimerunningUtil and TimerunningUtil.AddTinyIcon
+                then
                     local ok, decorated = pcall(TimerunningUtil.AddTinyIcon, primary)
                     if ok and type(decorated) == "string" and not isSecret(decorated) then
                         primary = decorated
