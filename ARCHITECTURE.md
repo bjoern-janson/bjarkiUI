@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-This document describes the current implementation of **bjarkiUI 0.2.76-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
+This document describes the current implementation of **bjarkiUI 0.2.77-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -269,3 +269,19 @@ Party-order reconnect recovery also no longer installs `OnShow`/`OnHide`
 scripts on compact member frames. `UNIT_CONNECTION` is observed by a separate
 addon event frame and the visual reanchor is deferred to the next tick, outside
 Blizzard's compact-unit update stack.
+
+
+## 18. Compact debuff border presentation
+
+Version 0.2.77 restores the requested removal of compact Party/Raid debuff borders
+without writing addon-owned values into Blizzard compact-frame Lua state.
+
+The addon post-hooks Blizzard's final `AuraUtil.SetAuraBorderAtlas` presentation
+write. After Blizzard has already consumed the secret aura/dispel data, bjarkiUI
+identifies compact Party/Raid aura textures only from their fixed frame ancestry
+and sets that border Texture's alpha to zero.
+
+No `CompactUnitFrame` fields, private-aura settings, aura tables, health values,
+or heal-prediction state are read or modified. Because private aura frames are
+pooled, a border hidden by bjarkiUI is restored to alpha 1 if that same Texture is
+later reused on a non-compact presentation.
