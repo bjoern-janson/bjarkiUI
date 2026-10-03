@@ -1246,6 +1246,7 @@ local function installDerivedDebuffRefresh()
 end
 
 local compactDebuffBorderAtlasHookInstalled = false
+local compactHiddenDebuffBorders = setmetatable({}, { __mode = "k" })
 
 local function isCompactPartyRaidAuraBorder(borderRegion)
     if not borderRegion or not borderRegion.GetParent then return false end
@@ -1273,25 +1274,21 @@ local function installCompactDebuffBorderNeutralization()
     end
 
     -- Stay at the final presentation write. Blizzard has already consumed the
-    -- secret aura/dispel data and selected an atlas before this post-hook runs.
-    -- We inspect only the fixed frame ancestry and replace the colored atlas
-    -- with Blizzard's own neutral/default debuff border. No compact-frame Lua
-    -- fields, private aura settings, or secret aura tables are modified.
+    -- secret aura/dispel data before this post-hook runs. We inspect only fixed
+    -- frame ancestry and change the final Texture alpha; compact-frame fields,
+    -- private-aura settings, and secret aura tables remain untouched.
     hooksecurefunc(AuraUtil, "SetAuraBorderAtlas", function(borderRegion)
-        if not isCompactPartyRaidAuraBorder(borderRegion)
-            or not borderRegion.SetAtlas
-        then
-            return
-        end
+        if not borderRegion or not borderRegion.SetAlpha then return end
 
-        local ignoreAtlasSize = TextureKitConstants
-            and TextureKitConstants.IgnoreAtlasSize
-        pcall(
-            borderRegion.SetAtlas,
-            borderRegion,
-            "ui-debuff-border-default-noicon",
-            ignoreAtlasSize
-        )
+        if isCompactPartyRaidAuraBorder(borderRegion) then
+            pcall(borderRegion.SetAlpha, borderRegion, 0)
+            compactHiddenDebuffBorders[borderRegion] = true
+        elseif compactHiddenDebuffBorders[borderRegion] then
+            -- Private aura frames are pooled. Restore the border if Blizzard
+            -- later reuses the same Texture on a non-compact presentation.
+            pcall(borderRegion.SetAlpha, borderRegion, 1)
+            compactHiddenDebuffBorders[borderRegion] = nil
+        end
     end)
 
     compactDebuffBorderAtlasHookInstalled = true
