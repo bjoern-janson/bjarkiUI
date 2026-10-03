@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-This document describes the current implementation of **bjarkiUI 0.2.74-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
+This document describes the current implementation of **bjarkiUI 0.2.75-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -231,3 +231,21 @@ Two native paths are covered explicitly:
 
 Blizzard still owns unit assignment and compact-frame refresh. The addon only
 reasserts anchors after native lifecycle/layout writes.
+
+
+## 16. Communities chat secret-message boundary
+
+Version 0.2.75 removes the direct wrapper around
+`CommunitiesFrame.Chat:FormatMessage`.
+
+Forever can supply `FormatMessage` with a secret message table. Calling the
+native formatter from an addon-owned replacement taints that execution before
+Blizzard indexes the secret table.
+
+Guild/Communities secondary-name shortening now happens only after Blizzard's
+native ScrollingMessageFrame has completed rendering. bjarkiUI registers an
+`AddOnDisplayRefreshedCallback`, reads only accessible visible FontString text,
+preserves the complete `playerCommunity` hyperlink payload, and shortens only
+the hyperlink's display text.
+
+The C_Club message table and native formatter remain untouched.
