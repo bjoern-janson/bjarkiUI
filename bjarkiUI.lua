@@ -90,6 +90,82 @@ local function anchorUIErrorsFrame()
     pcall(frame.SetPoint, frame, "TOP", UIParent, "TOP", 0, UI_ERRORS_Y)
 end
 
+local lossOfControlHooksInstalled = false
+
+local function stripLossOfControlPresentation()
+    local frame = _G.LossOfControlFrame
+    if not frame then return end
+
+    for _, region in ipairs({
+        frame.RedLineTop,
+        frame.RedLineBottom,
+        frame.blackBg,
+        frame.AbilityName,
+        frame.SpellName,
+        frame.ControlName,
+        frame.LocTypeText,
+        frame.Label,
+        frame.Text,
+    }) do
+        if region and region.Hide then
+            pcall(region.Hide, region)
+        end
+    end
+
+    local timeLeft = frame.TimeLeft
+    if timeLeft then
+        if timeLeft.Hide then
+            pcall(timeLeft.Hide, timeLeft)
+        end
+        for _, region in ipairs({
+            timeLeft.NumberText,
+            timeLeft.SecondsText,
+        }) do
+            if region and region.Hide then
+                pcall(region.Hide, region)
+            end
+        end
+    end
+
+    for _, region in ipairs({
+        frame.Timer,
+        frame.CooldownText,
+        frame.Duration,
+        frame.timeLeftText,
+        frame.TimeText,
+    }) do
+        if region and region.Hide then
+            pcall(region.Hide, region)
+        end
+    end
+
+    local icon = frame.Icon or frame.icon
+    if icon and icon.ClearAllPoints and icon.SetPoint then
+        pcall(icon.ClearAllPoints, icon)
+        pcall(icon.SetPoint, icon, "CENTER", frame, "CENTER", 0, 0)
+        if icon.Show then
+            pcall(icon.Show, icon)
+        end
+    end
+end
+
+local function installLossOfControlPresentation()
+    local frame = _G.LossOfControlFrame
+    if not frame then return end
+
+    if not lossOfControlHooksInstalled and hooksecurefunc then
+        if type(frame.SetUpDisplay) == "function" then
+            hooksecurefunc(frame, "SetUpDisplay", stripLossOfControlPresentation)
+        end
+        if type(frame.SetTime) == "function" then
+            hooksecurefunc(frame, "SetTime", stripLossOfControlPresentation)
+        end
+        lossOfControlHooksInstalled = true
+    end
+
+    stripLossOfControlPresentation()
+end
+
 local hooksInstalled = false
 
 local function isSecret(value)
@@ -1241,6 +1317,7 @@ events:SetScript("OnEvent", function(_, event, unit)
         installEditModeLayout()
         applyWorldTextPosition()
         anchorUIErrorsFrame()
+        installLossOfControlPresentation()
         installHooks()
         installCompactDebuffBorderSuppression()
         installMicroMenuChildOffset()
@@ -1252,6 +1329,7 @@ events:SetScript("OnEvent", function(_, event, unit)
         installEditModeLayout()
         applyWorldTextPosition()
         anchorUIErrorsFrame()
+        installLossOfControlPresentation()
         installCompactDebuffBorderSuppression()
         installMicroMenuChildOffset()
         installGuildNotificationPipSuppression()

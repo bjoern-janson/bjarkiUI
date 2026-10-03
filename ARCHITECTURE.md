@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-This document describes the current implementation of **bjarkiUI 0.2.67-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
+This document describes the current implementation of **bjarkiUI 0.2.72-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -194,3 +194,12 @@ The current build also makes three narrow presentation changes without replacing
 - raises the default `UIErrorsFrame` vertically while preserving its horizontal center;
 - hides dispel-type colored borders on harmful aura icons in compact Party/Raid frames while leaving the icons, cooldowns, stacks, and separate dispel overlay intact;
 - hides Guild and Legacy-system notification pips on the Micro Menu while keeping the buttons functional.
+
+
+## 13. Loss of Control presentation
+
+The default Loss of Control frame remains Blizzard-owned. bjarkiUI post-hooks the
+native display/timer writers and reduces the visible presentation to the spell
+icon only. The red line textures, black backing, ability label, timer frame,
+numeric countdown, and seconds label are hidden after native updates. The icon
+is reanchored to the exact center of the existing Loss of Control frame.
