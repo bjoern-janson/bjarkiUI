@@ -1,0 +1,36 @@
+name: Package bjarkiUI 0.2.77-local
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 0.2.77-local
+    paths:
+      - ".github/workflows/package-0.2.77.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build addon ZIP
+        run: |
+          rm -rf package
+          mkdir -p package/bjarkiUI
+          cp bjarkiUI.lua PartyOrder.lua bjarkiUI.toc bjarkiUI_Camelot.toc package/bjarkiUI/
+          cd package
+          zip -r ../bjarkiUI-0.2.77-local.zip bjarkiUI
+
+      - name: Publish test package
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view v0.2.77-local >/dev/null 2>&1; then
+            gh release upload v0.2.77-local bjarkiUI-0.2.77-local.zip --clobber
+          else
+            gh release create v0.2.77-local bjarkiUI-0.2.77-local.zip               --target 0.2.77-local               --title "bjarkiUI 0.2.77-local"               --notes "Local test build."               --prerelease
+          fi
