@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.79-local"
+local BJARKI_UI_VERSION = "0.2.80-local"
 local PRD_ATLAS = "UI-HUD-CoolDownManager-Bar"
 local CLASS_SATURATION = 1.18
 local CLASS_BRIGHTNESS = 1.08
@@ -1257,7 +1257,7 @@ local function installDerivedDebuffRefresh()
     derivedDebuffRefreshHookInstalled = true
 end
 
-local compactDebuffBorderAtlasHookInstalled = false
+local compactDebuffBorderHookInstalled = false
 local compactHiddenDebuffBorders = setmetatable({}, { __mode = "k" })
 
 local function isCompactPartyRaidAuraBorder(borderRegion)
@@ -1277,33 +1277,54 @@ local function isCompactPartyRaidAuraBorder(borderRegion)
         or name:match("^CompactRaidFrame%d+$") ~= nil
 end
 
+local function neutralizeCompactDebuffBorder(debuffFrame)
+    if not debuffFrame or not debuffFrame.border then return end
+
+    local border = debuffFrame.border
+    if not border.SetAlpha then return end
+
+    if isCompactPartyRaidAuraBorder(border) then
+        pcall(border.SetAlpha, border, 0)
+        compactHiddenDebuffBorders[border] = true
+    elseif compactHiddenDebuffBorders[border] then
+        -- Compact aura textures are pooled. If Blizzard reuses a border on a
+        -- non-compact frame, restore the native presentation.
+        pcall(border.SetAlpha, border, 1)
+        compactHiddenDebuffBorders[border] = nil
+    end
+end
+
 local function installCompactDebuffBorderNeutralization()
-    if compactDebuffBorderAtlasHookInstalled or not hooksecurefunc
-        or type(AuraUtil) ~= "table"
-        or type(AuraUtil.SetAuraBorderAtlas) ~= "function"
-    then
-        return
+    if compactDebuffBorderHookInstalled or not hooksecurefunc then return end
+
+    -- This is the authoritative compact-debuff presentation boundary on the
+    -- Classic/Forever path. CompactUnitFrame_UtilSetDebuff has already selected
+    -- the aura and written its type-colored border before this post-hook runs.
+    -- We deliberately do not inspect aura data or mutate the selection logic:
+    -- only the final border alpha is presentation-owned here.
+    if type(CompactUnitFrame_UtilSetDebuff) == "function" then
+        hooksecurefunc("CompactUnitFrame_UtilSetDebuff", function(debuffFrame)
+            neutralizeCompactDebuffBorder(debuffFrame)
+        end)
     end
 
-    -- Stay at the final presentation write. Blizzard has already consumed the
-    -- secret aura/dispel data before this post-hook runs. We inspect only fixed
-    -- frame ancestry and change the final Texture alpha; compact-frame fields,
-    -- private-aura settings, and secret aura tables remain untouched.
-    hooksecurefunc(AuraUtil, "SetAuraBorderAtlas", function(borderRegion)
-        if not borderRegion or not borderRegion.SetAlpha then return end
+    -- Newer AuraUtil paths may also write an atlas directly. Keep this narrow
+    -- compatibility hook, but treat the compact debuff-frame hook above as the
+    -- primary authority.
+    if type(AuraUtil) == "table" and type(AuraUtil.SetAuraBorderAtlas) == "function" then
+        hooksecurefunc(AuraUtil, "SetAuraBorderAtlas", function(borderRegion)
+            if not borderRegion or not borderRegion.SetAlpha then return end
+            if isCompactPartyRaidAuraBorder(borderRegion) then
+                pcall(borderRegion.SetAlpha, borderRegion, 0)
+                compactHiddenDebuffBorders[borderRegion] = true
+            elseif compactHiddenDebuffBorders[borderRegion] then
+                pcall(borderRegion.SetAlpha, borderRegion, 1)
+                compactHiddenDebuffBorders[borderRegion] = nil
+            end
+        end)
+    end
 
-        if isCompactPartyRaidAuraBorder(borderRegion) then
-            pcall(borderRegion.SetAlpha, borderRegion, 0)
-            compactHiddenDebuffBorders[borderRegion] = true
-        elseif compactHiddenDebuffBorders[borderRegion] then
-            -- Private aura frames are pooled. Restore the border if Blizzard
-            -- later reuses the same Texture on a non-compact presentation.
-            pcall(borderRegion.SetAlpha, borderRegion, 1)
-            compactHiddenDebuffBorders[borderRegion] = nil
-        end
-    end)
-
-    compactDebuffBorderAtlasHookInstalled = true
+    compactDebuffBorderHookInstalled = true
 end
 
 local legacyNotificationSuppressed = setmetatable({}, { __mode = "k" })
@@ -1563,7 +1584,7 @@ local function printUIAudit()
     out("hooks locSetup=" .. tostring(lossOfControlSetUpHookInstalled)
         .. " locTime=" .. tostring(lossOfControlSetTimeHookInstalled)
         .. " derivedDebuffs=" .. tostring(derivedDebuffRefreshHookInstalled)
-        .. " compactBorder=" .. tostring(compactDebuffBorderAtlasHookInstalled)
+        .. " compactBorder=" .. tostring(compactDebuffBorderHookInstalled)
         .. " communitiesRoster=" .. tostring(communitiesNameHookInstalled)
         .. " communitiesChat=" .. tostring(communitiesChatNameHookInstalled)
         .. " damageMeter=" .. tostring(damageMeterNameHookInstalled)
