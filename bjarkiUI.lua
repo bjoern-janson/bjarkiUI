@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.80-local"
+local BJARKI_UI_VERSION = "0.2.81-local"
 local PRD_ATLAS = "UI-HUD-CoolDownManager-Bar"
 local CLASS_SATURATION = 1.18
 local CLASS_BRIGHTNESS = 1.08
@@ -1258,73 +1258,134 @@ local function installDerivedDebuffRefresh()
 end
 
 local compactDebuffBorderHookInstalled = false
+local compactDebuffUpdateHookInstalled = false
+local compactDebuffAuraUpdateHookInstalled = false
+local compactAuraBorderHookInstalled = false
 local compactHiddenDebuffBorders = setmetatable({}, { __mode = "k" })
 
-local function isCompactPartyRaidAuraBorder(borderRegion)
-    if not borderRegion or not borderRegion.GetParent then return false end
-
-    local okAura, auraFrame = pcall(borderRegion.GetParent, borderRegion)
-    if not okAura or not auraFrame or not auraFrame.GetParent then return false end
-
-    local okContainer, container = pcall(auraFrame.GetParent, auraFrame)
-    if not okContainer or not container or not container.GetName then return false end
-
-    local okName, name = pcall(container.GetName, container)
-    if not okName or isSecret(name) or type(name) ~= "string" then return false end
-
+local function compactFrameNameMatches(name)
+    if type(name) ~= "string" or isSecret(name) then return false end
     return name:match("^CompactPartyFrameMember%d+$") ~= nil
         or name:match("^CompactRaidGroup%d+Member%d+$") ~= nil
         or name:match("^CompactRaidFrame%d+$") ~= nil
 end
 
+local function isCompactPartyRaidFrame(frame)
+    local current = frame
+    for _ = 1, 8 do
+        if not current then return false end
+
+        if current.GetName then
+            local okName, name = pcall(current.GetName, current)
+            if okName and compactFrameNameMatches(name) then
+                return true
+            end
+        end
+
+        if not current.GetParent then return false end
+        local okParent, parent = pcall(current.GetParent, current)
+        if not okParent then return false end
+        current = parent
+    end
+    return false
+end
+
 local function neutralizeCompactDebuffBorder(debuffFrame)
-    if not debuffFrame or not debuffFrame.border then return end
+    if not debuffFrame then return end
 
     local border = debuffFrame.border
-    if not border.SetAlpha then return end
+    if not border or not border.SetAlpha then return end
 
-    if isCompactPartyRaidAuraBorder(border) then
+    if isCompactPartyRaidFrame(debuffFrame) then
+        -- The border is already the final native presentation object here.
+        -- Alpha-zero hides only the dispel-colored border; icon, cooldown,
+        -- stacks, and the debuff frame itself remain untouched.
         pcall(border.SetAlpha, border, 0)
         compactHiddenDebuffBorders[border] = true
     elseif compactHiddenDebuffBorders[border] then
-        -- Compact aura textures are pooled. If Blizzard reuses a border on a
-        -- non-compact frame, restore the native presentation.
+        -- Compact aura textures are pooled. Restore native presentation if a
+        -- previously hidden border is later reused outside compact frames.
         pcall(border.SetAlpha, border, 1)
         compactHiddenDebuffBorders[border] = nil
     end
 end
 
-local function installCompactDebuffBorderNeutralization()
-    if compactDebuffBorderHookInstalled or not hooksecurefunc then return end
+local function neutralizeCompactDebuffFrames(frame)
+    if not isCompactPartyRaidFrame(frame) then return end
 
-    -- This is the authoritative compact-debuff presentation boundary on the
-    -- Classic/Forever path. CompactUnitFrame_UtilSetDebuff has already selected
-    -- the aura and written its type-colored border before this post-hook runs.
-    -- We deliberately do not inspect aura data or mutate the selection logic:
-    -- only the final border alpha is presentation-owned here.
-    if type(CompactUnitFrame_UtilSetDebuff) == "function" then
+    local debuffFrames = frame.debuffFrames
+    if type(debuffFrames) ~= "table" then return end
+
+    for i = 1, #debuffFrames do
+        neutralizeCompactDebuffBorder(debuffFrames[i])
+    end
+end
+
+local function installCompactDebuffBorderNeutralization()
+    if not hooksecurefunc then return end
+
+    -- CompactUnitFrame_UtilSetDebuff is the native type-color writer on the
+    -- Classic/Forever path. Install it when the function actually exists;
+    -- Blizzard compact-frame modules can load after bjarkiUI.
+    if not compactDebuffBorderHookInstalled
+        and type(CompactUnitFrame_UtilSetDebuff) == "function"
+    then
         hooksecurefunc("CompactUnitFrame_UtilSetDebuff", function(debuffFrame)
             neutralizeCompactDebuffBorder(debuffFrame)
         end)
+        compactDebuffBorderHookInstalled = true
     end
 
-    -- Newer AuraUtil paths may also write an atlas directly. Keep this narrow
-    -- compatibility hook, but treat the compact debuff-frame hook above as the
-    -- primary authority.
-    if type(AuraUtil) == "table" and type(AuraUtil.SetAuraBorderAtlas) == "function" then
+    -- A post-hook on the complete debuff refresh is the final safety boundary.
+    -- This catches clients/branches where another native aura writer updates
+    -- the border after the per-aura helper returns.
+    if not compactDebuffUpdateHookInstalled
+        and type(CompactUnitFrame_UpdateDebuffs) == "function"
+    then
+        hooksecurefunc("CompactUnitFrame_UpdateDebuffs", function(frame)
+            neutralizeCompactDebuffFrames(frame)
+        end)
+        compactDebuffUpdateHookInstalled = true
+    end
+
+    -- Some Forever builds route aura refreshes through UpdateAuras instead of
+    -- calling UpdateDebuffs directly. The same narrow final sweep handles that
+    -- path without reading aura data or changing selection.
+    if not compactDebuffAuraUpdateHookInstalled
+        and type(CompactUnitFrame_UpdateAuras) == "function"
+    then
+        hooksecurefunc("CompactUnitFrame_UpdateAuras", function(frame)
+            neutralizeCompactDebuffFrames(frame)
+        end)
+        compactDebuffAuraUpdateHookInstalled = true
+    end
+
+    -- Compatibility for clients whose compact border is written through AuraUtil.
+    if not compactAuraBorderHookInstalled
+        and type(AuraUtil) == "table"
+        and type(AuraUtil.SetAuraBorderAtlas) == "function"
+    then
         hooksecurefunc(AuraUtil, "SetAuraBorderAtlas", function(borderRegion)
             if not borderRegion or not borderRegion.SetAlpha then return end
-            if isCompactPartyRaidAuraBorder(borderRegion) then
-                pcall(borderRegion.SetAlpha, borderRegion, 0)
-                compactHiddenDebuffBorders[borderRegion] = true
-            elseif compactHiddenDebuffBorders[borderRegion] then
-                pcall(borderRegion.SetAlpha, borderRegion, 1)
-                compactHiddenDebuffBorders[borderRegion] = nil
+            local current = borderRegion
+            for _ = 1, 8 do
+                if not current then return end
+                if current.GetName then
+                    local okName, name = pcall(current.GetName, current)
+                    if okName and compactFrameNameMatches(name) then
+                        pcall(borderRegion.SetAlpha, borderRegion, 0)
+                        compactHiddenDebuffBorders[borderRegion] = true
+                        return
+                    end
+                end
+                if not current.GetParent then return end
+                local okParent, parent = pcall(current.GetParent, current)
+                if not okParent then return end
+                current = parent
             end
         end)
+        compactAuraBorderHookInstalled = true
     end
-
-    compactDebuffBorderHookInstalled = true
 end
 
 local legacyNotificationSuppressed = setmetatable({}, { __mode = "k" })
@@ -1588,7 +1649,7 @@ local function printUIAudit()
         .. " communitiesRoster=" .. tostring(communitiesNameHookInstalled)
         .. " communitiesChat=" .. tostring(communitiesChatNameHookInstalled)
         .. " damageMeter=" .. tostring(damageMeterNameHookInstalled)
-        .. " damageMeterInit=" .. tostring(damageMeterSourceInitHookInstalled))
+        .. " damageMeterInit=" .. tostring(damageMeterSourceInitHookInstalled)
 
     for _, unit in ipairs({ "targettarget", "focustarget" }) do
         local frame = smallFrame(unit)
