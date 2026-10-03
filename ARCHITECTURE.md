@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-This document describes the current implementation of **bjarkiUI 0.2.72-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
+This document describes the current implementation of **bjarkiUI 0.2.73-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -203,3 +203,12 @@ native display/timer writers and reduces the visible presentation to the spell
 icon only. The red line textures, black backing, ability label, timer frame,
 numeric countdown, and seconds label are hidden after native updates. The icon
 is reanchored to the exact center of the existing Loss of Control frame.
+
+
+## 14. Derived-frame repair notes
+
+Version 0.2.73 hardens Target-of-Target / Focus-of-Target presentation in three places:
+
+- derived health colors fail closed to neutral grey while player/pet identity witnesses are unreadable or disagree, instead of reusing an incorrect semantic tint;
+- native ToT/FoT debuffs are restored when Blizzard's global `showDispelDebuffs` option would otherwise filter friendly derived units down to `HARMFUL|RAID`;
+- compact Party/Raid debuff borders are suppressed by feeding the secure private-aura renderer zero border geometry through its ordinary frame settings, rather than attempting to hide forbidden `PrivateAuraMixin` regions after render.
