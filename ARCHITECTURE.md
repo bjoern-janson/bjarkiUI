@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-This document describes the current implementation of **bjarkiUI 0.2.75-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
+This document describes the current implementation of **bjarkiUI 0.2.76-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -249,3 +249,23 @@ preserves the complete `playerCommunity` hyperlink payload, and shortens only
 the hyperlink's display text.
 
 The C_Club message table and native formatter remain untouched.
+
+
+## 17. Compact-frame taint rollback
+
+Version 0.2.76 removes the 0.2.73 compact Party/Raid debuff-border suppression.
+
+The previous implementation wrote a synthetic negative `debuffBorderScale` directly
+onto Blizzard compact unit frames so the secure private-aura renderer would compute
+a zero-sized border. That writes addon-owned state into a compact frame later used
+by native secret-health/heal-prediction code, and can taint Blizzard's
+`CompactUnitFrame_OnUpdate` path.
+
+The addon no longer modifies compact aura-renderer settings or private-aura border
+geometry. Colored debuff borders therefore remain native for now rather than
+trading a cosmetic change for secret-value taint.
+
+Party-order reconnect recovery also no longer installs `OnShow`/`OnHide`
+scripts on compact member frames. `UNIT_CONNECTION` is observed by a separate
+addon event frame and the visual reanchor is deferred to the next tick, outside
+Blizzard's compact-unit update stack.
