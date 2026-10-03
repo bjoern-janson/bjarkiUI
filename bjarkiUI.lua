@@ -264,41 +264,74 @@ local function applyPowerColor(bar, unit)
     pcall(bar.SetStatusBarColor, bar, r, g, b, 1)
 end
 
-local function isPetUnit(unit)
-    if unit == "pet" then return true end
-    if not unit then return false end
+local function petUnitState(unit)
+    if unit == "pet" then return true, true end
+    if not unit then return nil, false end
 
-    -- Preserve the exact local-pet identity path for target/focus/derived tokens.
+    local localReadable = false
     if UnitIsUnit then
         local ok, same = pcall(UnitIsUnit, unit, "pet")
-        if ok and not isSecret(same) and same == true then return true end
+        if ok and not isSecret(same) and type(same) == "boolean" then
+            localReadable = true
+            if same then return true, true end
+        end
     end
 
-    -- Blizzard exposes positive identity for another player's combat pet.
-    -- Do not infer pet-ness from "non-player" or player-controlled state.
+    local otherReadable = false
     if UnitIsOtherPlayersPet then
         local ok, value = pcall(UnitIsOtherPlayersPet, unit)
         if ok and not isSecret(value) and type(value) == "boolean" then
-            return value
+            otherReadable = true
+            if value then return true, true end
         end
     end
 
-    return false
+    -- Negative pet identity requires both available identity paths to be readable.
+    -- Otherwise a reused ToT/FoT frame stays UNKNOWN instead of being painted as
+    -- an NPC while its referent is still transitioning.
+    if localReadable and (not UnitIsOtherPlayersPet or otherReadable) then
+        return false, true
+    end
+    return nil, false
 end
 
-local function isPlayerUnit(unit)
-    if not unit then return false end
+local function isPetUnit(unit)
+    local value, readable = petUnitState(unit)
+    return readable and value or false
+end
+
+local function playerUnitState(unit)
+    if not unit then return nil, false end
+
+    local apiValue, apiReadable
     if UnitIsPlayer then
         local ok, value = pcall(UnitIsPlayer, unit)
-        if ok and not isSecret(value) and type(value) == "boolean" then return value end
+        if ok and not isSecret(value) and type(value) == "boolean" then
+            apiValue, apiReadable = value, true
+        end
     end
+
+    local guidValue, guidReadable
     if UnitGUID then
         local ok, guid = pcall(UnitGUID, unit)
         if ok and not isSecret(guid) and type(guid) == "string" then
-            return guid:match("^Player%-") ~= nil
+            guidValue, guidReadable = guid:match("^Player%-") ~= nil, true
         end
     end
-    return false
+
+    -- Reused derived frames can briefly expose disagreeing identity witnesses.
+    -- Do not commit a semantic tint until the readable witnesses agree.
+    if apiReadable and guidReadable and apiValue ~= guidValue then
+        return nil, false
+    end
+    if guidReadable then return guidValue, true end
+    if apiReadable then return apiValue, true end
+    return nil, false
+end
+
+local function isPlayerUnit(unit)
+    local value, readable = playerUnitState(unit)
+    return readable and value or false
 end
 
 local function classToken(unit)
@@ -328,6 +361,16 @@ end
 local function applyHealthColor(bar, unit)
     if not bar or not bar.SetStatusBarColor or not unit then return end
 
+    local derived = unit == "targettarget" or unit == "focustarget"
+    local exists = readableBool(UnitExists, unit)
+    if exists == false then
+        clearUnknownDerivedColor(bar, unit)
+        return
+    elseif derived and exists == nil then
+        clearUnknownDerivedColor(bar, unit)
+        return
+    end
+
     -- The PRD atlas is colorized by the StatusBar tint. Keep the fill grayscale
     -- so Blizzard/source artwork cannot leak its own hue into our class/reaction tint.
     if bar.SetStatusBarDesaturated then
@@ -337,7 +380,8 @@ local function applyHealthColor(bar, unit)
     -- Positive player identity outranks pet identity. This matters most for the
     -- reusable ToT/FoT frames: a stale/transitioning pet observation must never
     -- be allowed to paint a real player green.
-    if isPlayerUnit(unit) then
+    local player, playerReadable = playerUnitState(unit)
+    if playerReadable and player then
         local colors = CUSTOM_CLASS_COLORS or RAID_CLASS_COLORS
         local color = colors and colors[classToken(unit)]
         if color then
@@ -363,12 +407,19 @@ local function applyHealthColor(bar, unit)
         end
         setHealthColor(bar, 0.5, 0.5, 0.5, 1)
         return
+    elseif derived and not playerReadable then
+        clearUnknownDerivedColor(bar, unit)
+        return
     end
 
     -- Combat pets use Blizzard's stock green health language regardless of
     -- owner/class/faction. Do this only after ruling out a real player.
-    if isPetUnit(unit) then
+    local pet, petReadable = petUnitState(unit)
+    if petReadable and pet then
         setHealthColor(bar, 0, 1, 0, 1)
+        return
+    elseif derived and not petReadable then
+        clearUnknownDerivedColor(bar, unit)
         return
     end
 
@@ -377,8 +428,6 @@ local function applyHealthColor(bar, unit)
     -- This preserves red/yellow/green selection colors while also surfacing
     -- important state such as a tap-denied/tagged NPC becoming grey.
     -- An unreadable/absent new referent must not inherit the old actor's tint.
-    if UnitExists and not UnitExists(unit) then clearUnknownDerivedColor(bar, unit); return end
-
     local connected = readableBool(UnitIsConnected, unit)
     local dead = readableBool(UnitIsDead, unit)
     if connected == false or dead == true then
@@ -1137,33 +1186,118 @@ local function installHooks()
     installThreatScaling()
 end
 
-local compactDebuffBorderHookInstalled = false
+local derivedDebuffRefreshHookInstalled = false
+local derivedDebuffRefreshGuard = false
 
-local function installCompactDebuffBorderSuppression()
-    if compactDebuffBorderHookInstalled or not hooksecurefunc then return end
-    if type(_G.PrivateAuraMixin) ~= "table"
-        or type(_G.PrivateAuraMixin.Update) ~= "function"
-        or type(_G.CompactRaidGroupTypeEnum) ~= "table"
+local function installDerivedDebuffRefresh()
+    if derivedDebuffRefreshHookInstalled or not hooksecurefunc
+        or type(AuraUtil) ~= "table" or type(AuraUtil.RefreshAuras) ~= "function"
     then
         return
     end
 
-    hooksecurefunc(_G.PrivateAuraMixin, "Update", function(self, _auraInfo, _unit, anchorInfo)
-        local settings = anchorInfo and anchorInfo.containerSettings
-        local groupType = settings and settings.groupType
-        if groupType ~= _G.CompactRaidGroupTypeEnum.Party
-            and groupType ~= _G.CompactRaidGroupTypeEnum.Raid
-        then
-            return
-        end
+    hooksecurefunc(AuraUtil, "RefreshAuras", function(frame, unit, numAuras, suffix, checkCVar, showBuffs)
+        if derivedDebuffRefreshGuard or checkCVar ~= true or showBuffs ~= false then return end
+        if frame ~= smallFrame("targettarget") and frame ~= smallFrame("focustarget") then return end
 
-        local border = self and self.DebuffBorder
-        if border and border.Hide then
-            pcall(border.Hide, border)
+        -- Blizzard's ToT/FoT refresh obeys showDispelDebuffs. When that option is
+        -- enabled on a friendly derived unit, the native HARMFUL|RAID filter can
+        -- make ordinary debuffs disappear entirely. Keep the global setting for
+        -- other frames, but restore the full harmful list on ToT/FoT.
+        local filterActive = false
+        if CVarCallbackRegistry and CVarCallbackRegistry.GetCVarValueBool then
+            local ok, value = pcall(
+                CVarCallbackRegistry.GetCVarValueBool,
+                CVarCallbackRegistry,
+                "showDispelDebuffs"
+            )
+            filterActive = ok and value == true
+        elseif GetCVarBool then
+            local ok, value = pcall(GetCVarBool, "showDispelDebuffs")
+            filterActive = ok and value == true
         end
+        if not filterActive then return end
+
+        local assistable = readableBool(UnitCanAssist, "player", unit)
+        if assistable ~= true then return end
+
+        derivedDebuffRefreshGuard = true
+        pcall(AuraUtil.RefreshAuras, frame, unit, numAuras, suffix, false, false)
+        derivedDebuffRefreshGuard = false
     end)
 
-    compactDebuffBorderHookInstalled = true
+    derivedDebuffRefreshHookInstalled = true
+end
+
+local compactDebuffBorderHookInstalled = false
+
+local function isCompactPartyOrRaidFrame(frame)
+    local enums = _G.CompactRaidGroupTypeEnum
+    local groupType = frame and frame.groupType
+    return type(enums) == "table"
+        and (groupType == enums.Party or groupType == enums.Raid)
+end
+
+local function suppressCompactDebuffBorderGeometry(frame, explicitAuraSize, refreshSettings)
+    if not isCompactPartyOrRaidFrame(frame) then return end
+
+    local auraSize = explicitAuraSize
+    if (type(auraSize) ~= "number" or isSecret(auraSize))
+        and frame.GetDebuffAuraSize
+    then
+        local ok, value = pcall(frame.GetDebuffAuraSize, frame)
+        if ok and not isSecret(value) and type(value) == "number" then
+            auraSize = value
+        end
+    end
+    if type(auraSize) ~= "number" or isSecret(auraSize) or auraSize <= 0 then return end
+
+    -- Private aura buttons are forbidden to addon code, so hiding DebuffBorder
+    -- after PrivateAuraMixin:Update is not a reliable ownership boundary. Feed
+    -- the secure renderer a border scale that makes its own border geometry 0x0:
+    --   borderSize = auraWidth + (5 * borderScale)
+    frame.debuffBorderScale = -(auraSize / 5)
+
+    if refreshSettings and not (InCombatLockdown and InCombatLockdown())
+        and frame.TriggerPrivateAuraSettingsUpdate
+    then
+        pcall(frame.TriggerPrivateAuraSettingsUpdate, frame)
+    end
+end
+
+local function refreshExistingCompactDebuffBorders()
+    local party = _G.CompactPartyFrame
+    local members = party and party.memberUnitFrames
+    if type(members) == "table" then
+        for _, frame in ipairs(members) do
+            suppressCompactDebuffBorderGeometry(frame, nil, true)
+        end
+    end
+
+    local raid = _G.CompactRaidFrameContainer
+    if raid and type(raid.ApplyToFrames) == "function" then
+        pcall(raid.ApplyToFrames, raid, "normal", function(frame)
+            suppressCompactDebuffBorderGeometry(frame, nil, true)
+        end)
+    end
+end
+
+local function installCompactDebuffBorderSuppression()
+    if not compactDebuffBorderHookInstalled and hooksecurefunc then
+        local mixin = _G.PrivateAuraAnchorSettingsContainerMixin
+        if type(mixin) == "table" and type(mixin.SetDebuffAuraSize) == "function" then
+            -- ApplyAuraLayout writes border scale first, then aura size, then asks
+            -- the secure private-aura renderer to update. Overriding the ordinary
+            -- Lua field here reaches that renderer without touching forbidden
+            -- PrivateAura frames.
+            hooksecurefunc(mixin, "SetDebuffAuraSize", function(self, auraSize)
+                suppressCompactDebuffBorderGeometry(self, auraSize, false)
+            end)
+            compactDebuffBorderHookInstalled = true
+        end
+    end
+
+    refreshExistingCompactDebuffBorders()
 end
 
 local legacyNotificationSuppressed = setmetatable({}, { __mode = "k" })
@@ -1319,6 +1453,7 @@ events:SetScript("OnEvent", function(_, event, unit)
         anchorUIErrorsFrame()
         installLossOfControlPresentation()
         installHooks()
+        installDerivedDebuffRefresh()
         installCompactDebuffBorderSuppression()
         installMicroMenuChildOffset()
         installGuildNotificationPipSuppression()
@@ -1330,6 +1465,7 @@ events:SetScript("OnEvent", function(_, event, unit)
         applyWorldTextPosition()
         anchorUIErrorsFrame()
         installLossOfControlPresentation()
+        installDerivedDebuffRefresh()
         installCompactDebuffBorderSuppression()
         installMicroMenuChildOffset()
         installGuildNotificationPipSuppression()
