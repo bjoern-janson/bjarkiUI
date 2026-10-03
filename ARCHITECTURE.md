@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-This document describes the current implementation of **bjarkiUI 0.2.79-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
+This document describes the current implementation of **bjarkiUI 0.2.80-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -324,3 +324,27 @@ visual layout.
 The maintenance invariant is that **presentation authority follows readable
 identity and runs outside Blizzard's protected state-transition stack whenever
 possible**.
+
+
+## 21. Compact debuff-border ownership
+
+Version 0.2.80 corrects the presentation interception point for colored debuff
+borders on raid and raid-style party frames.
+
+The previous hook observed `AuraUtil.SetAuraBorderAtlas`, which is not the
+authoritative write on the Forever compact-frame path. Blizzard can instead
+color the compact debuff border during `CompactUnitFrame_UtilSetDebuff`.
+
+The addon therefore hooks that post-write boundary and changes only the final
+border alpha for frames whose ancestry is positively identified as:
+
+- `CompactPartyFrameMemberN`
+- `CompactRaidGroupNMemberN`
+- `CompactRaidFrameN`
+
+It does not inspect aura data, alter debuff selection, change icons, cooldowns,
+stacks, health bars, or other frame types. UNKNOWN frame ancestry leaves the
+native presentation untouched.
+
+The `AuraUtil.SetAuraBorderAtlas` hook remains only as a compatibility path for
+clients where the same compact presentation is written through that API.
