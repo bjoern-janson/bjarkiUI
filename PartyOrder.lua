@@ -34,6 +34,11 @@ local function safeNumberMethod(object, method)
     return value
 end
 
+local function readableUnitToken(value)
+    if isSecret(value) or type(value) ~= "string" then return nil end
+    return value
+end
+
 local function inCombat()
     return safeBool(InCombatLockdown) == true
 end
@@ -69,11 +74,11 @@ local function visualMembers(frame)
 
     for _, member in ipairs(members) do
         if shown(member) then
-            local unit = member.unit
+            local unit = readableUnitToken(member.unit)
             -- Unit-token identity is the evidence that licenses reordering.
             -- If Blizzard protects or withholds it, preserve native order rather
             -- than guessing from frame position or stale assignments.
-            if isSecret(unit) or type(unit) ~= "string" then return nil end
+            if not unit then return nil end
             if unit == "player"
                 or unit == "party1" or unit == "party2"
                 or unit == "party3" or unit == "party4"
