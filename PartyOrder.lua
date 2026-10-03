@@ -11,6 +11,7 @@
 -- Blizzard compares secret health-color values.
 
 local hookedFrames = setmetatable({}, { __mode = "k" })
+local hookedMemberFrames = setmetatable({}, { __mode = "k" })
 local generatorHooked = false
 
 local function inCombat()
@@ -173,7 +174,7 @@ local function install()
         hookedFrames[frame] = true
 
         if type(frame.RefreshMembers) == "function" then
-            -- RefreshMembers calls the layout function cached during OnLoad.
+            -- GROUP_ROSTER_UPDATE and other roster rebuilds finish here.
             hooksecurefunc(frame, "RefreshMembers", function(self)
                 if self == frame then
                     applyVisualOrder(self)
@@ -181,13 +182,39 @@ local function install()
             end)
         end
 
-        if type(frame.UpdateLayout) == "function" then
-            -- Edit Mode and other native paths can relayout directly later.
+        -- CompactPartyFrame caches UpdateLayout into updateLayoutFunc during
+        -- OnLoad. Native code later calls that cached function directly, so a
+        -- hook on frame.UpdateLayout alone misses some relayouts.
+        if type(frame.updateLayoutFunc) == "function" then
+            hooksecurefunc(frame, "updateLayoutFunc", function(self)
+                if self == frame then
+                    applyVisualOrder(self)
+                end
+            end)
+        elseif type(frame.UpdateLayout) == "function" then
             hooksecurefunc(frame, "UpdateLayout", function(self)
                 if self == frame then
                     applyVisualOrder(self)
                 end
             end)
+        end
+    end
+
+    -- A relog can briefly make one compact member frame disappear and return
+    -- without reconstructing the whole party frame. Blizzard's visibility path
+    -- does not itself guarantee a Party-frame relayout, so keep our anchor chain
+    -- current when an individual member is shown/hidden.
+    if not inCombat() and type(frame.memberUnitFrames) == "table" then
+        for _, member in ipairs(frame.memberUnitFrames) do
+            if member and not hookedMemberFrames[member] and member.HookScript then
+                hookedMemberFrames[member] = true
+                member:HookScript("OnShow", function()
+                    applyVisualOrder(frame)
+                end)
+                member:HookScript("OnHide", function()
+                    applyVisualOrder(frame)
+                end)
+            end
         end
     end
 
