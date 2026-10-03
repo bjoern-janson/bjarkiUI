@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-This document describes the current implementation of **bjarkiUI 0.2.80-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
+This document describes the current implementation of **bjarkiUI 0.2.81-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -328,23 +328,35 @@ possible**.
 
 ## 21. Compact debuff-border ownership
 
-Version 0.2.80 corrects the presentation interception point for colored debuff
-borders on raid and raid-style party frames.
+Version 0.2.80 corrected the intended native write boundary for the colored
+compact debuff border to `CompactUnitFrame_UtilSetDebuff`, while retaining a
+narrow `AuraUtil.SetAuraBorderAtlas` compatibility path.
 
-The previous hook observed `AuraUtil.SetAuraBorderAtlas`, which is not the
-authoritative write on the Forever compact-frame path. Blizzard can instead
-color the compact debuff border during `CompactUnitFrame_UtilSetDebuff`.
+## 22. Compact debuff-border lifecycle hardening
 
-The addon therefore hooks that post-write boundary and changes only the final
-border alpha for frames whose ancestry is positively identified as:
+Version 0.2.81 tightens that implementation after live validation showed the
+per-aura hook alone was insufficient on the tested client.
+
+The addon now has three non-invasive final presentation boundaries:
+
+1. `CompactUnitFrame_UtilSetDebuff` — catches the native type-color write;
+2. `CompactUnitFrame_UpdateDebuffs` — performs a final sweep after the full
+   debuff refresh;
+3. `CompactUnitFrame_UpdateAuras` — covers builds that route aura refresh
+   through that path.
+
+The update hooks operate only on frames positively identified in their parent
+chain as:
 
 - `CompactPartyFrameMemberN`
 - `CompactRaidGroupNMemberN`
 - `CompactRaidFrameN`
 
-It does not inspect aura data, alter debuff selection, change icons, cooldowns,
-stacks, health bars, or other frame types. UNKNOWN frame ancestry leaves the
-native presentation untouched.
+The sweep changes only the existing `debuffFrame.border` alpha. It does not
+inspect aura data, alter debuff selection, touch icons/cooldowns/stacks, change
+health bars, or write compact-frame state.
 
-The `AuraUtil.SetAuraBorderAtlas` hook remains only as a compatibility path for
-clients where the same compact presentation is written through that API.
+Hook installation is also retryable. If Blizzard's compact-frame module is
+loaded after `PLAYER_LOGIN`, bjarkiUI waits for the relevant
+`ADDON_LOADED` boundary instead of permanently recording an uninstalled hook
+as installed.
