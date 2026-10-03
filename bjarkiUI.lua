@@ -8,6 +8,7 @@ local HIGHLIGHT_SCALE = 0.25
 
 local WORLD_TEXT_SCREEN_Y = "0.0425"
 local WORLD_TEXT_CRIT_SCREEN_Y = "0.0550"
+local UI_ERRORS_Y = -32
 
 local EDIT_MODE_LAYOUT_NAME = "bjarkiUI"
 
@@ -80,12 +81,28 @@ local function applyWorldTextPosition()
     pcall(setter, "WorldTextCritScreenY_v2", WORLD_TEXT_CRIT_SCREEN_Y)
 end
 
+local function anchorUIErrorsFrame()
+    local frame = _G.UIErrorsFrame
+    if not frame or not frame.ClearAllPoints or not frame.SetPoint then return end
+
+    -- Keep Blizzard's horizontal center; only raise the default error stack.
+    pcall(frame.ClearAllPoints, frame)
+    pcall(frame.SetPoint, frame, "TOP", UIParent, "TOP", 0, UI_ERRORS_Y)
+end
+
 local hooksInstalled = false
 
 local function isSecret(value)
     if not issecretvalue then return false end
     local ok, secret = pcall(issecretvalue, value)
     return ok and secret == true
+end
+
+local function readableBool(fn, ...)
+    if not fn then return nil end
+    local ok, value = pcall(fn, ...)
+    if not ok or isSecret(value) or type(value) ~= "boolean" then return nil end
+    return value
 end
 
 local function smallFrame(unit)
@@ -286,13 +303,6 @@ local function applyHealthColor(bar, unit)
     -- An unreadable/absent new referent must not inherit the old actor's tint.
     if UnitExists and not UnitExists(unit) then clearUnknownDerivedColor(bar, unit); return end
 
-    local function readableBool(fn, ...)
-        if not fn then return nil end
-        local ok, value = pcall(fn, ...)
-        if not ok or isSecret(value) or type(value) ~= "boolean" then return nil end
-        return value
-    end
-
     local connected = readableBool(UnitIsConnected, unit)
     local dead = readableBool(UnitIsDead, unit)
     if connected == false or dead == true then
@@ -462,12 +472,9 @@ local function shortenCommunityFormattedMessage(formatted, message)
 
     -- Keep the full name inside the hyperlink payload so clicks/whispers/report
     -- actions still resolve the real member. Change only the visible |h...|h text.
-    local changed = false
     local result = formatted:gsub("(|H.-|h)(.-)(|h)", function(openLink, display, closeLink)
-        if changed then return openLink .. display .. closeLink end
         local replaced, count = display:gsub(escapePattern(name), primary, 1)
         if count > 0 then
-            changed = true
             return openLink .. replaced .. closeLink
         end
         return openLink .. display .. closeLink
@@ -872,7 +879,7 @@ end
 
 local textureScaleGuards = setmetatable({}, { __mode = "k" })
 
-local function installVertexAlphaScale(texture, scale, predicate)
+local function installVertexAlphaScale(texture, scale)
     if not texture or not texture.SetVertexColor or not hooksecurefunc then return end
     local state = textureScaleGuards[texture] or {}
     textureScaleGuards[texture] = state
@@ -881,12 +888,7 @@ local function installVertexAlphaScale(texture, scale, predicate)
 
     local function apply(r, g, b, a)
         if state.vertexGuard then return end
-        if predicate and not predicate() then return end
         local resolvedScale = scale
-        if type(scale) == "function" then
-            local ok, value = pcall(scale)
-            if ok and not isSecret(value) then resolvedScale = value end
-        end
         if isSecret(resolvedScale) or type(resolvedScale) ~= "number" then resolvedScale = 1 end
 
         -- Secret color components can throw on comparison/arithmetic before
@@ -923,35 +925,13 @@ local function installThreatScaling()
     local targetFlash = target and target.TargetFrameContainer and target.TargetFrameContainer.Flash
     local focusFlash = focus and focus.TargetFrameContainer and focus.TargetFrameContainer.Flash
 
-    local function unitThreatScale(unit)
-        return function()
-            if UnitAffectingCombat then
-                local okPlayer, playerInCombat = pcall(UnitAffectingCombat, "player")
-                local okUnit, unitInCombat = pcall(UnitAffectingCombat, unit)
-                if okPlayer and okUnit
-                    and not isSecret(playerInCombat) and not isSecret(unitInCombat)
-                    and type(playerInCombat) == "boolean"
-                    and type(unitInCombat) == "boolean"
-                then
-                    -- Full warning only after both sides are actually in combat.
-                    -- A right-click/auto-attack intent can produce threat state
-                    -- before the target itself has entered combat.
-                    return (playerInCombat and unitInCombat)
-                        and HIGHLIGHT_SCALE
-                        or HIGHLIGHT_SCALE
-                end
-            end
-            return HIGHLIGHT_SCALE
-        end
-    end
-
     -- Player/target/focus now share the same native threat-flash treatment.
     -- Each frame keeps its own Blizzard atlas/geometry; only intensity is
     -- normalized. This makes the player warning read like the target warning
     -- instead of using the unrelated StatusTexture art.
     installVertexAlphaScale(playerFlash, HIGHLIGHT_SCALE)
-    installVertexAlphaScale(targetFlash, unitThreatScale("target"))
-    installVertexAlphaScale(focusFlash, unitThreatScale("focus"))
+    installVertexAlphaScale(targetFlash, HIGHLIGHT_SCALE)
+    installVertexAlphaScale(focusFlash, HIGHLIGHT_SCALE)
     installVertexAlphaScale(_G.PetFrameFlash, HIGHLIGHT_SCALE)
     installVertexAlphaScale(_G.PetAttackModeTexture, HIGHLIGHT_SCALE)
 
@@ -1081,10 +1061,112 @@ local function installHooks()
     installThreatScaling()
 end
 
+local compactDebuffBorderHookInstalled = false
+
+local function installCompactDebuffBorderSuppression()
+    if compactDebuffBorderHookInstalled or not hooksecurefunc then return end
+    if type(_G.PrivateAuraMixin) ~= "table"
+        or type(_G.PrivateAuraMixin.Update) ~= "function"
+        or type(_G.CompactRaidGroupTypeEnum) ~= "table"
+    then
+        return
+    end
+
+    hooksecurefunc(_G.PrivateAuraMixin, "Update", function(self, _auraInfo, _unit, anchorInfo)
+        local settings = anchorInfo and anchorInfo.containerSettings
+        local groupType = settings and settings.groupType
+        if groupType ~= _G.CompactRaidGroupTypeEnum.Party
+            and groupType ~= _G.CompactRaidGroupTypeEnum.Raid
+        then
+            return
+        end
+
+        local border = self and self.DebuffBorder
+        if border and border.Hide then
+            pcall(border.Hide, border)
+        end
+    end)
+
+    compactDebuffBorderHookInstalled = true
+end
+
+local legacyNotificationSuppressed = setmetatable({}, { __mode = "k" })
+
+local function isLegacyMicroButton(button)
+    if not button then return false end
+
+    local name
+    if button.GetName then
+        local ok, value = pcall(button.GetName, button)
+        if ok and type(value) == "string" then name = value end
+    end
+
+    local command = button.commandName
+    if type(name) == "string"
+        and name:lower():find("legacy", 1, true)
+    then
+        return true
+    end
+    if type(command) == "string"
+        and command:lower():find("legacy", 1, true)
+    then
+        return true
+    end
+
+    return false
+end
+
+local function suppressLegacyNotificationPip()
+    local menu = _G.MicroMenu
+    if not menu or not menu.GetChildren then return end
+
+    for _, button in ipairs({ menu:GetChildren() }) do
+        if isLegacyMicroButton(button) then
+            local overlay = button.NotificationOverlay
+            if overlay and not legacyNotificationSuppressed[overlay] then
+                -- Keep the feature button functional; suppress only its pip.
+                if overlay.SetAlpha then
+                    pcall(overlay.SetAlpha, overlay, 0)
+                end
+                if overlay.Hide then
+                    pcall(overlay.Hide, overlay)
+                end
+                legacyNotificationSuppressed[overlay] = true
+            end
+        end
+    end
+end
+
+local guildNotificationHookInstalled = false
+
+local function hideGuildNotificationPip()
+    local button = _G.GuildMicroButton
+    local overlay = button and button.NotificationOverlay
+    if overlay and overlay.Hide then
+        pcall(overlay.Hide, overlay)
+    end
+end
+
+local function installGuildNotificationPipSuppression()
+    local button = _G.GuildMicroButton
+    if not button then return end
+
+    if not guildNotificationHookInstalled and hooksecurefunc
+        and type(button.UpdateNotificationIcon) == "function"
+    then
+        hooksecurefunc(button, "UpdateNotificationIcon", hideGuildNotificationPip)
+        guildNotificationHookInstalled = true
+    end
+
+    hideGuildNotificationPip()
+end
+
 local microMenuChildOffsetHookInstalled = false
 local MICRO_MENU_CHILD_Y_OFFSET = -1
 
 local function applyMicroMenuChildOffset()
+    suppressLegacyNotificationPip()
+
     local menu = _G.MicroMenu
     local container = _G.MicroMenuContainer
     if not menu or not container or menu:GetParent() ~= container
@@ -1114,6 +1196,8 @@ end
 local function installMicroMenuChildOffset()
     local menu = _G.MicroMenu
     if not menu then return end
+
+    suppressLegacyNotificationPip()
 
     if not microMenuChildOffsetHookInstalled and hooksecurefunc
         and type(menu.AnchorToMenuContainer) == "function"
@@ -1146,20 +1230,31 @@ events:SetScript("OnEvent", function(_, event, unit)
             installCommunitiesPrimaryNames()
         elseif unit == "Blizzard_DamageMeter" then
             installDamageMeterPrimaryNames()
+        elseif unit == "Blizzard_MicroMenu" then
+            installGuildNotificationPipSuppression()
+            suppressLegacyNotificationPip()
+        elseif unit == "Blizzard_PrivateAurasUI" then
+            installCompactDebuffBorderSuppression()
         end
         return
     elseif event == "PLAYER_LOGIN" then
         installEditModeLayout()
         applyWorldTextPosition()
+        anchorUIErrorsFrame()
         installHooks()
+        installCompactDebuffBorderSuppression()
         installMicroMenuChildOffset()
+        installGuildNotificationPipSuppression()
         applyStaticFonts()
         anchorCombatText()
         applyAll()
     elseif event == "PLAYER_ENTERING_WORLD" then
         installEditModeLayout()
         applyWorldTextPosition()
+        anchorUIErrorsFrame()
+        installCompactDebuffBorderSuppression()
         installMicroMenuChildOffset()
+        installGuildNotificationPipSuppression()
         applyStaticFonts()
         anchorCombatText()
         applyAll()

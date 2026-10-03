@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-This document describes the current implementation of **bjarkiUI 0.2.61-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
+This document describes the current implementation of **bjarkiUI 0.2.67-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -126,7 +126,7 @@ Outgoing world combat text uses two CVars:
 
 Incoming player hit text is anchored above the Personal Resource Display using Blizzard's existing combat-text frame.
 
-The previous experimental PRD movement-speed/duel-distance module is not present in 0.2.61.
+The previous experimental PRD movement-speed/duel-distance module is not present in 0.2.67.
 
 ## 8. Party frame ordering
 
@@ -158,7 +158,7 @@ Examples:
 
 Optional Blizzard modules such as Communities and Damage Meter are hooked when they load.
 
-`PartyOrder.lua` installs its hook on login/world-entry/module availability and retries deferred visual ordering after leaving combat.
+`PartyOrder.lua` installs on login/world-entry/module availability, derives the visible party order from the current assigned unit tokens, and reapplies after both `RefreshMembers()` and direct `UpdateLayout()` paths. It does not initiate Blizzard compact-frame refreshes.
 
 ## 10. Protected and secret values
 
@@ -185,3 +185,12 @@ In particular:
 - remember that ToT/FoT and Damage Meter rows are reused;
 - prefer event/post-update corrections over permanent polling;
 - keep documentation files out of the `.toc` load list.
+
+
+## 12. Small presentation suppressions
+
+The current build also makes three narrow presentation changes without replacing the surrounding Blizzard systems:
+
+- raises the default `UIErrorsFrame` vertically while preserving its horizontal center;
+- hides dispel-type colored borders on harmful aura icons in compact Party/Raid frames while leaving the icons, cooldowns, stacks, and separate dispel overlay intact;
+- hides Guild and Legacy-system notification pips on the Micro Menu while keeping the buttons functional.

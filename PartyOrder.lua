@@ -12,7 +12,6 @@
 
 local hookedFrames = setmetatable({}, { __mode = "k" })
 local generatorHooked = false
-local pending = false
 
 local function inCombat()
     return InCombatLockdown and InCombatLockdown()
@@ -26,18 +25,53 @@ local function visualMembers(frame)
     local members = frame and frame.memberUnitFrames
     if type(members) ~= "table" then return nil end
 
-    local ordered = {}
+    -- Edit Mode can force empty party slots to display the player repeatedly.
+    -- In that preview state the unit token no longer identifies the slot.
+    local edit = _G.EditModeManagerFrame
+    if edit and edit.ArePartyFramesForcedShown
+        and edit:ArePartyFramesForcedShown()
+    then
+        local ordered = {}
+        for i = 2, #members do
+            if shown(members[i]) then
+                ordered[#ordered + 1] = members[i]
+            end
+        end
+        if shown(members[1]) then
+            ordered[#ordered + 1] = members[1]
+        end
+        return ordered
+    end
 
-    -- Native party assignment is normally:
-    -- Member1=player, Member2=party1, Member3=party2, ...
-    for i = 2, #members do
-        if shown(members[i]) then
-            ordered[#ordered + 1] = members[i]
+    -- Derive the order from the unit tokens Blizzard actually assigned. This
+    -- survives native group/alphabetical/role sorting.
+    local byToken = {}
+    local extras = {}
+
+    for _, member in ipairs(members) do
+        if shown(member) then
+            local unit = member.unit
+            if unit == "player"
+                or unit == "party1" or unit == "party2"
+                or unit == "party3" or unit == "party4"
+            then
+                byToken[unit] = member
+            else
+                extras[#extras + 1] = member
+            end
         end
     end
 
-    if shown(members[1]) then
-        ordered[#ordered + 1] = members[1]
+    local ordered = {}
+    for i = 1, 4 do
+        local member = byToken["party" .. i]
+        if member then ordered[#ordered + 1] = member end
+    end
+    for _, member in ipairs(extras) do
+        ordered[#ordered + 1] = member
+    end
+    if byToken.player then
+        ordered[#ordered + 1] = byToken.player
     end
 
     return ordered
@@ -60,7 +94,7 @@ local function reanchorPets(frame, ordered, horizontal)
                 pet:SetPoint("LEFT", previousShown, "RIGHT")
             end
         else
-            pet:SetPoint("TOP", anchor, "BOTTOM")
+            pet:SetPoint("TOP", previousShown or anchor, "BOTTOM")
         end
 
         if shown(pet) then
@@ -75,15 +109,12 @@ local function applyVisualOrder(frame)
 
     -- This feature is only for raid-style PARTY frames.
     if IsInRaid and IsInRaid() then
-        pending = false
         return
     end
 
     if inCombat() then
-        pending = true
         return
     end
-    pending = false
 
     local ordered = visualMembers(frame)
     if not ordered or #ordered == 0 then return end
@@ -132,33 +163,32 @@ local function install()
         and type(_G.CompactPartyFrame_Generate) == "function"
     then
         generatorHooked = true
-        hooksecurefunc("CompactPartyFrame_Generate", function(frame)
-            install()
-            applyVisualOrder(frame or _G.CompactPartyFrame)
-        end)
+        hooksecurefunc("CompactPartyFrame_Generate", install)
     end
 
     local frame = _G.CompactPartyFrame
     if not frame then return end
 
-    if not hookedFrames[frame] and hooksecurefunc
-        and type(frame.RefreshMembers) == "function"
-    then
+    if not hookedFrames[frame] and hooksecurefunc then
         hookedFrames[frame] = true
 
-        -- RefreshMembers has already:
-        --   1. chosen the native unit tokens,
-        --   2. run CompactUnitFrame_SetUpFrame / SetUnit,
-        --   3. updated health/power/name state,
-        --   4. run the native layout,
-        --   5. updated PartyFrame padding.
-        --
-        -- Reanchor only after all of that has returned.
-        hooksecurefunc(frame, "RefreshMembers", function(self)
-            if self == frame then
-                applyVisualOrder(self)
-            end
-        end)
+        if type(frame.RefreshMembers) == "function" then
+            -- RefreshMembers calls the layout function cached during OnLoad.
+            hooksecurefunc(frame, "RefreshMembers", function(self)
+                if self == frame then
+                    applyVisualOrder(self)
+                end
+            end)
+        end
+
+        if type(frame.UpdateLayout) == "function" then
+            -- Edit Mode and other native paths can relayout directly later.
+            hooksecurefunc(frame, "UpdateLayout", function(self)
+                if self == frame then
+                    applyVisualOrder(self)
+                end
+            end)
+        end
     end
 
     applyVisualOrder(frame)
@@ -175,10 +205,6 @@ for _, event in ipairs({
     events:RegisterEvent(event)
 end
 
-events:SetScript("OnEvent", function(_, event)
+events:SetScript("OnEvent", function()
     install()
-
-    if event == "PLAYER_REGEN_ENABLED" and pending then
-        applyVisualOrder(_G.CompactPartyFrame)
-    end
 end)
