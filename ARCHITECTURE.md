@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-This document describes the current implementation of **bjarkiUI 0.2.91-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
+This document describes the current implementation of **bjarkiUI 0.2.92-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -46,19 +46,21 @@ The addon does not replace the underlying health or power values.
 
 The health-color path currently prefers:
 
-1. positively identified players -> readable class color, or a matching native health-bar color when class data is unavailable;
+1. positively identified players -> adjusted readable direct/alias class color, then native class-color rendering, then a matching readable native health-bar color;
 2. positively identified combat pets -> green;
 3. unknown player identity -> class color only from a positively identified player alias with a readable same-actor match;
 4. otherwise, a matching native health bar -> its readable RGB copied exactly;
 5. when no matching native bar supplies a color, readable NPC state -> disconnected/dead grey, tap-denied light grey, hostile threat red, or Blizzard selection color.
 
-Player class colors receive the existing small saturation/brightness adjustment. Direct positive player identity remains ahead of a stale pet witness. A readable non-player identity blocks contradictory class evidence from party, raid, or nameplate aliases. A class token by itself does not establish player identity.
+Readable direct/alias class colors receive the existing small saturation/brightness adjustment. Direct positive player identity remains ahead of a stale pet witness. A readable non-player identity blocks contradictory class evidence from party, raid, or nameplate aliases. A class token by itself does not establish player identity.
 
-Native bar RGB is copied as presentation data, without reverse-mapping it to a class or applying the class-color adjustment again. Generic name/region FontString colors are not class evidence. Unmatched nameplates and unreadable color components cannot authorize a replacement.
+The native class-color path uses UnitClassBase and C_ClassColor.GetClassColor only after independent positive player evidence. It forwards ColorMixin:GetRGB components directly to SetStatusBarColor with alpha 1, through the existing write guard. Protected tokens and components never enter class inference, palette lookup, adjustment, logging, or retained identity state. A separate readable call-success result controls fallback; a failed write releases the guard. This path uses the native palette and precedes copied bar RGB, so a copied white bar cannot prevent an available class-color lookup. The pinned [class-color API](https://github.com/Gethe/wow-ui-source/blob/15666a6e67938a1ab5caf041406464251db111ca/Interface/AddOns/Blizzard_APIDocumentationGenerated/ClassColorDocumentation.lua) and [status-bar API](https://github.com/Gethe/wow-ui-source/blob/15666a6e67938a1ab5caf041406464251db111ca/Interface/AddOns/Blizzard_APIDocumentationGenerated/SimpleStatusBarAPIDocumentation.lua) permit this protected-component transport; live-client behavior still needs validation.
+
+Native bar RGB is copied as presentation data, without reverse-mapping it to a class or applying the class-color adjustment again. Generic name/region FontString colors are not class evidence. Unmatched nameplates and unreadable copied bar components cannot authorize that fallback.
 
 For `targettarget` and `focustarget`, the native frames are reusable. The addon therefore reapplies the current unit's presentation when Blizzard rebinds those frames. It also hooks the final health-bar color write on those two derived frames so a later native tint does not leave the color from the previous referent.
 
-If the derived referent cannot provide a warranted readable replacement color, the addon makes no color write and preserves Blizzard's native tint. Unknown identity does not introduce a neutral-grey fallback.
+If the derived referent cannot provide a warranted replacement color, the addon makes no color write and preserves Blizzard's native tint. Unknown identity does not introduce a neutral-grey fallback.
 
 ### Power colors
 
@@ -374,7 +376,7 @@ as installed.
 Recent user reports (2026-10-08) say opposing-faction class-colored health
 bars remain white or otherwise incorrect in Battlegrounds. The same problem
 affects enemy Target-of-Target and Focus-of-Target bars. These symptoms have not
-been checked in the live client against 0.2.91-local. The source repairs do not
+been checked in the live client against 0.2.92-local. The source repairs do not
 establish live resolution of these reports.
 
 A prior `/bui colors` capture showed the enemy target and targettarget as

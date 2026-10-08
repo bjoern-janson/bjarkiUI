@@ -1,11 +1,24 @@
 # Known issues and bugs
 
-Status recorded 2026-10-08 for **bjarkiUI 0.2.91-local**.
+Status recorded 2026-10-08 for **bjarkiUI 0.2.92-local**.
 
 The Battleground observations below reflect user reports and diagnostic output.
 They remain open until checked in the live client against this build.
 A report describes a visible symptom; it does not by itself establish the
 failing code path or root cause.
+
+## Native class-color fallback in 0.2.92
+
+Positively identified players can now use the native class-color lookup even
+when their class token or RGB components are protected. Components pass directly
+to the native status bar with alpha 1. Readable direct/authorized-alias class
+colors retain their adjustment and priority; copied native bar RGB remains the
+fallback if the new path fails.
+
+Player/pet/NPC/unknown identity rules, green pets and the existing derived-frame
+write guard are preserved. Focused mocked cases cover copied-white precedence,
+failed writes, recovery and unit/frame reassignment. This establishes source
+behavior, not resolution of every Battleground color report.
 
 ## Confirmed source repairs in 0.2.91
 
@@ -52,7 +65,7 @@ separate issues.
 
 ## Verification boundary
 
-No live WoW test has confirmed these reports fixed in 0.2.91-local. See
+No live WoW test has confirmed these reports fixed in 0.2.92-local. See
 [`ARCHITECTURE.md`](ARCHITECTURE.md) for the frame/color implementation and
 reported BG diagnostics. Pet portraits and aura category failures are tracked
 in the [bjarkiPortraits issue list](https://github.com/bjoern-janson/bjarkiPortraits/blob/main/KNOWN_ISSUES.md).

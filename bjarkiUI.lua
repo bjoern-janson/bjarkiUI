@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.91-local"
+local BJARKI_UI_VERSION = "0.2.92-local"
 local PRD_ATLAS = "UI-HUD-CoolDownManager-Bar"
 local CLASS_SATURATION = 1.18
 local CLASS_BRIGHTNESS = 1.08
@@ -595,8 +595,33 @@ local function setHealthColor(bar, ...)
         pcall(bar.SetStatusBarDesaturated, bar, false)
     end
     healthColorWrites[bar] = true
-    pcall(bar.SetStatusBarColor, bar, ...)
+    local ok = pcall(bar.SetStatusBarColor, bar, ...)
     healthColorWrites[bar] = nil
+    return ok
+end
+
+local function setNativePlayerClassColor(bar, unit)
+    if not isPlayerUnit(unit) then return false end
+    local ok, applied = pcall(function()
+        if type(UnitClassBase) ~= "function" then return false end
+        local api = C_ClassColor
+        if isSecret(api) or type(api) ~= "table" then return false end
+        local getClassColor = api.GetClassColor
+        if isSecret(getClassColor) or type(getClassColor) ~= "function" then return false end
+
+        local token = UnitClassBase(unit)
+        if not isSecret(token) and type(token) ~= "string" then return false end
+        local color = getClassColor(token)
+        if isSecret(color) or not color then return false end
+        local getRGB = color.GetRGB
+        if isSecret(getRGB) or type(getRGB) ~= "function" then return false end
+
+        -- Native APIs accept protected class/RGB values. Keep these components
+        -- out of readable color selection, palette adjustment, and identity.
+        local r, g, b = getRGB(color)
+        return setHealthColor(bar, r, g, b, 1)
+    end)
+    return ok and applied == true
 end
 
 local function preserveUnknownDerivedColor(bar, unit)
@@ -619,15 +644,19 @@ local function applyHealthColor(bar, unit)
     -- be allowed to paint a real player green.
     local player, playerReadable = playerUnitState(unit)
     if playerReadable and player then
-        local r, g, b, a = fallbackPlayerHealthColor(unit)
-        if r then
+        local r, g, b, a, source = fallbackPlayerHealthColor(unit)
+        -- Readable direct/alias class colors have no native source label.
+        -- Keep their adjustment ahead of the opaque native rendering path.
+        if r and not source then
             setHealthColor(bar, r, g, b, a)
             return
         end
+        if setNativePlayerClassColor(bar, unit) then return end
+        if r then setHealthColor(bar, r, g, b, a) end
 
         -- UnitSelectionColor is a faction/reaction color here, not class data;
         -- some battleground clients return white for protected enemy players.
-        -- The matching nameplate fallback above is the visible color witness.
+        -- Copied native health RGB remains the fallback if class rendering fails.
         return
     end
 
