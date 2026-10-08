@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.90-local"
+local BJARKI_UI_VERSION = "0.2.91-local"
 local PRD_ATLAS = "UI-HUD-CoolDownManager-Bar"
 local CLASS_SATURATION = 1.18
 local CLASS_BRIGHTNESS = 1.08
@@ -98,17 +98,18 @@ local function stripLossOfControlPresentation()
     local frame = _G.LossOfControlFrame
     if not frame then return end
 
-    for _, region in ipairs({
-        frame.RedLineTop,
-        frame.RedLineBottom,
-        frame.blackBg,
-        frame.AbilityName,
-        frame.SpellName,
-        frame.ControlName,
-        frame.LocTypeText,
-        frame.Label,
-        frame.Text,
+    for _, field in ipairs({
+        "RedLineTop",
+        "RedLineBottom",
+        "blackBg",
+        "AbilityName",
+        "SpellName",
+        "ControlName",
+        "LocTypeText",
+        "Label",
+        "Text",
     }) do
+        local region = frame[field]
         if region and region.Hide then
             pcall(region.Hide, region)
         end
@@ -119,23 +120,25 @@ local function stripLossOfControlPresentation()
         if timeLeft.Hide then
             pcall(timeLeft.Hide, timeLeft)
         end
-        for _, region in ipairs({
-            timeLeft.NumberText,
-            timeLeft.SecondsText,
+        for _, field in ipairs({
+            "NumberText",
+            "SecondsText",
         }) do
+            local region = timeLeft[field]
             if region and region.Hide then
                 pcall(region.Hide, region)
             end
         end
     end
 
-    for _, region in ipairs({
-        frame.Timer,
-        frame.CooldownText,
-        frame.Duration,
-        frame.timeLeftText,
-        frame.TimeText,
+    for _, field in ipairs({
+        "Timer",
+        "CooldownText",
+        "Duration",
+        "timeLeftText",
+        "TimeText",
     }) do
+        local region = frame[field]
         if region and region.Hide then
             pcall(region.Hide, region)
         end
@@ -407,76 +410,17 @@ local function matchingNamePlate(unit)
     end
 end
 
-local adjustedClassColor
-
-local function classTokenFromRGB(r, g, b)
-    if isSecret(r) or isSecret(g) or isSecret(b)
+local function readNativeHealthBarColor(bar)
+    if not bar or isSecret(bar) then return nil end
+    local ok, r, g, b = pcall(function()
+        if bar.IsForbidden and readableBool(bar.IsForbidden, bar) ~= false then return nil end
+        if type(bar.GetStatusBarColor) == "function" then return bar:GetStatusBarColor() end
+    end)
+    if not ok or isSecret(r) or isSecret(g) or isSecret(b)
         or type(r) ~= "number" or type(g) ~= "number" or type(b) ~= "number" then
         return nil
     end
-
-    local colors = CUSTOM_CLASS_COLORS or RAID_CLASS_COLORS
-    if type(colors) ~= "table" then return nil end
-    for token, color in pairs(colors) do
-        if color and not isSecret(color.r) and not isSecret(color.g) and not isSecret(color.b)
-            and type(color.r) == "number" and type(color.g) == "number" and type(color.b) == "number"
-        then
-            local function matches(cr, cg, cb)
-                return math.abs(r - cr) <= 0.055
-                    and math.abs(g - cg) <= 0.055
-                    and math.abs(b - cb) <= 0.055
-            end
-            if matches(color.r, color.g, color.b) then return token end
-
-            -- Also recognize the saturation/brightness adjustment used by this
-            -- addon when the visible client surface is already tinted.
-            local maximum = math.max(color.r, color.g, color.b)
-            local ar = math.min(1, (maximum + (color.r - maximum) * CLASS_SATURATION) * CLASS_BRIGHTNESS)
-            local ag = math.min(1, (maximum + (color.g - maximum) * CLASS_SATURATION) * CLASS_BRIGHTNESS)
-            local ab = math.min(1, (maximum + (color.b - maximum) * CLASS_SATURATION) * CLASS_BRIGHTNESS)
-            if matches(ar, ag, ab) then return token end
-        end
-    end
-end
-
-local function classColorFromFontString(region, path)
-    if not region or type(region.GetTextColor) ~= "function" then return nil end
-    local ok, r, g, b = pcall(region.GetTextColor, region)
-    local token = ok and classTokenFromRGB(r, g, b)
-    if not token then return nil end
-    local cr, cg, cb, ca = adjustedClassColor(token)
-    if cr then return cr, cg, cb, ca, path .. ":" .. token end
-end
-
-local function namePlateTextClassColor(frame, label)
-    if not frame then return nil end
-    local candidates = {}
-    local function add(region, path)
-        if region then candidates[#candidates + 1] = { region, path } end
-    end
-
-    for _, field in ipairs({ "name", "Name", "nameText", "NameText", "unitName" }) do
-        local ok, region = pcall(function() return frame[field] end)
-        if ok and region then
-            add(region, label .. "." .. field)
-            local childOK, child = pcall(function() return region.Name end)
-            if childOK and child then add(child, label .. "." .. field .. ".Name") end
-        end
-    end
-
-    if type(frame.GetRegions) == "function" then
-        local ok, regions = pcall(function() return { frame:GetRegions() } end)
-        if ok and type(regions) == "table" then
-            for index, region in ipairs(regions) do
-                add(region, label .. ".region" .. tostring(index))
-            end
-        end
-    end
-
-    for _, candidate in ipairs(candidates) do
-        local r, g, b, a, path = classColorFromFontString(candidate[1], candidate[2])
-        if r then return r, g, b, a, path end
-    end
+    return r, g, b
 end
 
 local function namePlateHealthColor(plate, unitFrame)
@@ -529,59 +473,38 @@ local function namePlateHealthColor(plate, unitFrame)
             end
         end)
         if barOK and bar then
-            if type(bar.GetStatusBarColor) == "function" then
-                local colorOK, r, g, b = pcall(bar.GetStatusBarColor, bar)
-                local token = colorOK and classTokenFromRGB(r, g, b)
-                if token then
-                    local cr, cg, cb, ca = adjustedClassColor(token)
-                    if cr then return cr, cg, cb, ca, path .. ":" .. token end
-                end
-                if colorOK and not nativeColor
-                    and not isSecret(r) and not isSecret(g) and not isSecret(b)
-                    and type(r) == "number" and type(g) == "number" and type(b) == "number"
-                then
-                    -- Preserve the actual visible nameplate color when it uses
-                    -- a client palette this addon cannot name as a class. This
-                    -- keeps hostile NPCs red and avoids inventing white/gray.
-                    nativeColor = { r, g, b, 1, path .. ":native" }
-                end
+            local r, g, b = readNativeHealthBarColor(bar)
+            if r and not nativeColor then
+                -- Native bar RGB is presentation data, not class identity.
+                -- Copy it exactly; ordinary white text and palette matches
+                -- cannot establish a player's class.
+                nativeColor = { r, g, b, 1, path .. ":native" }
             end
         end
 
         -- Era/Forever nameplates can expose their health StatusBar as an
         -- anonymous region rather than a parentKey. Find only named healthbar
         -- StatusBars here so cast/power bars cannot become color witnesses.
-        if type(frame.GetRegions) == "function" then
-            local regionsOK, regions = pcall(function() return { frame:GetRegions() } end)
-            if regionsOK and type(regions) == "table" then
-                for index, region in ipairs(regions) do
-                    local objectType, regionName
-                    if region and region.GetObjectType then
-                        local typeOK, value = pcall(region.GetObjectType, region)
-                        if typeOK then objectType = value end
-                    end
-                    if region and region.GetName then
-                        local nameOK, value = pcall(region.GetName, region)
-                        if nameOK and type(value) == "string" then regionName = value:lower() end
-                    end
-                    if objectType == "StatusBar" and regionName
-                        and regionName:find("health", 1, true)
+        local regionsOK, regions = pcall(function()
+            if type(frame.GetRegions) == "function" then return { frame:GetRegions() } end
+        end)
+        if regionsOK and type(regions) == "table" then
+            for index, region in ipairs(regions) do
+                local infoOK, objectType, regionName = pcall(function()
+                    if not region or isSecret(region) then return nil end
+                    local kind = region.GetObjectType and region:GetObjectType()
+                    local name = region.GetName and region:GetName()
+                    return kind, name
+                end)
+                if infoOK and not isSecret(objectType) and objectType == "StatusBar"
+                    and not isSecret(regionName) and type(regionName) == "string"
+                then
+                    regionName = regionName:lower()
+                    if regionName:find("health", 1, true)
                         and regionName:find("bar", 1, true)
-                        and type(region.GetStatusBarColor) == "function"
                     then
-                        local colorOK, r, g, b = pcall(region.GetStatusBarColor, region)
-                        local token = colorOK and classTokenFromRGB(r, g, b)
-                        if token then
-                            local cr, cg, cb, ca = adjustedClassColor(token)
-                            if cr then
-                                return cr, cg, cb, ca,
-                                    label .. ".region" .. tostring(index) .. ":" .. token
-                            end
-                        end
-                        if colorOK and not nativeColor
-                            and not isSecret(r) and not isSecret(g) and not isSecret(b)
-                            and type(r) == "number" and type(g) == "number" and type(b) == "number"
-                        then
+                        local r, g, b = readNativeHealthBarColor(region)
+                        if r and not nativeColor then
                             nativeColor = {
                                 r, g, b, 1,
                                 label .. ".region" .. tostring(index) .. ":native",
@@ -593,32 +516,32 @@ local function namePlateHealthColor(plate, unitFrame)
         end
     end
 
-    for _, candidate in ipairs(candidates) do
-        local r, g, b, a, path = namePlateTextClassColor(candidate[1], candidate[2])
-        if r then return r, g, b, a, path end
-    end
     if nativeColor then return unpack(nativeColor) end
-    return nil, nil, nil, nil, "class-color-unavailable"
+    return nil, nil, nil, nil, "native-color-unavailable"
+end
+
+local function classTokenFromPlayerAlias(unit, candidate)
+    if not candidate or not sameUnit(unit, candidate) then return nil end
+
+    -- A second view of the same actor may supply missing player/class data,
+    -- but must not contradict a readable non-player identity on this token.
+    local player, readable = playerUnitState(unit)
+    if readable and not player then return nil end
+    if isPlayerUnit(candidate) then return classToken(candidate) end
 end
 
 local function classTokenFromGroupAlias(unit)
-    local function check(candidate)
-        if sameUnit(unit, candidate) then
-            return classToken(candidate)
-        end
-    end
-
     for index = 1, 4 do
-        local token = check("party" .. index)
+        local token = classTokenFromPlayerAlias(unit, "party" .. index)
         if token then return token end
     end
     for index = 1, 40 do
-        local token = check("raid" .. index)
+        local token = classTokenFromPlayerAlias(unit, "raid" .. index)
         if token then return token end
     end
 end
 
-adjustedClassColor = function(token)
+local function adjustedClassColor(token)
     local colors = CUSTOM_CLASS_COLORS or RAID_CLASS_COLORS
     local color = colors and colors[token]
     if not color or isSecret(color.r) or isSecret(color.g) or isSecret(color.b)
@@ -634,28 +557,9 @@ adjustedClassColor = function(token)
     return r, g, b, 1
 end
 
-local function fallbackPlayerHealthColor(unit)
-    local token = classToken(unit) or classTokenFromGroupAlias(unit)
-    if token then
-        local r, g, b, a = adjustedClassColor(token)
-        if r then return r, g, b, a end
-    end
-
-    -- When battleground restrictions hide UnitClass for an enemy, Blizzard's
-    -- visible nameplate can still expose the class tint it is already showing.
-    local plate, unitFrame, plateUnit = matchingNamePlate(unit)
-    token = classToken(plateUnit)
-        or (unitFrame and classToken(readableUnitToken(unitFrame.unit)))
-    if token then
-        local r, g, b, a = adjustedClassColor(token)
-        if r then return r, g, b, a end
-    end
-    if plate then return namePlateHealthColor(plate, unitFrame) end
-end
-
 local function fallbackVisibleHealthColor(unit)
-    -- A matching party/raid unit is a positive class witness even when the
-    -- derived unit token itself has protected player/class identity.
+    -- Only a matching, positively identified player alias supplies class data.
+    -- Its class token alone cannot promote a pet, NPC, or unknown actor.
     local token = classTokenFromGroupAlias(unit)
     if token then
         local r, g, b, a = adjustedClassColor(token)
@@ -663,13 +567,24 @@ local function fallbackVisibleHealthColor(unit)
     end
 
     local plate, unitFrame, plateUnit = matchingNamePlate(unit)
-    token = classToken(plateUnit)
-        or (unitFrame and classToken(readableUnitToken(unitFrame.unit)))
+    token = classTokenFromPlayerAlias(unit, plateUnit)
     if token then
         local r, g, b, a = adjustedClassColor(token)
         if r then return r, g, b, a end
     end
     if plate then return namePlateHealthColor(plate, unitFrame) end
+end
+
+local function fallbackPlayerHealthColor(unit)
+    local token = isPlayerUnit(unit) and classToken(unit)
+    if token then
+        local r, g, b, a = adjustedClassColor(token)
+        if r then return r, g, b, a end
+    end
+
+    -- A readable native health bar may remain available when player class data
+    -- is restricted. The shared fallback copies that RGB without naming a class.
+    return fallbackVisibleHealthColor(unit)
 end
 
 local healthColorWrites = setmetatable({}, { __mode = "k" })
@@ -714,36 +629,25 @@ local function applyHealthColor(bar, unit)
         -- some battleground clients return white for protected enemy players.
         -- The matching nameplate fallback above is the visible color witness.
         return
-    elseif not playerReadable then
-        -- ToT/FoT often have a readable matching nameplate even when their
-        -- own derived unit token cannot expose player/class identity.
-        local r, g, b, a = fallbackVisibleHealthColor(unit)
-        if r then
-            setHealthColor(bar, r, g, b, a)
-            return
-        end
-        if derived then
-            preserveUnknownDerivedColor(bar, unit)
-            return
-        end
-    elseif not player then
-        -- Some BG unit tokens report a readable non-player state while another
-        -- view of the same visible actor is already identified as a player.
-        -- Prefer its live nameplate tint before falling through to NPC colors.
-        local r, g, b, a = fallbackVisibleHealthColor(unit)
-        if r then
-            setHealthColor(bar, r, g, b, a)
-            return
-        end
     end
 
     -- Combat pets use Blizzard's stock green health language regardless of
-    -- owner/class/faction. Do this only after ruling out a real player.
+    -- owner/class/faction. Resolve this before any untyped visible fallback,
+    -- while retaining the positive-player priority above.
     local pet, petReadable = petUnitState(unit)
     if petReadable and pet then
         setHealthColor(bar, 0, 1, 0, 1)
         return
-    elseif derived and not petReadable then
+    end
+
+    -- A matched player alias can fill an unknown identity; a matched native
+    -- health bar can supply its actual tint for either an unknown actor or NPC.
+    local r, g, b, a = fallbackVisibleHealthColor(unit)
+    if r then
+        setHealthColor(bar, r, g, b, a)
+        return
+    end
+    if derived and (not playerReadable or not petReadable) then
         preserveUnknownDerivedColor(bar, unit)
         return
     end
@@ -752,7 +656,7 @@ local function applyHealthColor(bar, unit)
     -- than staying permanently green or merely inheriting reaction color.
     -- This preserves red/yellow/green selection colors while also surfacing
     -- important state such as a tap-denied/tagged NPC becoming grey.
-    -- An unreadable/absent new referent must not inherit the old actor's tint.
+    -- Only readable NPC state below may replace the native tint.
     local connected = readableBool(UnitIsConnected, unit)
     local dead = readableBool(UnitIsDead, unit)
     if connected == false or dead == true then
@@ -1711,40 +1615,60 @@ local function isCompactPartyRaidFrame(frame)
     local current = frame
     for _ = 1, 8 do
         if not current then return false end
+        if isSecret(current) then return nil end
 
-        if current.GetName then
-            local okName, name = pcall(current.GetName, current)
-            if okName and compactFrameNameMatches(name) then
+        local ok, forbidden, getName, getParent = pcall(function()
+            return current.IsForbidden, current.GetName, current.GetParent
+        end)
+        if not ok or (forbidden and readableBool(forbidden, current) ~= false) then
+            return nil
+        end
+        if getName then
+            local okName, name = pcall(getName, current)
+            if not okName or isSecret(name) then return nil end
+            if compactFrameNameMatches(name) then
                 return true
             end
         end
 
-        if not current.GetParent then return false end
-        local okParent, parent = pcall(current.GetParent, current)
-        if not okParent then return false end
+        if not getParent then return false end
+        local okParent, parent = pcall(getParent, current)
+        if not okParent or isSecret(parent) then return nil end
         current = parent
     end
-    return false
+    -- An unreadable or deeper ancestry cannot authorize a hide or restoration.
+    return nil
 end
 
-local function neutralizeCompactDebuffBorder(debuffFrame)
-    if not debuffFrame then return end
+local function neutralizeCompactBorder(border)
+    if not border or isSecret(border) then return end
+    local ok, setAlpha = pcall(function()
+        if border.IsForbidden and readableBool(border.IsForbidden, border) ~= false then return nil end
+        return border.SetAlpha
+    end)
+    if not ok or type(setAlpha) ~= "function" then return end
 
-    local border = debuffFrame.border
-    if not border or not border.SetAlpha then return end
-
-    if isCompactPartyRaidFrame(debuffFrame) then
+    local compact = isCompactPartyRaidFrame(border)
+    if compact then
         -- The border is already the final native presentation object here.
         -- Alpha-zero hides only the dispel-colored border; icon, cooldown,
         -- stacks, and the debuff frame itself remain untouched.
-        pcall(border.SetAlpha, border, 0)
-        compactHiddenDebuffBorders[border] = true
-    elseif compactHiddenDebuffBorders[border] then
+        if pcall(setAlpha, border, 0) then
+            compactHiddenDebuffBorders[border] = true
+        end
+    elseif compact == false and compactHiddenDebuffBorders[border] then
         -- Compact aura textures are pooled. Restore native presentation if a
         -- previously hidden border is later reused outside compact frames.
-        pcall(border.SetAlpha, border, 1)
-        compactHiddenDebuffBorders[border] = nil
+        if pcall(setAlpha, border, 1) then
+            compactHiddenDebuffBorders[border] = nil
+        end
     end
+end
+
+local function neutralizeCompactDebuffBorder(debuffFrame)
+    if not debuffFrame or isSecret(debuffFrame) then return end
+    local ok, border = pcall(function() return debuffFrame.border end)
+    if ok then neutralizeCompactBorder(border) end
 end
 
 local function neutralizeCompactDebuffFrames(frame)
@@ -1803,23 +1727,7 @@ local function installCompactDebuffBorderNeutralization()
         and type(AuraUtil.SetAuraBorderAtlas) == "function"
     then
         hooksecurefunc(AuraUtil, "SetAuraBorderAtlas", function(borderRegion)
-            if not borderRegion or not borderRegion.SetAlpha then return end
-            local current = borderRegion
-            for _ = 1, 8 do
-                if not current then return end
-                if current.GetName then
-                    local okName, name = pcall(current.GetName, current)
-                    if okName and compactFrameNameMatches(name) then
-                        pcall(borderRegion.SetAlpha, borderRegion, 0)
-                        compactHiddenDebuffBorders[borderRegion] = true
-                        return
-                    end
-                end
-                if not current.GetParent then return end
-                local okParent, parent = pcall(current.GetParent, current)
-                if not okParent then return end
-                current = parent
-            end
+            neutralizeCompactBorder(borderRegion)
         end)
         compactAuraBorderHookInstalled = true
     end
@@ -2107,7 +2015,10 @@ local function printUIAudit()
     out("hooks locSetup=" .. tostring(lossOfControlSetUpHookInstalled)
         .. " locTime=" .. tostring(lossOfControlSetTimeHookInstalled)
         .. " derivedDebuffs=" .. tostring(derivedDebuffRefreshHookInstalled)
-        .. " compactBorder=" .. tostring(compactDebuffBorderHookInstalled)
+        .. " compactLegacy=" .. tostring(compactDebuffBorderHookInstalled)
+        .. " compactDebuffRefresh=" .. tostring(compactDebuffUpdateHookInstalled)
+        .. " compactAuraRefresh=" .. tostring(compactDebuffAuraUpdateHookInstalled)
+        .. " compactAuraUtil=" .. tostring(compactAuraBorderHookInstalled)
         .. " communitiesRoster=" .. tostring(communitiesNameHookInstalled)
         .. " communitiesChat=" .. tostring(communitiesChatNameHookInstalled)
         .. " damageMeter=" .. tostring(damageMeterNameHookInstalled)

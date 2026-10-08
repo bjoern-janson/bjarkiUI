@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-This document describes the current implementation of **bjarkiUI 0.2.90-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
+This document describes the current implementation of **bjarkiUI 0.2.91-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -46,18 +46,19 @@ The addon does not replace the underlying health or power values.
 
 The health-color path currently prefers:
 
-1. positively identified players -> class color;
+1. positively identified players -> readable class color, or a matching native health-bar color when class data is unavailable;
 2. positively identified combat pets -> green;
-3. disconnected/dead units -> grey;
-4. tap-denied NPCs -> light grey;
-5. hostile units with readable threat state -> red;
-6. otherwise -> Blizzard selection color when readable.
+3. unknown player identity -> class color only from a positively identified player alias with a readable same-actor match;
+4. otherwise, a matching native health bar -> its readable RGB copied exactly;
+5. when no matching native bar supplies a color, readable NPC state -> disconnected/dead grey, tap-denied light grey, hostile threat red, or Blizzard selection color.
 
-Player class colors receive a small saturation/brightness adjustment.
+Player class colors receive the existing small saturation/brightness adjustment. Direct positive player identity remains ahead of a stale pet witness. A readable non-player identity blocks contradictory class evidence from party, raid, or nameplate aliases. A class token by itself does not establish player identity.
+
+Native bar RGB is copied as presentation data, without reverse-mapping it to a class or applying the class-color adjustment again. Generic name/region FontString colors are not class evidence. Unmatched nameplates and unreadable color components cannot authorize a replacement.
 
 For `targettarget` and `focustarget`, the native frames are reusable. The addon therefore reapplies the current unit's presentation when Blizzard rebinds those frames. It also hooks the final health-bar color write on those two derived frames so a later native tint does not leave the color from the previous referent.
 
-If the derived referent cannot provide a readable replacement color, the current implementation clears the stale tint to neutral grey rather than preserving the previous unit's color.
+If the derived referent cannot provide a warranted readable replacement color, the addon makes no color write and preserves Blizzard's native tint. Unknown identity does not introduce a neutral-grey fallback.
 
 ### Power colors
 
@@ -286,6 +287,12 @@ or heal-prediction state are read or modified. Because private aura frames are
 pooled, a border hidden by bjarkiUI is restored to alpha 1 if that same Texture is
 later reused on a non-compact presentation.
 
+In 0.2.91, the legacy debuff helper and AuraUtil hook share this final-texture
+ownership handling. The weak ownership marker is created only after successful
+suppression and cleared only after successful restoration. Forbidden textures
+and unreadable ancestry defer both writes and ownership changes, allowing a later
+native update to retry.
+
 
 ## 19. Conservative hardening and audit
 
@@ -362,13 +369,13 @@ loaded after `PLAYER_LOGIN`, bjarkiUI waits for the relevant
 as installed.
 
 
-## 22. Reported Battleground class-color gaps
+## 23. Reported Battleground class-color gaps
 
 Recent user reports (2026-10-08) say opposing-faction class-colored health
 bars remain white or otherwise incorrect in Battlegrounds. The same problem
-affects enemy Target-of-Target and Focus-of-Target bars. This is not live-
-validated against 0.2.90-local; the pushed source should not be described as a
-confirmed fix.
+affects enemy Target-of-Target and Focus-of-Target bars. These symptoms have not
+been checked in the live client against 0.2.91-local. The source repairs do not
+establish live resolution of these reports.
 
 A prior `/bui colors` capture showed the enemy target and targettarget as
 `player=true` but `class=unknown`, with no usable nameplate color in that
@@ -382,3 +389,20 @@ disappear. The user restored them with `show=1` and `mode=nil`; frames returned,
 while opposite-faction class colors remained unresolved. Do not change those
 CVars as a color workaround. Check frame availability, current unit binding,
 readable class evidence, and the final native color writer as separate steps.
+
+## 24. Color authority and compact-border repair
+
+Version 0.2.91 corrects the confirmed source paths described above: pet/NPC
+identity precedence, unsupported text/RGB class inference, and pooled border
+restoration across both native border writers. `/bui audit` now reports
+`compactLegacy`, `compactDebuffRefresh`, `compactAuraRefresh`, and
+`compactAuraUtil` separately without changing presentation.
+
+Loss of Control decoration uses field-name iteration so a missing optional
+alias cannot hide later supported fields from the loop. The native icon remains
+centered in the same frame, with unchanged geometry. This is compatibility
+hardening; the pinned native field shape already supplied the required fields.
+
+These changes have source-level behavioral validation with mocked WoW inputs.
+Live Battleground rendering, restricted API availability, and protected
+execution remain separate validation requirements.

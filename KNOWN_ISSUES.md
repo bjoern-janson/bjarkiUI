@@ -1,11 +1,31 @@
 # Known issues and bugs
 
-Status recorded 2026-10-08 for **bjarkiUI 0.2.90-local**.
+Status recorded 2026-10-08 for **bjarkiUI 0.2.91-local**.
 
-The items below reflect reports and diagnostic output from Battleground
-sessions. They remain open until checked in the live client against this build.
+The Battleground observations below reflect user reports and diagnostic output.
+They remain open until checked in the live client against this build.
 A report describes a visible symptom; it does not by itself establish the
 failing code path or root cause.
+
+## Confirmed source repairs in 0.2.91
+
+- Confirmed pets are resolved before untyped nameplate fallback. A class-bearing
+  NPC or contradictory alias cannot override known non-player identity with a
+  player class tint. Positive player identity retains the accepted adjusted
+  class color.
+- Matching native health-bar RGB is copied exactly. Generic white names and
+  other FontString colors no longer establish a class, and native bar RGB is
+  not reverse-mapped to a class or adjusted again.
+- Legacy and AuraUtil compact-border paths share suppression/restoration
+  ownership. Pooled reuse outside compact ancestry restores only a border the
+  addon successfully hid; failed or inaccessible restoration remains pending.
+- `/bui audit` exposes all four compact-border hook states independently.
+- Optional Loss of Control field gaps no longer skip valid later decoration;
+  icon placement and the present native frame shape remain unchanged.
+
+These repairs are demonstrated by actual-source tests with mocked WoW boundary
+APIs. They do not establish that the Battleground observations below are fixed
+in the live client.
 
 ## Opposing-faction class colors in Battlegrounds
 
@@ -32,7 +52,7 @@ separate issues.
 
 ## Verification boundary
 
-No live WoW test has confirmed these reports fixed in 0.2.90-local. See
+No live WoW test has confirmed these reports fixed in 0.2.91-local. See
 [`ARCHITECTURE.md`](ARCHITECTURE.md) for the frame/color implementation and
 reported BG diagnostics. Pet portraits and aura category failures are tracked
 in the [bjarkiPortraits issue list](https://github.com/bjoern-janson/bjarkiPortraits/blob/main/KNOWN_ISSUES.md).
