@@ -1,6 +1,6 @@
 # Known issues and bugs
 
-Status recorded 2026-10-08 for **bjarkiUI 0.2.92-local**.
+Status recorded 2026-10-08 for **bjarkiUI 0.2.93-local**.
 
 The Battleground observations below reflect user reports and diagnostic output.
 They remain open until checked in the live client against this build.
@@ -63,9 +63,21 @@ returned, while the opposing-faction color issue remained. Do not change those
 CVars as a color workaround. Frame visibility and health-color selection are
 separate issues.
 
+## Derived portrait alignment in 0.2.93
+
+ToT/FoT frames were reported overlapping the parent aura rows. The current
+adapter moves the small frames right until the native portrait centers align
+horizontally, retaining the native Y and accounting for effective scale.
+It does not alter aura row logic or the user's parent frame positions.
+
+Point and scale reads/writes are deferred during combat. If Blizzard resets
+the anchor during combat, the correction retries after combat using the
+current native anchor. Final pixel placement, crowded aura rows and native
+protected execution need an in-client check.
+
 ## Verification boundary
 
-No live WoW test has confirmed these reports fixed in 0.2.92-local. See
+No live WoW test has confirmed these reports fixed in 0.2.93-local. See
 [`ARCHITECTURE.md`](ARCHITECTURE.md) for the frame/color implementation and
 reported BG diagnostics. Pet portraits and aura category failures are tracked
 in the [bjarkiPortraits issue list](https://github.com/bjoern-janson/bjarkiPortraits/blob/main/KNOWN_ISSUES.md).

@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-This document describes the current implementation of **bjarkiUI 0.2.92-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
+This document describes the current implementation of **bjarkiUI 0.2.93-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -408,3 +408,31 @@ hardening; the pinned native field shape already supplied the required fields.
 These changes have source-level behavioral validation with mocked WoW inputs.
 Live Battleground rendering, restricted API availability, and protected
 execution remain separate validation requirements.
+
+## 25. Derived portrait horizontal alignment
+
+Version 0.2.93 moves Target-of-Target and Focus-of-Target horizontally so each
+small portrait center lies below its parent portrait center. Native vertical
+placement, parent Edit Mode coordinates, frame sizes and aura row constraints
+remain in effect.
+
+The pinned [native frame definitions](https://github.com/Gethe/wow-ui-source/blob/15666a6e67938a1ab5caf041406464251db111ca/Interface/AddOns/Blizzard_UnitFrame/Mainline/TargetFrame.xml)
+place the parent portrait center 55 units left of its right edge and the
+derived portrait center 96.5 units left of the derived frame's right edge.
+The existing TOPRIGHT-to-parent-BOTTOMRIGHT anchor therefore uses
+`x = 96.5 - 55 * (parentEffectiveScale / derivedEffectiveScale)`. At equal
+scale, native x=12 becomes x=41.5, moving the small frame right by 29.5 units.
+The effective-scale ratio also covers the native small Focus mode.
+
+An addon-owned weak table holds hook and recursion state. Secure post-hooks
+on the derived frame's SetPoint and SetScale reapply only this X adjustment.
+The adapter checks readable out-of-combat state before point/scale reads or
+anchor writes, accepts only the recognized single native anchor, and retains
+its current Y. Missing or protected geometry leaves the native anchor intact.
+It never reads aura counts, visibility or screen positions, and never writes
+addon fields onto the native frame.
+
+Login, world entry, Edit Mode updates, UnitFrame module loading and combat exit
+retry from the current native relation. A native reset during combat remains
+untouched until the post-combat retry. Source-level geometry and lifecycle
+checks do not certify live pixel alignment or protected execution.

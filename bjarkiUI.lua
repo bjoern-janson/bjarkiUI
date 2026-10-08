@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.92-local"
+local BJARKI_UI_VERSION = "0.2.93-local"
 local PRD_ATLAS = "UI-HUD-CoolDownManager-Bar"
 local CLASS_SATURATION = 1.18
 local CLASS_BRIGHTNESS = 1.08
@@ -1584,6 +1584,81 @@ local function installHooks()
     installThreatScaling()
 end
 
+local derivedFrameAlignment = setmetatable({}, { __mode = "k" })
+
+local function readableGeometryNumber(value)
+    return not isSecret(value) and type(value) == "number"
+        and value == value and value > -math.huge and value < math.huge
+end
+
+local function alignDerivedFrame(frame)
+    local state = derivedFrameAlignment[frame]
+    if not state or state.updating or readableBool(InCombatLockdown) ~= false then return end
+
+    local parent = state.parent
+    if not frame.GetNumPoints or not frame.GetPoint or not frame.SetPoint
+        or not frame.GetEffectiveScale or not parent.GetEffectiveScale
+    then
+        return
+    end
+
+    local counted, count = pcall(frame.GetNumPoints, frame)
+    if not counted or isSecret(count) or count ~= 1 then return end
+
+    local anchored, point, relativeTo, relativePoint, x, y = pcall(frame.GetPoint, frame, 1)
+    if not anchored or isSecret(point) or isSecret(relativeTo) or isSecret(relativePoint)
+        or point ~= "TOPRIGHT" or relativeTo ~= parent or relativePoint ~= "BOTTOMRIGHT"
+        or not readableGeometryNumber(x) or not readableGeometryNumber(y)
+    then
+        return
+    end
+
+    local parentReadable, parentScale = pcall(parent.GetEffectiveScale, parent)
+    local frameReadable, frameScale = pcall(frame.GetEffectiveScale, frame)
+    if not parentReadable or not frameReadable
+        or not readableGeometryNumber(parentScale) or not readableGeometryNumber(frameScale)
+        or parentScale <= 0 or frameScale <= 0
+    then
+        return
+    end
+
+    -- Native TargetFrame.xml places the parent portrait center 55 units left
+    -- of its right edge and the derived portrait center 96.5 units left of its
+    -- right edge. SetPoint offsets use the derived frame's scale. Change only
+    -- X, retaining the current native Y (including small Focus's distinct Y).
+    local alignedX = 96.5 - 55 * (parentScale / frameScale)
+    if not readableGeometryNumber(alignedX) or math.abs(x - alignedX) < 0.000001 then return end
+
+    -- Replacing this same single point is atomic: a rejected write leaves the
+    -- native anchor intact. Never read positions/visibility or re-anchor in
+    -- combat; PLAYER_REGEN_ENABLED retries from the current native relation.
+    state.updating = true
+    pcall(frame.SetPoint, frame, point, parent, relativePoint, alignedX, y)
+    state.updating = false
+end
+
+local function installDerivedFrameAlignment()
+    for _, unit in ipairs({ "targettarget", "focustarget" }) do
+        local parent = unit == "targettarget" and _G.TargetFrame or _G.FocusFrame
+        local frame = smallFrame(unit)
+        if parent and frame then
+            local state = derivedFrameAlignment[frame] or {}
+            derivedFrameAlignment[frame] = state
+            state.parent = parent
+
+            if hooksecurefunc then
+                if not state.pointHook and type(frame.SetPoint) == "function" then
+                    state.pointHook = pcall(hooksecurefunc, frame, "SetPoint", alignDerivedFrame)
+                end
+                if not state.scaleHook and type(frame.SetScale) == "function" then
+                    state.scaleHook = pcall(hooksecurefunc, frame, "SetScale", alignDerivedFrame)
+                end
+            end
+            alignDerivedFrame(frame)
+        end
+    end
+end
+
 local derivedDebuffRefreshHookInstalled = false
 local derivedDebuffRefreshGuard = false
 
@@ -1893,12 +1968,14 @@ end
 local events = CreateFrame("Frame")
 for _, event in ipairs({
     "PLAYER_LOGIN", "PLAYER_ENTERING_WORLD", "PLAYER_TARGET_CHANGED", "PLAYER_FOCUS_CHANGED",
-    "EDIT_MODE_LAYOUTS_UPDATED", "ADDON_LOADED",
+    "EDIT_MODE_LAYOUTS_UPDATED", "ADDON_LOADED", "PLAYER_REGEN_ENABLED",
 }) do events:RegisterEvent(event) end
 
 events:SetScript("OnEvent", function(_, event, unit)
     if event == "ADDON_LOADED" then
-        if unit == "Blizzard_Communities" then
+        if unit == "Blizzard_UnitFrame" then
+            installDerivedFrameAlignment()
+        elseif unit == "Blizzard_Communities" then
             installCommunitiesPrimaryNames()
         elseif unit == "Blizzard_DamageMeter" then
             installDamageMeterPrimaryNames()
@@ -1923,6 +2000,7 @@ events:SetScript("OnEvent", function(_, event, unit)
         anchorUIErrorsFrame()
         installLossOfControlPresentation()
         installHooks()
+        installDerivedFrameAlignment()
         installDerivedDebuffRefresh()
         installCompactDebuffBorderNeutralization()
         installMicroMenuChildOffset()
@@ -1935,6 +2013,7 @@ events:SetScript("OnEvent", function(_, event, unit)
         applyWorldTextPosition()
         anchorUIErrorsFrame()
         installLossOfControlPresentation()
+        installDerivedFrameAlignment()
         installDerivedDebuffRefresh()
         installCompactDebuffBorderNeutralization()
         installMicroMenuChildOffset()
@@ -1943,9 +2022,12 @@ events:SetScript("OnEvent", function(_, event, unit)
         anchorCombatText()
         applyAll()
     elseif event == "EDIT_MODE_LAYOUTS_UPDATED" then
+        installDerivedFrameAlignment()
         installMicroMenuChildOffset()
         anchorCombatText()
         applyAll()
+    elseif event == "PLAYER_REGEN_ENABLED" then
+        installDerivedFrameAlignment()
     elseif event == "PLAYER_TARGET_CHANGED" then
         applyUnit("target"); applyUnit("targettarget")
         applyPrimaryName("target"); applyPrimaryName("targettarget")
