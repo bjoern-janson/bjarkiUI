@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-This document describes the current implementation of **bjarkiUI 0.2.81-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
+This document describes the current implementation of **bjarkiUI 0.2.90-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -360,3 +360,25 @@ Hook installation is also retryable. If Blizzard's compact-frame module is
 loaded after `PLAYER_LOGIN`, bjarkiUI waits for the relevant
 `ADDON_LOADED` boundary instead of permanently recording an uninstalled hook
 as installed.
+
+
+## 22. Reported Battleground class-color gaps
+
+Recent user reports (2026-10-08) say opposing-faction class-colored health
+bars remain white or otherwise incorrect in Battlegrounds. The same problem
+affects enemy Target-of-Target and Focus-of-Target bars. This is not live-
+validated against 0.2.90-local; the pushed source should not be described as a
+confirmed fix.
+
+A prior `/bui colors` capture showed the enemy target and targettarget as
+`player=true` but `class=unknown`, with no usable nameplate color in that
+diagnostic context. This records an UNKNOWN input at that point in the path; it
+does not prove whether the cause is client API visibility, unit-token timing,
+or refresh lifecycle. Trace the identity/color evidence before changing color
+fallbacks.
+
+During earlier ToT/FoT debugging, changing the display CVar made the frames
+disappear. The user restored them with `show=1` and `mode=nil`; frames returned,
+while opposite-faction class colors remained unresolved. Do not change those
+CVars as a color workaround. Check frame availability, current unit binding,
+readable class evidence, and the final native color writer as separate steps.
