@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.81-local"
+local BJARKI_UI_VERSION = "0.2.90-local"
 local PRD_ATLAS = "UI-HUD-CoolDownManager-Bar"
 local CLASS_SATURATION = 1.18
 local CLASS_BRIGHTNESS = 1.08
@@ -18,7 +18,7 @@ if bjarkiUISettings.showLevelNumbers == nil then
     bjarkiUISettings.showLevelNumbers = true
 end
 
-local EDIT_MODE_LAYOUT_STRING = [=[4 0 59 0 0 1 8 6 MicroMenuContainer -4.5 -4.0 -1 ##$$%/&('%)#+$,$ 0 1 1 7 7 UIParent 0.0 0.0 -1 ##$$%/&('%(#,# 0 2 1 7 7 UIParent 0.0 0.0 -1 ##$$%/&('%(#,# 0 3 1 5 5 UIParent -5.0 -77.0 -1 #$$$%/&('%(#,# 0 4 1 5 5 UIParent -5.0 -77.0 -1 #$$$%/&('%(#,# 0 5 1 1 4 UIParent 0.0 0.0 -1 ##$$%/&('%(#,$ 0 6 1 1 4 UIParent 0.0 -50.0 -1 ##$$%/&('%(#,$ 0 7 1 1 4 UIParent 0.0 -100.0 -1 ##$$%/&('%(#,$ 0 10 1 7 7 UIParent 0.0 -4.0 -1 ##$$&('% 0 11 1 7 7 UIParent 0.0 -4.0 -1 ##$$&('%,# 0 12 1 7 7 UIParent 0.0 -4.0 -1 ##$$&('% 1 -1 0 4 4 UIParent 0.0 -276.0 -1 #%$#%$ 2 -1 1 2 2 UIParent 0.0 0.0 -1 ##$#%(&( 3 0 0 0 0 UIParent 278.0 -164.0 -1 $#3% 3 1 0 1 1 UIParent -294.0 -164.0 -1 %#3% 3 2 0 4 4 UIParent 342.0 -164.0 -1 %#&$3% 3 3 0 0 0 UIParent 512.0 -420.0 -1 '$(#)#-G.5/#1$3#5#6,7-7$8(9, 3 4 1 0 2 CompactRaidFrameManager 0.0 -5.0 -1 ,#-=.+/#0#1#2(3#5#6(7-7$8(9( 3 5 1 5 5 UIParent 0.0 0.0 -1 &$*$3# 3 6 1 5 5 UIParent 0.0 0.0 -1 -=.+/#4$5#6(7-7$8(9( 3 7 0 1 7 PlayerFrame 34.0 25.0 -1 3% 4 -1 1 7 7 UIParent 0.0 -4.0 -1 # 5 -1 1 7 7 UIParent 0.0 -4.0 -1 # 6 0 0 1 1 UIParent 244.0 -100.0 -1 ##$#%#&.())( 6 1 0 2 8 BuffFrame -16.0 -4.0 -1 ##$#%#'+())(-# 6 2 1 1 1 UIParent 0.0 -25.0 -1 ##$#%$&.(()(+#,-,$ 7 -1 1 7 7 UIParent 0.0 -4.0 -1 # 8 -1 0 3 3 UIParent 34.0 -228.0 -1 #'$A%$&i 9 -1 1 7 7 UIParent 0.0 -4.0 -1 # 10 -1 1 0 0 UIParent 16.0 -116.0 -1 # 11 -1 1 8 8 UIParent -9.0 85.0 -1 # 12 -1 1 2 2 UIParent -110.0 -275.0 -1 #K$#%# 13 -1 1 7 7 UIParent 116.5 6.0 -1 ##$#%) 14 -1 1 6 8 MicroMenuContainer 7.0 -4.0 -1 ##$#%( 15 0 1 7 7 UIParent 0.0 0.0 -1 &- 15 1 1 7 7 UIParent 0.0 17.0 -1 &- 16 -1 1 5 5 UIParent 0.0 0.0 -1 #( 17 -1 1 1 1 UIParent 0.0 -100.0 -1 ## 18 -1 1 5 5 UIParent 0.0 0.0 -1 #- 19 -1 1 7 7 UIParent 0.0 0.0 -1 ## 20 0 1 7 7 UIParent 0.0 310.0 -1 ##$/%$&('%(-($)#+$,$-$ 20 1 1 7 7 UIParent 0.0 240.0 -1 ##$*%$&('%(-($)#+$,$-$ 20 2 1 7 7 UIParent 0.0 370.0 -1 ##$$%$&('((-($)#+$,$-$ 20 3 1 7 7 UIParent 420.0 430.0 -1 #$$$%#&('((-($)#*#+$,$-$.-.$ 21 -1 0 4 4 UIParent 0.0 -180.0 -1 ##%#&#'((()#*-*$+#,#-#.$/(0#1# 22 0 1 8 7 UIParent -457.0 336.0 -1 #$$$%#&('((#)U*$+%,$-#.#/U0% 22 1 1 1 1 UIParent 0.0 -40.0 -1 &('()U*#+% 22 2 1 1 1 UIParent 0.0 -90.0 -1 &('()U*#+% 22 3 1 1 1 UIParent 0.0 -130.0 -1 &('()U*#+% 23 -1 1 0 0 UIParent 0.0 0.0 -1 ##$#%$&7&%'7(%)U+$,$-$.(/U 24 -1 1 1 1 UIParent 0.0 -182.0 -1 # 25 -1 1 5 7 UIParent -28.0 128.0 -1 # 26 0 1 5 3 MainActionBar 30.0 5.0 -1 #$ 26 1 1 3 5 BagsBar -30.0 5.0 -1 #$ 27 -1 1 4 4 Minimap -68.0 -68.0 -1 #+ 28 -1 1 4 4 UIParent 0.0 0.0 -1 #& 29 0 1 7 7 UIParent 0.0 450.0 -1 #($U%$&K'#(#)# 29 1 1 7 7 UIParent 0.0 425.0 -1 #($U%$&K'#(#)# 29 2 1 7 7 UIParent 0.0 400.0 -1 #($U%$&K'#(#)#]=]
+local EDIT_MODE_LAYOUT_STRING = [=[4 0 59 0 0 1 8 6 MicroMenuContainer -4.5 -4.0 -1 ##$$%/&('%)#+$,$ 0 1 1 7 7 UIParent 0.0 0.0 -1 ##$$%/&('%(#,# 0 2 1 7 7 UIParent 0.0 0.0 -1 ##$$%/&('%(#,# 0 3 1 5 5 UIParent -5.0 -77.0 -1 #$$$%/&('%(#,# 0 4 1 5 5 UIParent -5.0 -77.0 -1 #$$$%/&('%(#,# 0 5 1 1 4 UIParent 0.0 0.0 -1 ##$$%/&('%(#,$ 0 6 1 1 4 UIParent 0.0 -50.0 -1 ##$$%/&('%(#,$ 0 7 1 1 4 UIParent 0.0 -100.0 -1 ##$$%/&('%(#,$ 0 10 1 7 7 UIParent 0.0 -4.0 -1 ##$$&('% 0 11 1 7 7 UIParent 0.0 -4.0 -1 ##$$&('%,# 0 12 1 7 7 UIParent 0.0 -4.0 -1 ##$$&('% 1 -1 0 4 4 UIParent 0.0 -276.0 -1 #%$#%$ 2 -1 1 2 2 UIParent 0.0 0.0 -1 ##$#%(&( 3 0 0 0 0 UIParent 278.0 -160.0 -1 $#3% 3 1 0 1 1 UIParent -294.0 -160.0 -1 %#3% 3 2 0 4 4 UIParent 358.0 -160.0 -1 %#&$3% 3 3 0 0 0 UIParent 512.0 -420.0 -1 '$(#)#-k.5/#1$3#5#6,7-7$8(9, 3 4 1 0 2 CompactRaidFrameManager 0.0 -5.0 -1 ,#-=.+/#0#1#2(3#5#6(7-7$8(9( 3 5 1 5 5 UIParent 0.0 0.0 -1 &$*$3# 3 6 1 5 5 UIParent 0.0 0.0 -1 -=.+/#4$5#6(7-7$8(9( 3 7 0 1 7 PlayerFrame 34.0 25.0 -1 3% 4 -1 1 7 7 UIParent 0.0 -4.0 -1 # 5 -1 1 7 7 UIParent 0.0 -4.0 -1 # 6 0 0 1 1 UIParent 244.0 -100.0 -1 ##$#%#&.())( 6 1 0 2 8 BuffFrame -16.0 -4.0 -1 ##$#%#'+())(-# 6 2 1 1 1 UIParent 0.0 -25.0 -1 ##$#%$&.(()(+#,-,$ 7 -1 1 7 7 UIParent 0.0 -4.0 -1 # 8 -1 0 3 3 UIParent 34.0 -220.0 -1 #'$d%$&i 9 -1 1 7 7 UIParent 0.0 -4.0 -1 # 10 -1 1 0 0 UIParent 16.0 -116.0 -1 # 11 -1 1 8 8 UIParent -9.0 85.0 -1 # 12 -1 1 2 2 UIParent -110.0 -275.0 -1 #K$#%# 13 -1 1 7 7 UIParent 116.5 6.0 -1 ##$#%) 14 -1 1 6 8 MicroMenuContainer 7.0 -4.0 -1 ##$#%( 15 0 1 7 7 UIParent 0.0 0.0 -1 &- 15 1 1 7 7 UIParent 0.0 17.0 -1 &- 16 -1 1 5 5 UIParent 0.0 0.0 -1 #( 17 -1 1 1 1 UIParent 0.0 -100.0 -1 ## 18 -1 1 5 5 UIParent 0.0 0.0 -1 #- 19 -1 1 7 7 UIParent 0.0 0.0 -1 ## 20 0 1 7 7 UIParent 0.0 310.0 -1 ##$/%$&('%(-($)#+$,$-$ 20 1 1 7 7 UIParent 0.0 240.0 -1 ##$*%$&('%(-($)#+$,$-$ 20 2 1 7 7 UIParent 0.0 370.0 -1 ##$$%$&('((-($)#+$,$-$ 20 3 1 7 7 UIParent 420.0 430.0 -1 #$$$%#&('((-($)#*#+$,$-$.-.$ 21 -1 0 4 4 UIParent 0.0 -164.0 -1 ##%#&#'$($)#*U+#,&-#.#/&0$1# 22 0 1 8 7 UIParent -457.0 336.0 -1 #$$$%#&('((#)U*$+%,$-#.#/U0% 22 1 1 1 1 UIParent 0.0 -40.0 -1 &('()U*#+% 22 2 1 1 1 UIParent 0.0 -90.0 -1 &('()U*#+% 22 3 1 1 1 UIParent 0.0 -130.0 -1 &('()U*#+% 23 -1 0 8 6 MultiBarLeft -4.0 0.0 -1 ##$#%$&i'T(%)U+$,$-#.(/# 24 -1 1 1 1 UIParent 0.0 -182.0 -1 # 25 -1 1 5 7 UIParent -28.0 128.0 -1 # 26 0 1 5 3 MainActionBar 30.0 5.0 -1 #$ 26 1 1 3 5 BagsBar -30.0 5.0 -1 #$ 27 -1 1 4 4 Minimap -68.0 -68.0 -1 #+ 28 -1 1 4 4 UIParent 0.0 0.0 -1 #& 29 0 1 7 7 UIParent 0.0 450.0 -1 #($U%$&K'#(#)# 29 1 1 7 7 UIParent 0.0 425.0 -1 #($U%$&K'#(#)# 29 2 1 7 7 UIParent 0.0 400.0 -1 #($U%$&K'#(#)#]=]
 local editModeLayoutChecked = false
 
 local function installEditModeLayout()
@@ -189,6 +189,21 @@ local function readableUnitToken(value)
     return value
 end
 
+local function readableUnitGUID(unit)
+    if not UnitGUID then return nil end
+    local ok, guid = pcall(UnitGUID, unit)
+    if ok and not isSecret(guid) and type(guid) == "string" then return guid end
+end
+
+local function sameUnit(unitA, unitB)
+    if UnitIsUnit then
+        local same = readableBool(UnitIsUnit, unitA, unitB)
+        if same ~= nil then return same end
+    end
+    local guidA, guidB = readableUnitGUID(unitA), readableUnitGUID(unitB)
+    if guidA and guidB then return guidA == guidB end
+end
+
 local function smallFrame(unit)
     if unit == "targettarget" then
         return (_G.TargetFrame and _G.TargetFrame.totFrame) or _G.TargetFrameToT
@@ -354,17 +369,324 @@ local function classToken(unit)
     end
 end
 
+local function matchingNamePlate(unit)
+    if not C_NamePlate then return nil end
+
+    -- This API accepts nameplateN tokens, not target/focus/derived unit tokens.
+    -- Use it only when the caller already has the required token shape.
+    local unitToken = readableUnitToken(unit)
+    if unitToken and unitToken:match("^nameplate%d+$")
+        and type(C_NamePlate.GetNamePlateForUnit) == "function"
+    then
+        local ok, plate = pcall(C_NamePlate.GetNamePlateForUnit, unitToken)
+        if ok and plate then
+            local frame
+            pcall(function() frame = plate.UnitFrame or plate.unitFrame end)
+            return plate, frame, unitToken
+        end
+    end
+
+    if not C_NamePlate.GetNamePlates then return nil end
+    local ok, plates = pcall(C_NamePlate.GetNamePlates)
+    if not ok or isSecret(plates) or type(plates) ~= "table" then return nil end
+
+    for _, plate in pairs(plates) do
+        local frameOK, unitFrame, plateUnit = pcall(function()
+            local frame = plate and (plate.UnitFrame or plate.unitFrame)
+            local token = frame and readableUnitToken(frame.unit)
+            if not token and plate and type(plate.GetUnit) == "function" then
+                token = readableUnitToken(plate:GetUnit())
+            end
+            if not token and plate then token = readableUnitToken(plate.unit) end
+            return frame, token
+        end)
+        if frameOK and plateUnit then
+            local same = sameUnit(unit, plateUnit)
+            if same then return plate, unitFrame, plateUnit end
+        end
+    end
+end
+
+local adjustedClassColor
+
+local function classTokenFromRGB(r, g, b)
+    if isSecret(r) or isSecret(g) or isSecret(b)
+        or type(r) ~= "number" or type(g) ~= "number" or type(b) ~= "number" then
+        return nil
+    end
+
+    local colors = CUSTOM_CLASS_COLORS or RAID_CLASS_COLORS
+    if type(colors) ~= "table" then return nil end
+    for token, color in pairs(colors) do
+        if color and not isSecret(color.r) and not isSecret(color.g) and not isSecret(color.b)
+            and type(color.r) == "number" and type(color.g) == "number" and type(color.b) == "number"
+        then
+            local function matches(cr, cg, cb)
+                return math.abs(r - cr) <= 0.055
+                    and math.abs(g - cg) <= 0.055
+                    and math.abs(b - cb) <= 0.055
+            end
+            if matches(color.r, color.g, color.b) then return token end
+
+            -- Also recognize the saturation/brightness adjustment used by this
+            -- addon when the visible client surface is already tinted.
+            local maximum = math.max(color.r, color.g, color.b)
+            local ar = math.min(1, (maximum + (color.r - maximum) * CLASS_SATURATION) * CLASS_BRIGHTNESS)
+            local ag = math.min(1, (maximum + (color.g - maximum) * CLASS_SATURATION) * CLASS_BRIGHTNESS)
+            local ab = math.min(1, (maximum + (color.b - maximum) * CLASS_SATURATION) * CLASS_BRIGHTNESS)
+            if matches(ar, ag, ab) then return token end
+        end
+    end
+end
+
+local function classColorFromFontString(region, path)
+    if not region or type(region.GetTextColor) ~= "function" then return nil end
+    local ok, r, g, b = pcall(region.GetTextColor, region)
+    local token = ok and classTokenFromRGB(r, g, b)
+    if not token then return nil end
+    local cr, cg, cb, ca = adjustedClassColor(token)
+    if cr then return cr, cg, cb, ca, path .. ":" .. token end
+end
+
+local function namePlateTextClassColor(frame, label)
+    if not frame then return nil end
+    local candidates = {}
+    local function add(region, path)
+        if region then candidates[#candidates + 1] = { region, path } end
+    end
+
+    for _, field in ipairs({ "name", "Name", "nameText", "NameText", "unitName" }) do
+        local ok, region = pcall(function() return frame[field] end)
+        if ok and region then
+            add(region, label .. "." .. field)
+            local childOK, child = pcall(function() return region.Name end)
+            if childOK and child then add(child, label .. "." .. field .. ".Name") end
+        end
+    end
+
+    if type(frame.GetRegions) == "function" then
+        local ok, regions = pcall(function() return { frame:GetRegions() } end)
+        if ok and type(regions) == "table" then
+            for index, region in ipairs(regions) do
+                add(region, label .. ".region" .. tostring(index))
+            end
+        end
+    end
+
+    for _, candidate in ipairs(candidates) do
+        local r, g, b, a, path = classColorFromFontString(candidate[1], candidate[2])
+        if r then return r, g, b, a, path end
+    end
+end
+
+local function namePlateHealthColor(plate, unitFrame)
+    if not plate then return nil end
+    local candidates = {}
+    local nativeColor
+    if unitFrame then candidates[#candidates + 1] = { unitFrame, "unitFrame" } end
+
+    -- Some clients return the NamePlate wrapper from GetNamePlates, while
+    -- others expose the unit-frame object itself. Resolve both parentKey shapes.
+    local embeddedOK, embeddedFrame = pcall(function()
+        return plate.UnitFrame or plate.unitFrame
+    end)
+    if embeddedOK and embeddedFrame and embeddedFrame ~= unitFrame then
+        candidates[#candidates + 1] = { embeddedFrame, "plate.UnitFrame" }
+    end
+    for _, candidate in pairs({ candidates[1], candidates[2] }) do
+        local frame = candidate and candidate[1]
+        if frame then
+            local containerOK, container = pcall(function()
+                return frame.HealthBarsContainer or frame.healthBarsContainer
+            end)
+            if containerOK and container then
+                candidates[#candidates + 1] = {
+                    container,
+                    candidate[2] .. ".HealthBarsContainer",
+                }
+            end
+        end
+    end
+    candidates[#candidates + 1] = { plate, "plate" }
+
+    for _, candidate in ipairs(candidates) do
+        local frame, label = candidate[1], candidate[2]
+        local barOK, bar, path = pcall(function()
+            local direct = frame.healthBar
+            if direct then return direct, label .. ".healthBar" end
+            direct = frame.HealthBar
+            if direct then return direct, label .. ".HealthBar" end
+            direct = frame.healthbar
+            if direct then return direct, label .. ".healthbar" end
+            local container = frame.HealthBarsContainer or frame.healthBarsContainer
+            local nested = container and container.healthBar
+            if nested then
+                return nested, label .. ".HealthBarsContainer.healthBar"
+            end
+            nested = container and container.HealthBar
+            if nested then
+                return nested, label .. ".HealthBarsContainer.HealthBar"
+            end
+        end)
+        if barOK and bar then
+            if type(bar.GetStatusBarColor) == "function" then
+                local colorOK, r, g, b = pcall(bar.GetStatusBarColor, bar)
+                local token = colorOK and classTokenFromRGB(r, g, b)
+                if token then
+                    local cr, cg, cb, ca = adjustedClassColor(token)
+                    if cr then return cr, cg, cb, ca, path .. ":" .. token end
+                end
+                if colorOK and not nativeColor
+                    and not isSecret(r) and not isSecret(g) and not isSecret(b)
+                    and type(r) == "number" and type(g) == "number" and type(b) == "number"
+                then
+                    -- Preserve the actual visible nameplate color when it uses
+                    -- a client palette this addon cannot name as a class. This
+                    -- keeps hostile NPCs red and avoids inventing white/gray.
+                    nativeColor = { r, g, b, 1, path .. ":native" }
+                end
+            end
+        end
+
+        -- Era/Forever nameplates can expose their health StatusBar as an
+        -- anonymous region rather than a parentKey. Find only named healthbar
+        -- StatusBars here so cast/power bars cannot become color witnesses.
+        if type(frame.GetRegions) == "function" then
+            local regionsOK, regions = pcall(function() return { frame:GetRegions() } end)
+            if regionsOK and type(regions) == "table" then
+                for index, region in ipairs(regions) do
+                    local objectType, regionName
+                    if region and region.GetObjectType then
+                        local typeOK, value = pcall(region.GetObjectType, region)
+                        if typeOK then objectType = value end
+                    end
+                    if region and region.GetName then
+                        local nameOK, value = pcall(region.GetName, region)
+                        if nameOK and type(value) == "string" then regionName = value:lower() end
+                    end
+                    if objectType == "StatusBar" and regionName
+                        and regionName:find("health", 1, true)
+                        and regionName:find("bar", 1, true)
+                        and type(region.GetStatusBarColor) == "function"
+                    then
+                        local colorOK, r, g, b = pcall(region.GetStatusBarColor, region)
+                        local token = colorOK and classTokenFromRGB(r, g, b)
+                        if token then
+                            local cr, cg, cb, ca = adjustedClassColor(token)
+                            if cr then
+                                return cr, cg, cb, ca,
+                                    label .. ".region" .. tostring(index) .. ":" .. token
+                            end
+                        end
+                        if colorOK and not nativeColor
+                            and not isSecret(r) and not isSecret(g) and not isSecret(b)
+                            and type(r) == "number" and type(g) == "number" and type(b) == "number"
+                        then
+                            nativeColor = {
+                                r, g, b, 1,
+                                label .. ".region" .. tostring(index) .. ":native",
+                            }
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    for _, candidate in ipairs(candidates) do
+        local r, g, b, a, path = namePlateTextClassColor(candidate[1], candidate[2])
+        if r then return r, g, b, a, path end
+    end
+    if nativeColor then return unpack(nativeColor) end
+    return nil, nil, nil, nil, "class-color-unavailable"
+end
+
+local function classTokenFromGroupAlias(unit)
+    local function check(candidate)
+        if sameUnit(unit, candidate) then
+            return classToken(candidate)
+        end
+    end
+
+    for index = 1, 4 do
+        local token = check("party" .. index)
+        if token then return token end
+    end
+    for index = 1, 40 do
+        local token = check("raid" .. index)
+        if token then return token end
+    end
+end
+
+adjustedClassColor = function(token)
+    local colors = CUSTOM_CLASS_COLORS or RAID_CLASS_COLORS
+    local color = colors and colors[token]
+    if not color or isSecret(color.r) or isSecret(color.g) or isSecret(color.b)
+        or type(color.r) ~= "number" or type(color.g) ~= "number" or type(color.b) ~= "number" then
+        return nil
+    end
+
+    local r, g, b = color.r, color.g, color.b
+    local maximum = math.max(r, g, b)
+    r = math.min(1, (maximum + (r - maximum) * CLASS_SATURATION) * CLASS_BRIGHTNESS)
+    g = math.min(1, (maximum + (g - maximum) * CLASS_SATURATION) * CLASS_BRIGHTNESS)
+    b = math.min(1, (maximum + (b - maximum) * CLASS_SATURATION) * CLASS_BRIGHTNESS)
+    return r, g, b, 1
+end
+
+local function fallbackPlayerHealthColor(unit)
+    local token = classToken(unit) or classTokenFromGroupAlias(unit)
+    if token then
+        local r, g, b, a = adjustedClassColor(token)
+        if r then return r, g, b, a end
+    end
+
+    -- When battleground restrictions hide UnitClass for an enemy, Blizzard's
+    -- visible nameplate can still expose the class tint it is already showing.
+    local plate, unitFrame, plateUnit = matchingNamePlate(unit)
+    token = classToken(plateUnit)
+        or (unitFrame and classToken(readableUnitToken(unitFrame.unit)))
+    if token then
+        local r, g, b, a = adjustedClassColor(token)
+        if r then return r, g, b, a end
+    end
+    if plate then return namePlateHealthColor(plate, unitFrame) end
+end
+
+local function fallbackVisibleHealthColor(unit)
+    -- A matching party/raid unit is a positive class witness even when the
+    -- derived unit token itself has protected player/class identity.
+    local token = classTokenFromGroupAlias(unit)
+    if token then
+        local r, g, b, a = adjustedClassColor(token)
+        if r then return r, g, b, a end
+    end
+
+    local plate, unitFrame, plateUnit = matchingNamePlate(unit)
+    token = classToken(plateUnit)
+        or (unitFrame and classToken(readableUnitToken(unitFrame.unit)))
+    if token then
+        local r, g, b, a = adjustedClassColor(token)
+        if r then return r, g, b, a end
+    end
+    if plate then return namePlateHealthColor(plate, unitFrame) end
+end
+
 local healthColorWrites = setmetatable({}, { __mode = "k" })
 local function setHealthColor(bar, ...)
+    if bar.SetStatusBarDesaturated then
+        -- The desaturation flag is applied after the bar tint on some client
+        -- builds, turning class colors into white/gray fills.
+        pcall(bar.SetStatusBarDesaturated, bar, false)
+    end
     healthColorWrites[bar] = true
     pcall(bar.SetStatusBarColor, bar, ...)
     healthColorWrites[bar] = nil
 end
 
-local function clearUnknownDerivedColor(bar, unit)
-    if unit == "targettarget" or unit == "focustarget" then
-        setHealthColor(bar, 0.5, 0.5, 0.5, 1)
-    end
+local function preserveUnknownDerivedColor(bar, unit)
+    -- Leave Blizzard's own color in place when the referent is unreadable.
+    -- Writing neutral gray here erased enemy class/reaction colors in BGs.
 end
 
 local function applyHealthColor(bar, unit)
@@ -373,17 +695,8 @@ local function applyHealthColor(bar, unit)
     local derived = unit == "targettarget" or unit == "focustarget"
     local exists = readableBool(UnitExists, unit)
     if exists == false then
-        clearUnknownDerivedColor(bar, unit)
+        preserveUnknownDerivedColor(bar, unit)
         return
-    elseif derived and exists == nil then
-        clearUnknownDerivedColor(bar, unit)
-        return
-    end
-
-    -- The PRD atlas is colorized by the StatusBar tint. Keep the fill grayscale
-    -- so Blizzard/source artwork cannot leak its own hue into our class/reaction tint.
-    if bar.SetStatusBarDesaturated then
-        pcall(bar.SetStatusBarDesaturated, bar, true)
     end
 
     -- Positive player identity outranks pet identity. This matters most for the
@@ -391,34 +704,37 @@ local function applyHealthColor(bar, unit)
     -- be allowed to paint a real player green.
     local player, playerReadable = playerUnitState(unit)
     if playerReadable and player then
-        local colors = CUSTOM_CLASS_COLORS or RAID_CLASS_COLORS
-        local color = colors and colors[classToken(unit)]
-        if color then
-            local r, g, b = color.r, color.g, color.b
-            local maximum = math.max(r, g, b)
-            r = math.min(1, (maximum + (r - maximum) * CLASS_SATURATION) * CLASS_BRIGHTNESS)
-            g = math.min(1, (maximum + (g - maximum) * CLASS_SATURATION) * CLASS_BRIGHTNESS)
-            b = math.min(1, (maximum + (b - maximum) * CLASS_SATURATION) * CLASS_BRIGHTNESS)
-            setHealthColor(bar, r, g, b, 1)
+        local r, g, b, a = fallbackPlayerHealthColor(unit)
+        if r then
+            setHealthColor(bar, r, g, b, a)
             return
         end
 
-        -- Player identity can remain readable while class identity is protected.
-        -- Never leave a previous unit's tint behind in that state.
-        if UnitSelectionColor then
-            local ok, r, g, b, a = pcall(UnitSelectionColor, unit)
-            if ok and not isSecret(r) and not isSecret(g) and not isSecret(b)
-                and type(r) == "number" and type(g) == "number" and type(b) == "number" then
-                if type(a) ~= "number" or isSecret(a) then a = 1 end
-                setHealthColor(bar, r, g, b, a)
-                return
-            end
+        -- UnitSelectionColor is a faction/reaction color here, not class data;
+        -- some battleground clients return white for protected enemy players.
+        -- The matching nameplate fallback above is the visible color witness.
+        return
+    elseif not playerReadable then
+        -- ToT/FoT often have a readable matching nameplate even when their
+        -- own derived unit token cannot expose player/class identity.
+        local r, g, b, a = fallbackVisibleHealthColor(unit)
+        if r then
+            setHealthColor(bar, r, g, b, a)
+            return
         end
-        setHealthColor(bar, 0.5, 0.5, 0.5, 1)
-        return
-    elseif derived and not playerReadable then
-        clearUnknownDerivedColor(bar, unit)
-        return
+        if derived then
+            preserveUnknownDerivedColor(bar, unit)
+            return
+        end
+    elseif not player then
+        -- Some BG unit tokens report a readable non-player state while another
+        -- view of the same visible actor is already identified as a player.
+        -- Prefer its live nameplate tint before falling through to NPC colors.
+        local r, g, b, a = fallbackVisibleHealthColor(unit)
+        if r then
+            setHealthColor(bar, r, g, b, a)
+            return
+        end
     end
 
     -- Combat pets use Blizzard's stock green health language regardless of
@@ -428,7 +744,7 @@ local function applyHealthColor(bar, unit)
         setHealthColor(bar, 0, 1, 0, 1)
         return
     elseif derived and not petReadable then
-        clearUnknownDerivedColor(bar, unit)
+        preserveUnknownDerivedColor(bar, unit)
         return
     end
 
@@ -446,7 +762,8 @@ local function applyHealthColor(bar, unit)
 
     local tapDenied = readableBool(UnitIsTapDenied, unit)
     local playerControlled = readableBool(UnitPlayerControlled, unit)
-    if tapDenied == true and playerControlled == false then
+    local enemy = readableBool(UnitIsEnemy, "player", unit)
+    if tapDenied == true and playerControlled == false and enemy == false then
         -- Matches Blizzard compact/nameplate convention for an NPC whose tap
         -- belongs elsewhere.
         setHealthColor(bar, 0.9, 0.9, 0.9, 1)
@@ -465,11 +782,11 @@ local function applyHealthColor(bar, unit)
         end
     end
 
-    if not UnitSelectionColor then clearUnknownDerivedColor(bar, unit); return end
+    if not UnitSelectionColor then preserveUnknownDerivedColor(bar, unit); return end
     local ok, r, g, b, a = pcall(UnitSelectionColor, unit)
     if not ok or isSecret(r) or isSecret(g) or isSecret(b)
         or type(r) ~= "number" or type(g) ~= "number" or type(b) ~= "number" then
-        clearUnknownDerivedColor(bar, unit)
+        preserveUnknownDerivedColor(bar, unit)
         return
     end
     if type(a) ~= "number" or isSecret(a) then a = 1 end
@@ -499,11 +816,69 @@ local function applyUnit(unit)
     applyPowerColor(power, unit)
 end
 
+local function escapePattern(text) return (text:gsub("(%W)", "%%%1")) end
+
+local function normalizedNameForRealmMatch(value)
+    return value:lower():gsub("[^%a%d]", "")
+end
+
+local function stripRealmSuffix(name, getter)
+    if type(getter) ~= "function" then return name end
+    local ok, realm = pcall(getter)
+    if not ok or isSecret(realm) or type(realm) ~= "string" or realm == "" then
+        return name
+    end
+
+    local normalizedName = normalizedNameForRealmMatch(name)
+    local normalizedRealm = normalizedNameForRealmMatch(realm)
+    if normalizedRealm ~= "" and #normalizedName > #normalizedRealm
+        and normalizedName:sub(-#normalizedRealm) == normalizedRealm
+    then
+        -- Find the start of the realm suffix in the original text, allowing
+        -- servers that append it with no separator.
+        local index = #name
+        local remaining = #normalizedRealm
+        while index > 0 and remaining > 0 do
+            local character = name:sub(index, index)
+            if character:match("[%a%d]") then remaining = remaining - 1 end
+            index = index - 1
+        end
+
+        while index > 0 and name:sub(index, index):match("[%s_%-]") do
+            index = index - 1
+        end
+
+        local prefix = name:sub(1, index)
+        if prefix ~= "" then
+            name = prefix
+        end
+    end
+
+    return name
+end
+
+local function stripLocalRealmSuffix(value)
+    local name = value
+    if GetNormalizedRealmName then
+        name = stripRealmSuffix(name, GetNormalizedRealmName)
+    end
+    if GetRealmName then
+        name = stripRealmSuffix(name, GetRealmName)
+    end
+    return name
+end
+
+local function primaryDisplayName(value)
+    if isSecret(value) or type(value) ~= "string" then return nil end
+    local withoutRealm = stripLocalRealmSuffix(value)
+    return withoutRealm:match("^%S+")
+end
+
 local function primaryName(unit)
     if not isPlayerUnit(unit) or not UnitName then return nil end
     local ok, name = pcall(UnitName, unit)
     if not ok or isSecret(name) or type(name) ~= "string" then return nil end
-    return name:match("^%S+")
+    return primaryDisplayName(name)
 end
 
 local function applyPrimaryNameToFrame(frame, unit)
@@ -570,14 +945,13 @@ local function senderIsPlayer(event, guid)
     return PLAYER_CHAT_EVENTS[event] == true
 end
 
-local function escapePattern(text) return (text:gsub("(%W)", "%%%1")) end
 local function senderNameFilter(event, decorated, text, sender, language, channel, player2, flags,
                                 zoneID, channelIndex, baseName, languageID, lineID, guid)
     if isSecret(decorated) or isSecret(sender) or isSecret(guid) then return decorated end
     if type(decorated) ~= "string" or type(sender) ~= "string" or not senderIsPlayer(event, guid) then
         return decorated
     end
-    local primary = sender:match("^%S+")
+    local primary = primaryDisplayName(sender)
     if not primary or primary == sender then return decorated end
     local replaced, count = decorated:gsub(escapePattern(sender), primary, 1)
     return count > 0 and replaced or decorated
@@ -585,6 +959,8 @@ end
 
 local communitiesNameHookInstalled = false
 local communitiesChatNameHookInstalled = false
+local communitiesMemberRefreshHookInstalled = false
+local communitiesFrameShowHookInstalled = false
 
 local function shortenCommunityVisibleText(text)
     if isSecret(text) or type(text) ~= "string" then return text end
@@ -600,7 +976,7 @@ local function shortenCommunityVisibleText(text)
                 return openLink .. display .. closeLink
             end
 
-            local primary = fullName:match("^%S+")
+            local primary = primaryDisplayName(fullName)
             if not primary or primary == fullName then
                 return openLink .. display .. closeLink
             end
@@ -608,6 +984,11 @@ local function shortenCommunityVisibleText(text)
             local replaced, count = display:gsub(escapePattern(fullName), primary, 1)
             if count > 0 then
                 return openLink .. replaced .. closeLink
+            end
+
+            local displayPrimary = primaryDisplayName(display)
+            if displayPrimary and displayPrimary ~= display then
+                return openLink .. displayPrimary .. closeLink
             end
             return openLink .. display .. closeLink
         end,
@@ -636,6 +1017,48 @@ local function applyCommunityVisibleNames(messageFrame)
     end
 end
 
+local function applyCommunityMemberPrimaryName(entry, memberInfo)
+    if isSecret(memberInfo) or type(memberInfo) ~= "table"
+        or not entry or not entry.NameFrame
+        or not entry.NameFrame.Name or not entry.NameFrame.Name.SetText then
+        return
+    end
+
+    local primary = primaryDisplayName(memberInfo.name)
+    if not primary then return end
+
+    local seasonID = memberInfo.timerunningSeasonID
+    if not isSecret(seasonID) and seasonID
+        and TimerunningUtil and TimerunningUtil.AddTinyIcon
+    then
+        local ok, decorated = pcall(TimerunningUtil.AddTinyIcon, primary)
+        if ok and type(decorated) == "string" and not isSecret(decorated) then
+            primary = decorated
+        end
+    end
+    pcall(entry.NameFrame.Name.SetText, entry.NameFrame.Name, primary)
+end
+
+local function applyVisibleCommunityMemberNames()
+    local communitiesFrame = _G.CommunitiesFrame
+    local memberList = communitiesFrame
+        and (communitiesFrame.MemberList or communitiesFrame.MemberListFrame)
+    local scrollBox = memberList and (memberList.ScrollBox or memberList.scrollBox)
+    if not scrollBox or type(scrollBox.ForEachFrame) ~= "function" then return end
+
+    pcall(scrollBox.ForEachFrame, scrollBox, function(entry)
+        applyCommunityMemberPrimaryName(entry, entry and entry.memberInfo)
+    end)
+end
+
+local function scheduleCommunityMemberNameRefresh()
+    if C_Timer and C_Timer.After then
+        pcall(C_Timer.After, 0, applyVisibleCommunityMemberNames)
+    else
+        applyVisibleCommunityMemberNames()
+    end
+end
+
 local function installCommunitiesPrimaryNames()
     if not hooksecurefunc then return end
 
@@ -643,30 +1066,42 @@ local function installCommunitiesPrimaryNames()
         local mixin = _G.CommunitiesMemberListEntryMixin
         if type(mixin) == "table" and type(mixin.SetMember) == "function" then
             hooksecurefunc(mixin, "SetMember", function(self, memberInfo)
-                if isSecret(memberInfo) or type(memberInfo) ~= "table"
-                    or not self or not self.NameFrame
-                    or not self.NameFrame.Name or not self.NameFrame.Name.SetText then
-                    return
-                end
-
-                local name = memberInfo.name
-                if isSecret(name) or type(name) ~= "string" then return end
-                local primary = name:match("^%S+")
-                if not primary then return end
-
-                local seasonID = memberInfo.timerunningSeasonID
-                if not isSecret(seasonID) and seasonID
-                    and TimerunningUtil and TimerunningUtil.AddTinyIcon
-                then
-                    local ok, decorated = pcall(TimerunningUtil.AddTinyIcon, primary)
-                    if ok and type(decorated) == "string" and not isSecret(decorated) then
-                        primary = decorated
-                    end
-                end
-                pcall(self.NameFrame.Name.SetText, self.NameFrame.Name, primary)
+                applyCommunityMemberPrimaryName(self, memberInfo)
             end)
 
             communitiesNameHookInstalled = true
+
+            if type(mixin.UpdateNameFrame) == "function" then
+                hooksecurefunc(mixin, "UpdateNameFrame", function(self)
+                    applyCommunityMemberPrimaryName(self, self and self.memberInfo)
+                end)
+            end
+        end
+    end
+
+    if not communitiesMemberRefreshHookInstalled then
+        local listMixin = _G.CommunitiesMemberListMixin
+        if type(listMixin) == "table" and type(listMixin.RefreshListDisplay) == "function" then
+            hooksecurefunc(listMixin, "RefreshListDisplay", scheduleCommunityMemberNameRefresh)
+            communitiesMemberRefreshHookInstalled = true
+        end
+
+        local communitiesFrame = _G.CommunitiesFrame
+        local memberList = communitiesFrame
+            and (communitiesFrame.MemberList or communitiesFrame.MemberListFrame)
+        local scrollBox = memberList and (memberList.ScrollBox or memberList.scrollBox)
+        if scrollBox and type(scrollBox.SetDataProvider) == "function" then
+            hooksecurefunc(scrollBox, "SetDataProvider", scheduleCommunityMemberNameRefresh)
+            communitiesMemberRefreshHookInstalled = true
+        end
+    end
+
+    if not communitiesFrameShowHookInstalled then
+        local communitiesFrame = _G.CommunitiesFrame
+        if communitiesFrame and communitiesFrame.HookScript then
+            local hooked = pcall(communitiesFrame.HookScript, communitiesFrame, "OnShow",
+                scheduleCommunityMemberNameRefresh)
+            communitiesFrameShowHookInstalled = hooked
         end
     end
 
@@ -686,6 +1121,8 @@ local function installCommunitiesPrimaryNames()
             applyCommunityVisibleNames(messageFrame)
         end
     end
+
+    applyVisibleCommunityMemberNames()
 end
 
 local damageMeterNameHookInstalled = false
@@ -1633,6 +2070,23 @@ end
 local npcStateEventsPrimary = installNPCStateEvents("target", "focus")
 local npcStateEventsDerived = installNPCStateEvents("targettarget", "focustarget")
 
+local namePlateColorEvents = CreateFrame("Frame")
+local namePlateAddedRegistered = pcall(
+    namePlateColorEvents.RegisterEvent, namePlateColorEvents, "NAME_PLATE_UNIT_ADDED"
+)
+local namePlateRemovedRegistered = pcall(
+    namePlateColorEvents.RegisterEvent, namePlateColorEvents, "NAME_PLATE_UNIT_REMOVED"
+)
+if namePlateAddedRegistered or namePlateRemovedRegistered then
+    namePlateColorEvents:SetScript("OnEvent", function()
+        -- Only four tracked bars need to be recolored. Refresh them on every
+        -- plate change so protected UnitIsUnit results cannot skip the match.
+        for _, unit in ipairs({ "target", "focus", "targettarget", "focustarget" }) do
+            applyHealthColor(healthBar(unit), unit)
+        end
+    end)
+end
+
 -- PetFrame can appear/rebind independently of target/focus state. Refresh only
 -- the pet bars when the player's pet changes.
 local petStateEvents = CreateFrame("Frame")
@@ -1657,7 +2111,7 @@ local function printUIAudit()
         .. " communitiesRoster=" .. tostring(communitiesNameHookInstalled)
         .. " communitiesChat=" .. tostring(communitiesChatNameHookInstalled)
         .. " damageMeter=" .. tostring(damageMeterNameHookInstalled)
-        .. " damageMeterInit=" .. tostring(damageMeterSourceInitHookInstalled)
+        .. " damageMeterInit=" .. tostring(damageMeterSourceInitHookInstalled))
 
     for _, unit in ipairs({ "targettarget", "focustarget" }) do
         local frame = smallFrame(unit)
@@ -1687,14 +2141,58 @@ local function printUIAudit()
     end
 end
 
+local function healthColorText(bar)
+    if not bar or not bar.GetStatusBarColor then return "none" end
+    local ok, r, g, b = pcall(bar.GetStatusBarColor, bar)
+    if not ok or isSecret(r) or isSecret(g) or isSecret(b)
+        or type(r) ~= "number" or type(g) ~= "number" or type(b) ~= "number" then
+        return "unknown"
+    end
+    return string.format("%.2f,%.2f,%.2f", r, g, b)
+end
+
+local function printHealthColorAudit()
+    local function out(message)
+        if DEFAULT_CHAT_FRAME then
+            DEFAULT_CHAT_FRAME:AddMessage("|cff74c7ecbjarkiUI|r: " .. tostring(message))
+        end
+    end
+
+    out("colors version=" .. BJARKI_UI_VERSION)
+    for _, unit in ipairs({ "target", "focus", "targettarget", "focustarget" }) do
+        local exists = readableBool(UnitExists, unit)
+        local player, playerReadable = playerUnitState(unit)
+        local pet, petReadable = petUnitState(unit)
+        local token = classToken(unit)
+        local plate, plateFrame, plateUnit = matchingNamePlate(unit)
+        local plateFrameUnit = plateFrame and readableUnitToken(plateFrame.unit)
+        local plateClass = classToken(plateUnit) or classToken(plateFrameUnit)
+        local plateR, plateG, plateB, _, plateBarPath = namePlateHealthColor(plate, plateFrame)
+        local plateColor = plateR and string.format("%.2f,%.2f,%.2f", plateR, plateG, plateB) or "none"
+        out(unit
+            .. " exists=" .. (exists == nil and "unknown" or tostring(exists))
+            .. " player=" .. (playerReadable and tostring(player) or "unknown")
+            .. " class=" .. tostring(token or "unknown")
+            .. " pet=" .. (petReadable and tostring(pet) or "unknown")
+            .. " nameplate=" .. tostring(plateUnit or "none")
+            .. " plateClass=" .. tostring(plateClass or "unknown")
+            .. " plateBar=" .. tostring(plateBarPath or "none")
+            .. " plateColor=" .. plateColor
+            .. " barColor=" .. healthColorText(healthBar(unit)))
+    end
+end
+
 local previousBJarkiUISlash = SlashCmdList.BJARKIUI
 SlashCmdList.BJARKIUI = function(message)
     local command = tostring(message or ""):lower():match("^%s*(%S*)")
     if command == "audit" then
         printUIAudit()
         return
+    elseif command == "colors" then
+        printHealthColorAudit()
+        return
     elseif command == "" or command == "help" then
-        print("bjarkiUI: /bui levels [on|off] | audit")
+        print("bjarkiUI: /bui levels [on|off] | audit | colors")
         return
     end
     if previousBJarkiUISlash then
