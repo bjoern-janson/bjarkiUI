@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-This document describes the current implementation of **bjarkiUI 0.2.93-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
+This document describes the current implementation of **bjarkiUI 0.2.94-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -116,6 +116,13 @@ On first use, the addon can import a named Edit Mode layout called `bjarkiUI`.
 
 Once a layout with that name exists, the addon treats it as user-owned and does not continuously overwrite its coordinates.
 
+The 0.2.94 bundled layout moves Player and Target up three saved UI units
+(-160 to -157), and Focus and PRD down three (-160 to -163 and -164 to -167).
+Every other serialized field, including X coordinates, is unchanged. Existing
+layouts receive these four edits only when the updated string is imported.
+This is a small scoreboard-spacing adjustment; an older cropped screenshot
+cannot establish exact post-maintenance portrait or PRD edge clearance.
+
 The Micro Menu correction is separate from the serialized Edit Mode layout. The addon leaves `MicroMenuContainer` in place and offsets the visible `MicroMenu` child downward by one UI unit after Blizzard anchors it.
 
 This avoids moving the shared container that other bottom-bar elements may use as an anchor.
@@ -195,7 +202,7 @@ In particular:
 The current build also makes three narrow presentation changes without replacing the surrounding Blizzard systems:
 
 - raises the default `UIErrorsFrame` vertically while preserving its horizontal center;
-- hides dispel-type colored borders on harmful aura icons in compact Party/Raid frames while leaving the icons, cooldowns, stacks, and separate dispel overlay intact;
+- hides dispel-type borders reached through older public compact aura renderers, while leaving their icons, cooldowns, stacks and separate dispel overlay intact; current private aura borders are outside those hooks;
 - hides Guild and Legacy-system notification pips on the Micro Menu while keeping the buttons functional.
 
 
@@ -210,7 +217,9 @@ is reanchored to the exact center of the existing Loss of Control frame.
 
 ## 14. Derived-frame repair notes
 
-Version 0.2.73 hardens Target-of-Target / Focus-of-Target presentation in three places:
+The following 0.2.73 behavior is historical. Its grey UNKNOWN-state fallback
+and private-border geometry manipulation have been superseded by the current
+color rules and the rollback in section 17:
 
 - derived health colors fail closed to neutral grey while player/pet identity witnesses are unreadable or disagree, instead of reusing an incorrect semantic tint;
 - native ToT/FoT debuffs are restored when Blizzard's global `showDispelDebuffs` option would otherwise filter friendly derived units down to `HARMFUL|RAID`;
@@ -276,8 +285,9 @@ Blizzard's compact-unit update stack.
 
 ## 18. Compact debuff border presentation
 
-Version 0.2.77 restores the requested removal of compact Party/Raid debuff borders
-without writing addon-owned values into Blizzard compact-frame Lua state.
+Version 0.2.77 added removal for public compact aura renderers without writing
+addon-owned values into Blizzard compact-frame Lua state. The current private
+renderer uses a separate environment and is not reached by this hook.
 
 The addon post-hooks Blizzard's final `AuraUtil.SetAuraBorderAtlas` presentation
 write. After Blizzard has already consumed the secret aura/dispel data, bjarkiUI
@@ -285,7 +295,7 @@ identifies compact Party/Raid aura textures only from their fixed frame ancestry
 and sets that border Texture's alpha to zero.
 
 No `CompactUnitFrame` fields, private-aura settings, aura tables, health values,
-or heal-prediction state are read or modified. Because private aura frames are
+or heal-prediction state are read or modified by this operation. Because public aura frames are
 pooled, a border hidden by bjarkiUI is restored to alpha 1 if that same Texture is
 later reused on a non-compact presentation.
 
@@ -337,16 +347,16 @@ possible**.
 
 ## 21. Compact debuff-border ownership
 
-Version 0.2.80 corrected the intended native write boundary for the colored
-compact debuff border to `CompactUnitFrame_UtilSetDebuff`, while retaining a
-narrow `AuraUtil.SetAuraBorderAtlas` compatibility path.
+Version 0.2.80 added the public `CompactUnitFrame_UtilSetDebuff` border-write
+path while retaining the narrow public `AuraUtil.SetAuraBorderAtlas` hook.
+Neither path reaches the current secure private-aura renderer.
 
 ## 22. Compact debuff-border lifecycle hardening
 
 Version 0.2.81 tightens that implementation after live validation showed the
 per-aura hook alone was insufficient on the tested client.
 
-The addon now has three non-invasive final presentation boundaries:
+The public-renderer compatibility code has three final presentation boundaries:
 
 1. `CompactUnitFrame_UtilSetDebuff` — catches the native type-color write;
 2. `CompactUnitFrame_UpdateDebuffs` — performs a final sweep after the full
@@ -436,3 +446,35 @@ Login, world entry, Edit Mode updates, UnitFrame module loading and combat exit
 retry from the current native relation. A native reset during combat remains
 untouched until the post-combat retry. Source-level geometry and lifecycle
 checks do not certify live pixel alignment or protected execution.
+
+
+## 26. Current private aura borders and diagnostic scope
+
+The current compact Party/Raid aura path passes anchor settings into
+Blizzard_PrivateAurasUI. Its
+[TOC](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_PrivateAurasUI/Blizzard_PrivateAurasUI.toc)
+selects a secure execution environment, and its
+[XML](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_PrivateAurasUI/Blizzard_PrivateAurasUI.xml)
+marks the aura templates forbidden and hidden from the public environment.
+The private Update method shows DebuffBorder for harmful auras and calls its
+own secure AuraUtil copy. Public compact/AuraUtil hooks cannot reach that
+writer; sections 18, 21 and 22 describe public-renderer compatibility only.
+
+The inspected public settings expose size, border scale and separate dispel
+indicators, but no individual private-icon border-visibility switch. Zero
+border scale still yields an icon-sized border; hiding a dispel glyph selects
+a colored no-glyph atlas. Neither removes the border. The earlier negative
+geometry workaround remains removed. The current private border request is
+unresolved, with its native owner identified.
+
+The existing /bui audit reports public private-container API availability and
+client ownership of private-border visibility without inspecting private
+icons. The existing /bui colors adds readable connection, death, tap-denial
+and selection RGB to distinguish grey NPC states from copied or retained
+native colors. These commands report unknown on unavailable or protected
+inputs and make no presentation writes.
+
+Targeted-nameplate font size remains native. The inspected target-selection
+Lua updates health/level selection without resizing the name font; this does
+not establish whether native C++ scaling has a beta regression. No font or
+CVar workaround follows from the screenshot alone.

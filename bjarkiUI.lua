@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.93-local"
+local BJARKI_UI_VERSION = "0.2.94-local"
 local PRD_ATLAS = "UI-HUD-CoolDownManager-Bar"
 local CLASS_SATURATION = 1.18
 local CLASS_BRIGHTNESS = 1.08
@@ -18,7 +18,7 @@ if bjarkiUISettings.showLevelNumbers == nil then
     bjarkiUISettings.showLevelNumbers = true
 end
 
-local EDIT_MODE_LAYOUT_STRING = [=[4 0 59 0 0 1 8 6 MicroMenuContainer -4.5 -4.0 -1 ##$$%/&('%)#+$,$ 0 1 1 7 7 UIParent 0.0 0.0 -1 ##$$%/&('%(#,# 0 2 1 7 7 UIParent 0.0 0.0 -1 ##$$%/&('%(#,# 0 3 1 5 5 UIParent -5.0 -77.0 -1 #$$$%/&('%(#,# 0 4 1 5 5 UIParent -5.0 -77.0 -1 #$$$%/&('%(#,# 0 5 1 1 4 UIParent 0.0 0.0 -1 ##$$%/&('%(#,$ 0 6 1 1 4 UIParent 0.0 -50.0 -1 ##$$%/&('%(#,$ 0 7 1 1 4 UIParent 0.0 -100.0 -1 ##$$%/&('%(#,$ 0 10 1 7 7 UIParent 0.0 -4.0 -1 ##$$&('% 0 11 1 7 7 UIParent 0.0 -4.0 -1 ##$$&('%,# 0 12 1 7 7 UIParent 0.0 -4.0 -1 ##$$&('% 1 -1 0 4 4 UIParent 0.0 -276.0 -1 #%$#%$ 2 -1 1 2 2 UIParent 0.0 0.0 -1 ##$#%(&( 3 0 0 0 0 UIParent 278.0 -160.0 -1 $#3% 3 1 0 1 1 UIParent -294.0 -160.0 -1 %#3% 3 2 0 4 4 UIParent 358.0 -160.0 -1 %#&$3% 3 3 0 0 0 UIParent 512.0 -420.0 -1 '$(#)#-k.5/#1$3#5#6,7-7$8(9, 3 4 1 0 2 CompactRaidFrameManager 0.0 -5.0 -1 ,#-=.+/#0#1#2(3#5#6(7-7$8(9( 3 5 1 5 5 UIParent 0.0 0.0 -1 &$*$3# 3 6 1 5 5 UIParent 0.0 0.0 -1 -=.+/#4$5#6(7-7$8(9( 3 7 0 1 7 PlayerFrame 34.0 25.0 -1 3% 4 -1 1 7 7 UIParent 0.0 -4.0 -1 # 5 -1 1 7 7 UIParent 0.0 -4.0 -1 # 6 0 0 1 1 UIParent 244.0 -100.0 -1 ##$#%#&.())( 6 1 0 2 8 BuffFrame -16.0 -4.0 -1 ##$#%#'+())(-# 6 2 1 1 1 UIParent 0.0 -25.0 -1 ##$#%$&.(()(+#,-,$ 7 -1 1 7 7 UIParent 0.0 -4.0 -1 # 8 -1 0 3 3 UIParent 34.0 -220.0 -1 #'$d%$&i 9 -1 1 7 7 UIParent 0.0 -4.0 -1 # 10 -1 1 0 0 UIParent 16.0 -116.0 -1 # 11 -1 1 8 8 UIParent -9.0 85.0 -1 # 12 -1 1 2 2 UIParent -110.0 -275.0 -1 #K$#%# 13 -1 1 7 7 UIParent 116.5 6.0 -1 ##$#%) 14 -1 1 6 8 MicroMenuContainer 7.0 -4.0 -1 ##$#%( 15 0 1 7 7 UIParent 0.0 0.0 -1 &- 15 1 1 7 7 UIParent 0.0 17.0 -1 &- 16 -1 1 5 5 UIParent 0.0 0.0 -1 #( 17 -1 1 1 1 UIParent 0.0 -100.0 -1 ## 18 -1 1 5 5 UIParent 0.0 0.0 -1 #- 19 -1 1 7 7 UIParent 0.0 0.0 -1 ## 20 0 1 7 7 UIParent 0.0 310.0 -1 ##$/%$&('%(-($)#+$,$-$ 20 1 1 7 7 UIParent 0.0 240.0 -1 ##$*%$&('%(-($)#+$,$-$ 20 2 1 7 7 UIParent 0.0 370.0 -1 ##$$%$&('((-($)#+$,$-$ 20 3 1 7 7 UIParent 420.0 430.0 -1 #$$$%#&('((-($)#*#+$,$-$.-.$ 21 -1 0 4 4 UIParent 0.0 -164.0 -1 ##%#&#'$($)#*U+#,&-#.#/&0$1# 22 0 1 8 7 UIParent -457.0 336.0 -1 #$$$%#&('((#)U*$+%,$-#.#/U0% 22 1 1 1 1 UIParent 0.0 -40.0 -1 &('()U*#+% 22 2 1 1 1 UIParent 0.0 -90.0 -1 &('()U*#+% 22 3 1 1 1 UIParent 0.0 -130.0 -1 &('()U*#+% 23 -1 0 8 6 MultiBarLeft -4.0 0.0 -1 ##$#%$&i'T(%)U+$,$-#.(/# 24 -1 1 1 1 UIParent 0.0 -182.0 -1 # 25 -1 1 5 7 UIParent -28.0 128.0 -1 # 26 0 1 5 3 MainActionBar 30.0 5.0 -1 #$ 26 1 1 3 5 BagsBar -30.0 5.0 -1 #$ 27 -1 1 4 4 Minimap -68.0 -68.0 -1 #+ 28 -1 1 4 4 UIParent 0.0 0.0 -1 #& 29 0 1 7 7 UIParent 0.0 450.0 -1 #($U%$&K'#(#)# 29 1 1 7 7 UIParent 0.0 425.0 -1 #($U%$&K'#(#)# 29 2 1 7 7 UIParent 0.0 400.0 -1 #($U%$&K'#(#)#]=]
+local EDIT_MODE_LAYOUT_STRING = [=[4 0 59 0 0 1 8 6 MicroMenuContainer -4.5 -4.0 -1 ##$$%/&('%)#+$,$ 0 1 1 7 7 UIParent 0.0 0.0 -1 ##$$%/&('%(#,# 0 2 1 7 7 UIParent 0.0 0.0 -1 ##$$%/&('%(#,# 0 3 1 5 5 UIParent -5.0 -77.0 -1 #$$$%/&('%(#,# 0 4 1 5 5 UIParent -5.0 -77.0 -1 #$$$%/&('%(#,# 0 5 1 1 4 UIParent 0.0 0.0 -1 ##$$%/&('%(#,$ 0 6 1 1 4 UIParent 0.0 -50.0 -1 ##$$%/&('%(#,$ 0 7 1 1 4 UIParent 0.0 -100.0 -1 ##$$%/&('%(#,$ 0 10 1 7 7 UIParent 0.0 -4.0 -1 ##$$&('% 0 11 1 7 7 UIParent 0.0 -4.0 -1 ##$$&('%,# 0 12 1 7 7 UIParent 0.0 -4.0 -1 ##$$&('% 1 -1 0 4 4 UIParent 0.0 -276.0 -1 #%$#%$ 2 -1 1 2 2 UIParent 0.0 0.0 -1 ##$#%(&( 3 0 0 0 0 UIParent 278.0 -157.0 -1 $#3% 3 1 0 1 1 UIParent -294.0 -157.0 -1 %#3% 3 2 0 4 4 UIParent 358.0 -163.0 -1 %#&$3% 3 3 0 0 0 UIParent 512.0 -420.0 -1 '$(#)#-k.5/#1$3#5#6,7-7$8(9, 3 4 1 0 2 CompactRaidFrameManager 0.0 -5.0 -1 ,#-=.+/#0#1#2(3#5#6(7-7$8(9( 3 5 1 5 5 UIParent 0.0 0.0 -1 &$*$3# 3 6 1 5 5 UIParent 0.0 0.0 -1 -=.+/#4$5#6(7-7$8(9( 3 7 0 1 7 PlayerFrame 34.0 25.0 -1 3% 4 -1 1 7 7 UIParent 0.0 -4.0 -1 # 5 -1 1 7 7 UIParent 0.0 -4.0 -1 # 6 0 0 1 1 UIParent 244.0 -100.0 -1 ##$#%#&.())( 6 1 0 2 8 BuffFrame -16.0 -4.0 -1 ##$#%#'+())(-# 6 2 1 1 1 UIParent 0.0 -25.0 -1 ##$#%$&.(()(+#,-,$ 7 -1 1 7 7 UIParent 0.0 -4.0 -1 # 8 -1 0 3 3 UIParent 34.0 -220.0 -1 #'$d%$&i 9 -1 1 7 7 UIParent 0.0 -4.0 -1 # 10 -1 1 0 0 UIParent 16.0 -116.0 -1 # 11 -1 1 8 8 UIParent -9.0 85.0 -1 # 12 -1 1 2 2 UIParent -110.0 -275.0 -1 #K$#%# 13 -1 1 7 7 UIParent 116.5 6.0 -1 ##$#%) 14 -1 1 6 8 MicroMenuContainer 7.0 -4.0 -1 ##$#%( 15 0 1 7 7 UIParent 0.0 0.0 -1 &- 15 1 1 7 7 UIParent 0.0 17.0 -1 &- 16 -1 1 5 5 UIParent 0.0 0.0 -1 #( 17 -1 1 1 1 UIParent 0.0 -100.0 -1 ## 18 -1 1 5 5 UIParent 0.0 0.0 -1 #- 19 -1 1 7 7 UIParent 0.0 0.0 -1 ## 20 0 1 7 7 UIParent 0.0 310.0 -1 ##$/%$&('%(-($)#+$,$-$ 20 1 1 7 7 UIParent 0.0 240.0 -1 ##$*%$&('%(-($)#+$,$-$ 20 2 1 7 7 UIParent 0.0 370.0 -1 ##$$%$&('((-($)#+$,$-$ 20 3 1 7 7 UIParent 420.0 430.0 -1 #$$$%#&('((-($)#*#+$,$-$.-.$ 21 -1 0 4 4 UIParent 0.0 -167.0 -1 ##%#&#'$($)#*U+#,&-#.#/&0$1# 22 0 1 8 7 UIParent -457.0 336.0 -1 #$$$%#&('((#)U*$+%,$-#.#/U0% 22 1 1 1 1 UIParent 0.0 -40.0 -1 &('()U*#+% 22 2 1 1 1 UIParent 0.0 -90.0 -1 &('()U*#+% 22 3 1 1 1 UIParent 0.0 -130.0 -1 &('()U*#+% 23 -1 0 8 6 MultiBarLeft -4.0 0.0 -1 ##$#%$&i'T(%)U+$,$-#.(/# 24 -1 1 1 1 UIParent 0.0 -182.0 -1 # 25 -1 1 5 7 UIParent -28.0 128.0 -1 # 26 0 1 5 3 MainActionBar 30.0 5.0 -1 #$ 26 1 1 3 5 BagsBar -30.0 5.0 -1 #$ 27 -1 1 4 4 Minimap -68.0 -68.0 -1 #+ 28 -1 1 4 4 UIParent 0.0 0.0 -1 #& 29 0 1 7 7 UIParent 0.0 450.0 -1 #($U%$&K'#(#)# 29 1 1 7 7 UIParent 0.0 425.0 -1 #($U%$&K'#(#)# 29 2 1 7 7 UIParent 0.0 400.0 -1 #($U%$&K'#(#)#]=]
 local editModeLayoutChecked = false
 
 local function installEditModeLayout()
@@ -1789,9 +1789,8 @@ end
 local function installCompactDebuffBorderNeutralization()
     if not hooksecurefunc then return end
 
-    -- CompactUnitFrame_UtilSetDebuff is the native type-color writer on the
-    -- Classic/Forever path. Install it when the function actually exists;
-    -- Blizzard compact-frame modules can load after bjarkiUI.
+    -- Older public compact renderers color borders through this helper.
+    -- Install when it exists; compact modules can load after bjarkiUI.
     if not compactDebuffBorderHookInstalled
         and type(CompactUnitFrame_UtilSetDebuff) == "function"
     then
@@ -1801,8 +1800,8 @@ local function installCompactDebuffBorderNeutralization()
         compactDebuffBorderHookInstalled = true
     end
 
-    -- A post-hook on the complete debuff refresh is the final safety boundary.
-    -- This catches clients/branches where another native aura writer updates
+    -- A post-hook on the complete public debuff refresh is the final boundary.
+    -- This catches implementations where another public aura writer updates
     -- the border after the per-aura helper returns.
     if not compactDebuffUpdateHookInstalled
         and type(CompactUnitFrame_UpdateDebuffs) == "function"
@@ -1813,7 +1812,7 @@ local function installCompactDebuffBorderNeutralization()
         compactDebuffUpdateHookInstalled = true
     end
 
-    -- Some Forever builds route aura refreshes through UpdateAuras instead of
+    -- Some public renderers route aura refreshes through UpdateAuras instead of
     -- calling UpdateDebuffs directly. The same narrow final sweep handles that
     -- path without reading aura data or changing selection.
     if not compactDebuffAuraUpdateHookInstalled
@@ -1825,7 +1824,8 @@ local function installCompactDebuffBorderNeutralization()
         compactDebuffAuraUpdateHookInstalled = true
     end
 
-    -- Compatibility for clients whose compact border is written through AuraUtil.
+    -- Public AuraUtil renderers only. Blizzard_PrivateAurasUI has a separate
+    -- secure environment and does not call this copy of AuraUtil.
     if not compactAuraBorderHookInstalled
         and type(AuraUtil) == "table"
         and type(AuraUtil.SetAuraBorderAtlas) == "function"
@@ -2135,6 +2135,19 @@ local function printUIAudit()
         .. " damageMeter=" .. tostring(damageMeterNameHookInstalled)
         .. " damageMeterInit=" .. tostring(damageMeterSourceInitHookInstalled))
 
+    local privateContainer = readableBool(function()
+        local mixin = _G.ContainerPrivateAuraBehaviorMixin
+        if isSecret(mixin) then return nil end
+        if type(mixin) ~= "table" then return false end
+        local setter = mixin.SetPrivateAuraAnchorSettings
+        if isSecret(setter) then return nil end
+        return type(setter) == "function"
+    end)
+    -- Private aura icons are rendered in Blizzard's separate secure environment;
+    -- public legacy hook installation does not prove their borders were hidden.
+    out("compactPrivateAuraContainer=" .. (privateContainer == nil and "unknown" or tostring(privateContainer))
+        .. " privateBorderVisibility=client-owned")
+
     for _, unit in ipairs({ "targettarget", "focustarget" }) do
         local frame = smallFrame(unit)
         local bar = healthBar(unit)
@@ -2173,6 +2186,16 @@ local function healthColorText(bar)
     return string.format("%.2f,%.2f,%.2f", r, g, b)
 end
 
+local function selectionColorText(unit)
+    if type(UnitSelectionColor) ~= "function" then return "unknown" end
+    local ok, r, g, b = pcall(UnitSelectionColor, unit)
+    if not ok or isSecret(r) or isSecret(g) or isSecret(b)
+        or type(r) ~= "number" or type(g) ~= "number" or type(b) ~= "number" then
+        return "unknown"
+    end
+    return string.format("%.2f,%.2f,%.2f", r, g, b)
+end
+
 local function printHealthColorAudit()
     local function out(message)
         if DEFAULT_CHAT_FRAME then
@@ -2183,6 +2206,9 @@ local function printHealthColorAudit()
     out("colors version=" .. BJARKI_UI_VERSION)
     for _, unit in ipairs({ "target", "focus", "targettarget", "focustarget" }) do
         local exists = readableBool(UnitExists, unit)
+        local connected = readableBool(UnitIsConnected, unit)
+        local dead = readableBool(UnitIsDead, unit)
+        local tapDenied = readableBool(UnitIsTapDenied, unit)
         local player, playerReadable = playerUnitState(unit)
         local pet, petReadable = petUnitState(unit)
         local token = classToken(unit)
@@ -2193,6 +2219,10 @@ local function printHealthColorAudit()
         local plateColor = plateR and string.format("%.2f,%.2f,%.2f", plateR, plateG, plateB) or "none"
         out(unit
             .. " exists=" .. (exists == nil and "unknown" or tostring(exists))
+            .. " connected=" .. (connected == nil and "unknown" or tostring(connected))
+            .. " dead=" .. (dead == nil and "unknown" or tostring(dead))
+            .. " tapDenied=" .. (tapDenied == nil and "unknown" or tostring(tapDenied))
+            .. " selection=" .. selectionColorText(unit)
             .. " player=" .. (playerReadable and tostring(player) or "unknown")
             .. " class=" .. tostring(token or "unknown")
             .. " pet=" .. (petReadable and tostring(pet) or "unknown")

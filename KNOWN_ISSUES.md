@@ -1,6 +1,6 @@
 # Known issues and bugs
 
-Status recorded 2026-10-08 for **bjarkiUI 0.2.93-local**.
+Status recorded 2026-10-08 for **bjarkiUI 0.2.94-local**.
 
 The Battleground observations below reflect user reports and diagnostic output.
 They remain open until checked in the live client against this build.
@@ -63,6 +63,41 @@ returned, while the opposing-faction color issue remained. Do not change those
 CVars as a color workaround. Frame visibility and health-color selection are
 separate issues.
 
+## Persistent private party debuff borders
+
+Poison and curse borders in the current compact party frames are drawn by
+Blizzard_PrivateAurasUI in a separate secure environment. Its forbidden aura
+frames are hidden from the public environment, and its harmful-icon update
+unconditionally displays DebuffBorder. The addon's legacy compact/AuraUtil
+hooks do not reach this writer.
+
+Current public settings expose icon size, border scale and separate dispel
+indicators, but no border-visibility control for this private renderer.
+Zero border scale leaves an icon-sized border, and disabling dispel indicators
+does not hide it. Native-source execution reproduces both observations.
+No private-frame or negative-border-geometry workaround is added. Removal
+of these specific borders remains unresolved; earlier public-hook success
+must not be described as a fix for them.
+
+The existing `/bui audit` now distinguishes public private-container API
+availability from the private border's client-owned visibility.
+
+## Grey dungeon targets and targeted nameplate names
+
+A dungeon screenshot shows a grey NPC target-of-target bar. The current code
+uses grey for readable dead/disconnected or tap-denied state, may copy a
+matching native bar colour, and preserves the native tint when identity is
+unknown. The screenshot does not distinguish those paths. `/bui colors` now
+includes readable connection, death, tap-denial and native selection colour
+alongside the existing actor and rendered-bar diagnostics. It does not change
+the health-colour policy or write presentation state.
+
+Another screenshot shows a targeted nameplate name without the expected size
+increase. The inspected native target refresh changes selection/health/level
+presentation without resizing the name font. bjarkiUI does not resize that
+name font either. The screenshot alone does not establish a regression or a
+Blizzard bug; no speculative font or CVar change is included.
+
 ## Derived portrait alignment in 0.2.93
 
 ToT/FoT frames were reported overlapping the parent aura rows. The current
@@ -77,7 +112,24 @@ protected execution need an in-client check.
 
 ## Verification boundary
 
-No live WoW test has confirmed these reports fixed in 0.2.93-local. See
+No live WoW test has confirmed these reports fixed in 0.2.94-local. See
 [`ARCHITECTURE.md`](ARCHITECTURE.md) for the frame/color implementation and
 reported BG diagnostics. Pet portraits and aura category failures are tracked
 in the [bjarkiPortraits issue list](https://github.com/bjoern-janson/bjarkiPortraits/blob/main/KNOWN_ISSUES.md).
+
+
+## Bundled layout spacing in 0.2.94
+
+The embedded layout is the confirmed starting point for four vertical edits:
+Player/Target up 3 saved UI units; Focus/PRD down 3. All other fields are
+preserved. A previously installed named layout remains user-owned and needs
+an explicit import of the updated string to receive these edits.
+
+The target and party content rectangles in the supplied crop already align
+within roughly one pixel, while their native bevels differ. No party X change
+is included. The scoreboard partly obscures the focus portrait; full-circle
+clearance would require a much larger move than the requested small nudge.
+Today's build 70291 also adds Druid/Rogue class-resource frames and changes
+Druid alternate-mana visibility. Because PRD uses a center anchor and its
+height follows visible bars, exact post-maintenance outer-edge alignment
+requires a fresh live view.
