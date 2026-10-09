@@ -1,6 +1,6 @@
 # Known issues and bugs
 
-Status recorded 2026-10-09 for **bjarkiUI 0.2.96-local**.
+Status recorded 2026-10-09 for **bjarkiUI 0.2.97-local**.
 
 The Battleground observations below reflect user reports and diagnostic output.
 They remain open until checked in the live client against this build.
@@ -146,18 +146,19 @@ protected execution need an in-client check.
 
 ## Verification boundary
 
-No live WoW test has confirmed these reports fixed in 0.2.96-local. See
+No live WoW test has confirmed these reports fixed in 0.2.97-local. See
 [`ARCHITECTURE.md`](ARCHITECTURE.md) for the frame/color implementation and
 reported BG diagnostics. Pet portraits and aura category failures are tracked
 in the [bjarkiPortraits issue list](https://github.com/bjoern-janson/bjarkiPortraits/blob/main/KNOWN_ISSUES.md).
 
 
-## Bundled layout spacing in 0.2.94
+## Latest bundled layout in 0.2.97
 
-The embedded layout is the confirmed starting point for four vertical edits:
-Player/Target up 3 saved UI units; Focus/PRD down 3. All other fields are
-preserved. A previously installed named layout remains user-owned and needs
-an explicit import of the updated string to receive these edits.
+The embedded layout is the supplied version-5 export, preserved verbatim with
+all 59 records. The main frame coordinates retain the earlier spacing edits:
+Player/Target Y -157, Focus -163 and PRD -167. Other encoded settings and
+relative anchors match the new export. A previously installed named layout
+remains user-owned; importing a different export is an explicit user action.
 
 The target and party content rectangles in the supplied crop already align
 within roughly one pixel, while their native bevels differ. No party X change

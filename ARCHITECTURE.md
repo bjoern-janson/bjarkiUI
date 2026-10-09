@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-This document describes the current implementation of **bjarkiUI 0.2.96-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
+This document describes the current implementation of **bjarkiUI 0.2.97-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -158,12 +158,13 @@ On first use, the addon can import a named Edit Mode layout called `bjarkiUI`.
 
 Once a layout with that name exists, the addon treats it as user-owned and does not continuously overwrite its coordinates.
 
-The 0.2.94 bundled layout moves Player and Target up three saved UI units
-(-160 to -157), and Focus and PRD down three (-160 to -163 and -164 to -167).
-Every other serialized field, including X coordinates, is unchanged. Existing
-layouts receive these four edits only when the updated string is imported.
-This is a small scoreboard-spacing adjustment; an older cropped screenshot
-cannot establish exact post-maintenance portrait or PRD edge clearance.
+Version 0.2.97 bundles the supplied version-5, 59-record Edit Mode export
+verbatim. Its Player/Target Y positions remain -157, Focus remains -163 and
+PRD remains -167. Encoded settings, decimal coordinates and relative anchors
+are preserved exactly as exported; the addon does not reinterpret them.
+The import lifecycle is unchanged, so an existing named layout remains
+user-owned. The serialized export alone does not establish visible scoreboard
+clearance or native import behavior in the current client.
 
 The Micro Menu correction is separate from the serialized Edit Mode layout. The addon leaves `MicroMenuContainer` in place and offsets the visible `MicroMenu` child downward by one UI unit after Blizzard anchors it.
 
