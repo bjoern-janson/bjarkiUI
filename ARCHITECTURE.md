@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-This document describes the current implementation of **bjarkiUI 0.2.97-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
+This document describes the current implementation of **bjarkiUI 0.2.98-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -158,13 +158,15 @@ On first use, the addon can import a named Edit Mode layout called `bjarkiUI`.
 
 Once a layout with that name exists, the addon treats it as user-owned and does not continuously overwrite its coordinates.
 
-Version 0.2.97 bundles the supplied version-5, 59-record Edit Mode export
-verbatim. Its Player/Target Y positions remain -157, Focus remains -163 and
-PRD remains -167. Encoded settings, decimal coordinates and relative anchors
-are preserved exactly as exported; the addon does not reinterpret them.
+Version 0.2.98 retains the supplied version-5, 59-record Edit Mode export with
+one coordinate adjustment: BuffFrame X changes from 244.0 to 238.3. This moves
+the top buff block approximately six screen pixels left at the measured layout
+scale, aligning its reference icon with the existing Focus/FoT artwork axis.
+The DebuffFrame keeps its relative anchor to BuffFrame and follows that move.
+All other coordinates, encoded settings and relative anchors are unchanged.
 The import lifecycle is unchanged, so an existing named layout remains
-user-owned. The serialized export alone does not establish visible scoreboard
-clearance or native import behavior in the current client.
+user-owned and requires an explicit import to adopt the revised coordinates.
+Screenshot calibration does not certify the client's final pixel rendering.
 
 The Micro Menu correction is separate from the serialized Edit Mode layout. The addon leaves `MicroMenuContainer` in place and offsets the visible `MicroMenu` child downward by one UI unit after Blizzard anchors it.
 

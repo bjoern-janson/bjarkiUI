@@ -1,6 +1,6 @@
 # Known issues and bugs
 
-Status recorded 2026-10-09 for **bjarkiUI 0.2.97-local**.
+Status recorded 2026-10-09 for **bjarkiUI 0.2.98-local**.
 
 The Battleground observations below reflect user reports and diagnostic output.
 They remain open until checked in the live client against this build.
@@ -146,19 +146,23 @@ protected execution need an in-client check.
 
 ## Verification boundary
 
-No live WoW test has confirmed these reports fixed in 0.2.97-local. See
+No live WoW test has confirmed these reports fixed in 0.2.98-local. See
 [`ARCHITECTURE.md`](ARCHITECTURE.md) for the frame/color implementation and
 reported BG diagnostics. Pet portraits and aura category failures are tracked
 in the [bjarkiPortraits issue list](https://github.com/bjoern-janson/bjarkiPortraits/blob/main/KNOWN_ISSUES.md).
 
 
-## Latest bundled layout in 0.2.97
+## Latest bundled layout in 0.2.98
 
-The embedded layout is the supplied version-5 export, preserved verbatim with
-all 59 records. The main frame coordinates retain the earlier spacing edits:
-Player/Target Y -157, Focus -163 and PRD -167. Other encoded settings and
-relative anchors match the new export. A previously installed named layout
-remains user-owned; importing a different export is an explicit user action.
+The embedded layout retains all 59 records of the supplied version-5 export.
+Only BuffFrame X changes, from 244.0 to 238.3. In the measured screenshot, its
+reference icon is approximately six pixels right of the Focus/FoT artwork
+axis; the calibrated move addresses that gap. The existing DebuffFrame follows
+its unchanged relative anchor to BuffFrame. Main-frame coordinates and all
+encoded settings remain unchanged. A previously installed named layout
+remains user-owned; importing the revised export is an explicit user action.
+The screenshot is from an earlier build, and the revised layout still needs
+an in-client rendering check. No new runtime alignment hook is introduced.
 
 The target and party content rectangles in the supplied crop already align
 within roughly one pixel, while their native bevels differ. No party X change
