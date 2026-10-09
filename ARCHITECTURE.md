@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-This document describes the current implementation of **bjarkiUI 0.2.100-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
+This document describes the current implementation of **bjarkiUI 0.2.101-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -61,9 +61,28 @@ The health-color path currently prefers:
 
 Readable direct/alias class colors receive the existing small saturation/brightness adjustment. Direct positive player identity remains ahead of a stale pet witness. A readable non-player identity blocks contradictory class evidence from party, raid, or nameplate aliases. A class token by itself does not establish player identity.
 
+Version 0.2.101 also lets ToT/FoT try the `player`, `target` and `focus`
+tokens after the existing direct, group and nameplate class paths. The same
+current-actor match, readable GUID-mismatch veto and positive player/class
+checks apply. This supplies the existing 1.18 saturation and 1.08 brightness
+when a primary token exposes readable class data that its derived token does
+not. No identity or color is cached, and the previous readable-source priority
+is retained. Opaque-only class colors remain on the native unadjusted path.
+
 The native class-color path uses UnitClassBase and C_ClassColor.GetClassColor only after independent positive player evidence. It forwards ColorMixin:GetRGB components directly to SetStatusBarColor with alpha 1, through the existing write guard. Protected tokens and components never enter class inference, palette lookup, adjustment, logging, or retained identity state. A separate readable call-success result controls fallback; a failed write releases the guard. This path uses the native palette and precedes copied bar RGB, so a copied white bar cannot prevent an available class-color lookup. The pinned [class-color API](https://github.com/Gethe/wow-ui-source/blob/15666a6e67938a1ab5caf041406464251db111ca/Interface/AddOns/Blizzard_APIDocumentationGenerated/ClassColorDocumentation.lua) and [status-bar API](https://github.com/Gethe/wow-ui-source/blob/15666a6e67938a1ab5caf041406464251db111ca/Interface/AddOns/Blizzard_APIDocumentationGenerated/SimpleStatusBarAPIDocumentation.lua) permit this protected-component transport; live-client behavior still needs validation.
 
 Native bar RGB is copied as presentation data, without reverse-mapping it to a class or applying the class-color adjustment again. Generic name/region FontString colors are not class evidence. Unmatched nameplates and unreadable copied bar components cannot authorize that fallback.
+
+Version 0.2.101 observes the native
+[CompactUnitFrame_UpdateHealthColor](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_UnitFrame/Shared/CompactUnitFrame.lua)
+after color selection finishes. An owned bar can otherwise sample old RGB
+before a later nameplate event or deferred health update recolors the source.
+The post-hook rejects forbidden/unreadable frames and non-nameplate unit
+tokens, then runs existing color selection only for currently matching
+target/focus/ToT/FoT actors. Unmatched nameplates and compact party/raid frames
+do not trigger a full plate scan or owned-bar write. The hook does not invoke
+native refresh functions or alter threat policy; it follows the finished
+native presentation through the existing color and identity guards.
 
 Readable unequal GUIDs veto a positive alias comparison before any class or
 native RGB is copied. After positive pet checks, an explicit readable

@@ -1,11 +1,36 @@
 # Known issues and bugs
 
-Status recorded 2026-10-09 for **bjarkiUI 0.2.100-local**.
+Status recorded 2026-10-09 for **bjarkiUI 0.2.101-local**.
 
 The Battleground observations below reflect user reports and diagnostic output.
 They remain open until checked in the live client against this build.
 A report describes a visible symptom; it does not by itself establish the
 failing code path or root cause.
+
+## Health-color synchronization and derived class aliases in 0.2.101
+
+An owned bar can copy a neutral nameplate's yellow RGB before the native
+nameplate event or deferred health update finishes with red. Without a later
+owned refresh, the copied color remains stale. The native final color-selection
+function is now observed, and current matching target/focus/ToT/FoT bars run
+their existing color selection again after it returns. Unreadable identity or
+RGB still cannot authorize a copy.
+
+The source reproduction uses a documented grouped tank-style threat display
+to produce red while personal detailed-threat status remains nil. This proves
+the update-order gap, but not the user's actual role, CVar setting or event
+timing. The repair follows readable native presentation and introduces no
+party-wide threat inference.
+
+ToT/FoT already receive the shared bar atlas and the same class adjustment
+when direct, group or nameplate class data is readable. They can now also
+use readable class data from a positively matched player/target/focus token,
+after those existing class sources. This closes an omitted alias path while
+preserving source priority, NPC/pet checks and GUID-mismatch vetoes.
+
+Opaque-only native class RGB remains unadjusted. The source checks do not
+measure the reported visual brightness difference, mask edges or the live
+secret/taint engine. No screenshot was supplied for this follow-up.
 
 ## Primary-name transport in 0.2.100
 
@@ -210,7 +235,7 @@ protected execution need an in-client check.
 
 ## Verification boundary
 
-No live WoW test has confirmed these reports fixed in 0.2.100-local. See
+No live WoW test has confirmed these reports fixed in 0.2.101-local. See
 [`ARCHITECTURE.md`](ARCHITECTURE.md) for the frame/color implementation and
 reported BG diagnostics. Pet portraits and aura category failures are tracked
 in the [bjarkiPortraits issue list](https://github.com/bjoern-janson/bjarkiPortraits/blob/main/KNOWN_ISSUES.md).

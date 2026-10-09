@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.100-local"
+local BJARKI_UI_VERSION = "0.2.101-local"
 local PRD_ATLAS = "UI-HUD-CoolDownManager-Bar"
 local CLASS_SATURATION = 1.18
 local CLASS_BRIGHTNESS = 1.08
@@ -577,6 +577,18 @@ local function fallbackVisibleHealthColor(unit)
     if token then
         local r, g, b, a = adjustedClassColor(token)
         if r then return r, g, b, a end
+    end
+    if unit == "targettarget" or unit == "focustarget" then
+        -- The same actor can have readable class data on a primary frame even
+        -- when its derived token does not. Reuse the existing identity checks;
+        -- never infer a class from the displayed bar color.
+        token = classTokenFromPlayerAlias(unit, "player")
+            or classTokenFromPlayerAlias(unit, "target")
+            or classTokenFromPlayerAlias(unit, "focus")
+        if token then
+            local r, g, b, a = adjustedClassColor(token)
+            if r then return r, g, b, a end
+        end
     end
     if plate then return namePlateHealthColor(plate, unitFrame) end
 end
@@ -1767,6 +1779,24 @@ local function installHooks()
                 end)
             end
         end
+    end
+    -- Owned bars can refresh before the nameplate's deferred health update.
+    -- Re-sample matching plates after their native color selection finishes.
+    if hooksecurefunc and type(CompactUnitFrame_UpdateHealthColor) == "function" then
+        hooksecurefunc("CompactUnitFrame_UpdateHealthColor", function(frame)
+            local ok, plateUnit = pcall(function()
+                if isSecret(frame) or not frame
+                    or (frame.IsForbidden and readableBool(frame.IsForbidden, frame) ~= false)
+                then return nil end
+                return readableUnitToken(frame.unit)
+            end)
+            if not ok or not plateUnit or not plateUnit:match("^nameplate%d+$") then return end
+            for _, unit in ipairs({ "target", "focus", "targettarget", "focustarget" }) do
+                if sameUnit(unit, plateUnit) then
+                    applyHealthColor(healthBar(unit), unit)
+                end
+            end
+        end)
     end
     -- Nameplates, raid frames, and raid-style party frames share
     -- CompactUnitFrame_UpdateName. Strip only secondary player names after
