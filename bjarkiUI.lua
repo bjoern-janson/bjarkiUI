@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.94-local"
+local BJARKI_UI_VERSION = "0.2.95-local"
 local PRD_ATLAS = "UI-HUD-CoolDownManager-Bar"
 local CLASS_SATURATION = 1.18
 local CLASS_BRIGHTNESS = 1.08
@@ -199,11 +199,13 @@ local function readableUnitGUID(unit)
 end
 
 local function sameUnit(unitA, unitB)
-    if UnitIsUnit then
-        local same = readableBool(UnitIsUnit, unitA, unitB)
-        if same ~= nil then return same end
-    end
+    local same = readableBool(UnitIsUnit, unitA, unitB)
+    if same == false then return false end
     local guidA, guidB = readableUnitGUID(unitA), readableUnitGUID(unitB)
+    -- Reused unit tokens can disagree briefly. A readable GUID mismatch
+    -- vetoes copying a previous nameplate occupant's class or native tint.
+    if guidA and guidB and guidA ~= guidB then return false end
+    if same == true then return true end
     if guidA and guidB then return guidA == guidB end
 end
 
@@ -313,9 +315,13 @@ local function petUnitState(unit)
         end
     end
 
-    -- Negative pet identity requires both available identity paths to be readable.
-    -- Otherwise a reused ToT/FoT frame stays UNKNOWN instead of being painted as
-    -- an NPC while its referent is still transitioning.
+    -- Minions include pets, totems, and guardians. A readable negative can
+    -- establish non-pet identity when the direct pet comparison is restricted;
+    -- a positive is not sufficient to classify a combat pet.
+    if readableBool(UnitIsMinion, unit) == false then return false, true end
+
+    -- Otherwise both available pet identity paths must be readable. Unknown
+    -- identity on a reused ToT/FoT frame cannot authorize an NPC tint.
     if localReadable and (not UnitIsOtherPlayersPet or otherReadable) then
         return false, true
     end
@@ -743,6 +749,11 @@ end
 local function applyUnit(unit)
     local health, power = healthBar(unit), powerBar(unit)
     installDerivedColorHook(health, unit)
+    -- Blizzard's separate red damage-loss animation can cover the player fill.
+    -- Its native animation does not change frame alpha; keep only this layer
+    -- invisible while preserving health values, absorbs, and ordinary bar tint.
+    local loss = unit == "player" and health and health.AnimatedLossBar
+    if loss and loss.SetAlpha then pcall(loss.SetAlpha, loss, 0) end
     applyAtlas(health)
     applyAtlas(power)
     applyHealthColor(health, unit)
@@ -810,14 +821,23 @@ end
 local function primaryName(unit)
     if not isPlayerUnit(unit) or not UnitName then return nil end
     local ok, name = pcall(UnitName, unit)
-    if not ok or isSecret(name) or type(name) ~= "string" then return nil end
-    return primaryDisplayName(name)
+    if not ok then return nil end
+    if isSecret(name) then
+        -- Camelot's native first-name helper returns this component unchanged
+        -- outside regional full-name mode. Forward it only to the text sink;
+        -- never parse, compare, or infer the contents of a protected name.
+        if readableBool(RegionalUniqueNamesEnabled) == false then return name, true end
+        return nil
+    end
+    if type(name) ~= "string" then return nil end
+    local primary = primaryDisplayName(name)
+    return primary, primary ~= nil
 end
 
 local function applyPrimaryNameToFrame(frame, unit)
     if not frame or not frame.name or not frame.name.SetText then return end
-    local name = primaryName(unit)
-    if name then pcall(frame.name.SetText, frame.name, name) end
+    local name, canDisplay = primaryName(unit)
+    if canDisplay then pcall(frame.name.SetText, frame.name, name) end
 end
 
 local function applyPrimaryName(unit)
@@ -1536,11 +1556,11 @@ local function installHooks()
 
     if hooksecurefunc and type(UnitFrameHealthBar_Update) == "function" then
         hooksecurefunc("UnitFrameHealthBar_Update", function(bar, unit)
-            unit = readableUnitToken(unit)
-                or (bar and readableUnitToken(bar.unit))
-            -- Only touch the actual Blizzard unit-frame health bar. PlayerFrame
-            -- also owns an AnimatedLossBar which is intentionally red on damage;
-            -- styling that auxiliary bar makes the whole health display flash red.
+            -- The event can name another alias of this actor (for example
+            -- target while updating focus). Route by the bar's bound unit.
+            unit = (bar and readableUnitToken(bar.unit)) or readableUnitToken(unit)
+            -- Only touch the actual unit-frame health bar, excluding auxiliary
+            -- damage/absorb bars that can carry the same unit token.
             if unit and bar == healthBar(unit) then
                 applyAtlas(bar)
                 applyHealthColor(bar, unit)
@@ -1626,7 +1646,8 @@ local function alignDerivedFrame(frame)
     -- of its right edge and the derived portrait center 96.5 units left of its
     -- right edge. SetPoint offsets use the derived frame's scale. Change only
     -- X, retaining the current native Y (including small Focus's distinct Y).
-    local alignedX = 96.5 - 55 * (parentScale / frameScale)
+    -- The visible small-circle aperture needs one unit left of logical center.
+    local alignedX = 95.5 - 55 * (parentScale / frameScale)
     if not readableGeometryNumber(alignedX) or math.abs(x - alignedX) < 0.000001 then return end
 
     -- Replacing this same single point is atomic: a rejected write leaves the

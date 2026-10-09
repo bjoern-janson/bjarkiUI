@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-This document describes the current implementation of **bjarkiUI 0.2.94-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
+This document describes the current implementation of **bjarkiUI 0.2.95-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -58,6 +58,19 @@ The native class-color path uses UnitClassBase and C_ClassColor.GetClassColor on
 
 Native bar RGB is copied as presentation data, without reverse-mapping it to a class or applying the class-color adjustment again. Generic name/region FontString colors are not class evidence. Unmatched nameplates and unreadable copied bar components cannot authorize that fallback.
 
+Readable unequal GUIDs veto a positive alias comparison before any class or
+native RGB is copied. After positive pet checks, an explicit readable
+UnitIsMinion=false establishes non-pet identity even if the local-pet comparison
+is restricted. A positive minion result alone does not classify a combat pet.
+The native [unit API](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_APIDocumentationGenerated/UnitDocumentation.lua)
+defines minions to include pets, totems and guardians.
+
+Health-update hooks prefer the actual bar's bound unit over the event argument;
+an event may name another alias such as target while the bar belongs to focus.
+The actual owned-bar check still excludes auxiliary and unrelated status bars.
+This closes a skipped-refresh path; it does not prove that an aliased native
+event caused every reported focus reset.
+
 For `targettarget` and `focustarget`, the native frames are reusable. The addon therefore reapplies the current unit's presentation when Blizzard rebinds those frames. It also hooks the final health-bar color write on those two derived frames so a later native tint does not leave the color from the previous referent.
 
 If the derived referent cannot provide a warranted replacement color, the addon makes no color write and preserves Blizzard's native tint. Unknown identity does not introduce a neutral-grey fallback.
@@ -79,6 +92,16 @@ Current surfaces include:
 - Blizzard Damage Meter source labels.
 
 The implementation tries to change only visible text. Hyperlink payloads, combat-source records, roster records, and other identity data remain native.
+
+For positively identified players, a protected UnitName component can be passed
+unchanged to the native text widget only when RegionalUniqueNamesEnabled is
+readable and explicitly false. The native
+[Camelot name helper](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_FrameXMLUtil/Camelot/NameUtil.lua)
+returns that component directly in this mode, and the
+[FontString API](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_APIDocumentationGenerated/SimpleFontStringAPIDocumentation.lua)
+accepts protected text. A separate readable flag authorizes the write; the
+protected name is never parsed, compared, logged or cached. Regional full-name
+mode, unknown mode and unknown player identity retain native text.
 
 Damage Meter rows are recycled, so name normalization is attached near the final text writer rather than only at row creation.
 
@@ -421,8 +444,8 @@ execution remain separate validation requirements.
 
 ## 25. Derived portrait horizontal alignment
 
-Version 0.2.93 moves Target-of-Target and Focus-of-Target horizontally so each
-small portrait center lies below its parent portrait center. Native vertical
+Version 0.2.95 retains the derived-frame alignment adapter and adds a one-unit
+left optical correction for the visible small-circle aperture. Native vertical
 placement, parent Edit Mode coordinates, frame sizes and aura row constraints
 remain in effect.
 
@@ -430,8 +453,9 @@ The pinned [native frame definitions](https://github.com/Gethe/wow-ui-source/blo
 place the parent portrait center 55 units left of its right edge and the
 derived portrait center 96.5 units left of the derived frame's right edge.
 The existing TOPRIGHT-to-parent-BOTTOMRIGHT anchor therefore uses
-`x = 96.5 - 55 * (parentEffectiveScale / derivedEffectiveScale)`. At equal
-scale, native x=12 becomes x=41.5, moving the small frame right by 29.5 units.
+`x = 95.5 - 55 * (parentEffectiveScale / derivedEffectiveScale)`, including
+the optical correction. At equal scale, native x=12 becomes x=40.5, moving the
+small frame right by 28.5 units and one unit left of its 0.2.93 position.
 The effective-scale ratio also covers the native small Focus mode.
 
 An addon-owned weak table holds hook and recursion state. Secure post-hooks
@@ -446,6 +470,16 @@ Login, world entry, Edit Mode updates, UnitFrame module loading and combat exit
 retry from the current native relation. A native reset during combat remains
 untouched until the post-combat retry. Source-level geometry and lifecycle
 checks do not certify live pixel alignment or protected execution.
+
+## Player damage-loss presentation
+
+The player health bar's separate AnimatedLossBar is native red artwork that
+briefly covers the previous health amount after damage. The existing player
+presentation pass sets only this auxiliary frame's alpha to zero. The native
+[animation mixin](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_UnitFrame/Mainline/UnitFrame.lua)
+changes its visibility and value but never frame alpha, so no additional
+animation hook or polling loop is needed. Main health values, power, absorb
+widgets and other units' damage layers retain their existing behavior.
 
 
 ## 26. Current private aura borders and diagnostic scope
