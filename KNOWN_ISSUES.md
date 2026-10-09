@@ -1,11 +1,37 @@
 # Known issues and bugs
 
-Status recorded 2026-10-09 for **bjarkiUI 0.2.101-local**.
+Status recorded 2026-10-09 for **bjarkiUI 0.2.102-local**.
 
 The Battleground observations below reflect user reports and diagnostic output.
 They remain open until checked in the live client against this build.
 A report describes a visible symptom; it does not by itself establish the
 failing code path or root cause.
+
+## Native binding and presentation repairs in 0.2.102
+
+Tracked presentation now requires the current readable native frame/bar unit.
+The native vehicle layout reuses PlayerFrame and PetFrame with different units;
+the same object no longer authorizes a stale literal-player name or class color.
+Unavailable bindings retain native presentation instead of borrowing the event
+argument. Existing class brightness, native NPC colors and matching-nameplate
+refresh rules remain unchanged.
+
+The level-number preference now follows native SetShown as well as Show, and
+enabling it preserves a level intentionally hidden by the vehicle layout.
+Communities rank icons are repositioned after a readable primary name shortens,
+using current native text/presence geometry. Party pet rows use the visible
+native party border before the existing reordered-member fallback.
+
+The former ToT/FoT full-debuff-list adapter re-entered AuraUtil.RefreshAuras.
+Source execution demonstrates an icon update followed by a protected-duration
+failure, leaving the old timer on the new icon. That re-entry is removed.
+With showDispelDebuffs enabled, friendly derived native debuff lists retain
+their native dispel filtering. No global CVar change is made, and the separate
+bjarkiPortraits aura selection is unchanged by this UI repair.
+
+These are reproduced source transitions with unavailable WoW C/widget behavior
+modeled. They do not establish live vehicle, secure execution, pixel placement
+or resolution of every reported Battleground symptom.
 
 ## Health-color synchronization and derived class aliases in 0.2.101
 

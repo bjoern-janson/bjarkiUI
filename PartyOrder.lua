@@ -110,7 +110,9 @@ local function reanchorPets(frame, ordered, horizontal)
     local pets = frame and frame.petUnitFrames
     if type(pets) ~= "table" or #ordered == 0 then return end
 
-    local anchor = horizontal and ordered[1] or ordered[#ordered]
+    local border = frame.borderFrame
+    local anchor = border and shown(border) and border
+        or (horizontal and ordered[1] or ordered[#ordered])
     local previousShown
 
     for _, pet in ipairs(pets) do

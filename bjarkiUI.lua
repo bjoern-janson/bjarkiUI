@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.101-local"
+local BJARKI_UI_VERSION = "0.2.102-local"
 local PRD_ATLAS = "UI-HUD-CoolDownManager-Bar"
 local CLASS_SATURATION = 1.18
 local CLASS_BRIGHTNESS = 1.08
@@ -649,6 +649,7 @@ end
 
 local function applyHealthColor(bar, unit)
     if not bar or not bar.SetStatusBarColor or not unit then return end
+    if readableUnitToken(bar.unit) ~= unit then return end
 
     local derived = unit == "targettarget" or unit == "focustarget"
     local exists = readableBool(UnitExists, unit)
@@ -760,6 +761,10 @@ end
 
 local function applyUnit(unit)
     local health, power = healthBar(unit), powerBar(unit)
+    -- Native player/pet frames can swap bindings. Keep unsupported or unknown
+    -- bindings native until these surfaces return to their tracked units.
+    if (health and readableUnitToken(health.unit) ~= unit)
+        or (power and readableUnitToken(power.unit) ~= unit) then return end
     installDerivedColorHook(health, unit)
     -- Blizzard's separate red damage-loss animation can cover the player fill.
     -- Its native animation does not change frame alpha; keep only this layer
@@ -862,7 +867,9 @@ local function applyPrimaryNameToFrame(frame, unit)
 end
 
 local function applyPrimaryName(unit)
-    applyPrimaryNameToFrame(unitFrame(unit), unit)
+    local frame = unitFrame(unit)
+    if not frame or readableUnitToken(frame.unit) ~= unit then return end
+    applyPrimaryNameToFrame(frame, unit)
 end
 
 local function applyCompactPrimaryName(frame)
@@ -1079,7 +1086,28 @@ local function applyCommunityMemberPrimaryName(entry, memberInfo)
             primary = decorated
         end
     end
-    pcall(entry.NameFrame.Name.SetText, entry.NameFrame.Name, primary)
+    local nameFrame = entry.NameFrame
+    local nameRegion = nameFrame.Name
+    if not pcall(nameRegion.SetText, nameRegion, primary) then return end
+
+    -- Native SetMember lays out the rank icon before this name post-hook runs.
+    -- Re-anchor only that icon using the current readable text geometry.
+    pcall(function()
+        local rank = nameFrame.RankIcon
+        if not rank or readableBool(rank.IsShown, rank) ~= true then return end
+        local truncated = readableBool(nameRegion.IsTruncated, nameRegion)
+        if truncated == nil then return end
+        local width = truncated and nameRegion:GetWidth() or nameRegion:GetStringWidth()
+        local presence = nameFrame.PresenceIcon
+        local presenceShown = presence and readableBool(presence.IsShown, presence)
+        if presenceShown == nil then return end
+        local offset = presenceShown and presence:GetWidth() or 0
+        if isSecret(width) or isSecret(offset)
+            or type(width) ~= "number" or type(offset) ~= "number"
+            or width < 0 or offset < 0 or width ~= width or offset ~= offset
+            or width == math.huge or offset == math.huge then return end
+        rank:SetPoint("LEFT", nameFrame, "LEFT", width + offset, 0)
+    end)
 end
 
 local function applyVisibleCommunityMemberNames()
@@ -1517,10 +1545,14 @@ local function installLevelVisibilityHook(textRegion)
     end
 
     levelVisibilityHooks[textRegion] = true
-    hooksecurefunc(textRegion, "Show", function(self)
+    local function enforceHidden(self)
         if levelNumbersEnabled() then return end
         pcall(self.Hide, self)
-    end)
+    end
+    hooksecurefunc(textRegion, "Show", enforceHidden)
+    if type(textRegion.SetShown) == "function" then
+        hooksecurefunc(textRegion, "SetShown", enforceHidden)
+    end
 end
 
 local function applyLevelNumberVisibility()
@@ -1532,13 +1564,17 @@ local function applyLevelNumberVisibility()
             if not levelNumbersEnabled() then
                 pcall(textRegion.Hide, textRegion)
             elseif unit == "player" then
-                if type(PlayerFrame_UpdateLevel) == "function" then
-                    pcall(PlayerFrame_UpdateLevel)
+                local frame = _G.PlayerFrame
+                if frame and readableUnitToken(frame.unit) == "player" then
+                    if type(PlayerFrame_UpdateLevel) == "function" then
+                        pcall(PlayerFrame_UpdateLevel)
+                    end
+                    pcall(textRegion.Show, textRegion)
                 end
-                pcall(textRegion.Show, textRegion)
             else
                 local frame = unit == "target" and _G.TargetFrame or _G.FocusFrame
-                if frame and type(frame.CheckLevel) == "function" then
+                if frame and readableUnitToken(frame.unit) == unit
+                    and type(frame.CheckLevel) == "function" then
                     -- Blizzard owns the valid visibility state for target/focus
                     -- (corpse, battle pet, unknown/high level, etc.).
                     pcall(frame.CheckLevel, frame)
@@ -1733,7 +1769,7 @@ local function installHooks()
         hooksecurefunc("UnitFrameHealthBar_Update", function(bar, unit)
             -- The event can name another alias of this actor (for example
             -- target while updating focus). Route by the bar's bound unit.
-            unit = (bar and readableUnitToken(bar.unit)) or readableUnitToken(unit)
+            unit = bar and readableUnitToken(bar.unit)
             -- Only touch the actual unit-frame health bar, excluding auxiliary
             -- damage/absorb bars that can carry the same unit token.
             if unit and bar == healthBar(unit) then
@@ -1890,49 +1926,6 @@ local function installDerivedFrameAlignment()
             alignDerivedFrame(frame)
         end
     end
-end
-
-local derivedDebuffRefreshHookInstalled = false
-local derivedDebuffRefreshGuard = false
-
-local function installDerivedDebuffRefresh()
-    if derivedDebuffRefreshHookInstalled or not hooksecurefunc
-        or type(AuraUtil) ~= "table" or type(AuraUtil.RefreshAuras) ~= "function"
-    then
-        return
-    end
-
-    hooksecurefunc(AuraUtil, "RefreshAuras", function(frame, unit, numAuras, suffix, checkCVar, showBuffs)
-        if derivedDebuffRefreshGuard or checkCVar ~= true or showBuffs ~= false then return end
-        if frame ~= smallFrame("targettarget") and frame ~= smallFrame("focustarget") then return end
-
-        -- Blizzard's ToT/FoT refresh obeys showDispelDebuffs. When that option is
-        -- enabled on a friendly derived unit, the native HARMFUL|RAID filter can
-        -- make ordinary debuffs disappear entirely. Keep the global setting for
-        -- other frames, but restore the full harmful list on ToT/FoT.
-        local filterActive = false
-        if CVarCallbackRegistry and CVarCallbackRegistry.GetCVarValueBool then
-            local ok, value = pcall(
-                CVarCallbackRegistry.GetCVarValueBool,
-                CVarCallbackRegistry,
-                "showDispelDebuffs"
-            )
-            filterActive = ok and value == true
-        elseif GetCVarBool then
-            local ok, value = pcall(GetCVarBool, "showDispelDebuffs")
-            filterActive = ok and value == true
-        end
-        if not filterActive then return end
-
-        local assistable = readableBool(UnitCanAssist, "player", unit)
-        if assistable ~= true then return end
-
-        derivedDebuffRefreshGuard = true
-        pcall(AuraUtil.RefreshAuras, frame, unit, numAuras, suffix, false, false)
-        derivedDebuffRefreshGuard = false
-    end)
-
-    derivedDebuffRefreshHookInstalled = true
 end
 
 local compactDebuffBorderHookInstalled = false
@@ -2257,7 +2250,6 @@ events:SetScript("OnEvent", function(_, event, unit)
         installLossOfControlPresentation()
         installHooks()
         installDerivedFrameAlignment()
-        installDerivedDebuffRefresh()
         installCompactDebuffBorderNeutralization()
         installMicroMenuChildOffset()
         installGuildNotificationPipSuppression()
@@ -2270,7 +2262,6 @@ events:SetScript("OnEvent", function(_, event, unit)
         anchorUIErrorsFrame()
         installLossOfControlPresentation()
         installDerivedFrameAlignment()
-        installDerivedDebuffRefresh()
         installCompactDebuffBorderNeutralization()
         installMicroMenuChildOffset()
         installGuildNotificationPipSuppression()
@@ -2381,7 +2372,6 @@ local function printUIAudit()
     out("audit version=" .. BJARKI_UI_VERSION)
     out("hooks locSetup=" .. tostring(lossOfControlSetUpHookInstalled)
         .. " locTime=" .. tostring(lossOfControlSetTimeHookInstalled)
-        .. " derivedDebuffs=" .. tostring(derivedDebuffRefreshHookInstalled)
         .. " compactLegacy=" .. tostring(compactDebuffBorderHookInstalled)
         .. " compactDebuffRefresh=" .. tostring(compactDebuffUpdateHookInstalled)
         .. " compactAuraRefresh=" .. tostring(compactDebuffAuraUpdateHookInstalled)

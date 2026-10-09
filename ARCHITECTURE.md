@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-This document describes the current implementation of **bjarkiUI 0.2.101-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
+This document describes the current implementation of **bjarkiUI 0.2.102-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -21,7 +21,9 @@ The main recurring pattern is:
 3. apply the smaller presentation change;
 4. avoid replacing the surrounding Blizzard system.
 
-There is no addon-owned `OnUpdate` loop in the current build.
+There is no addon-owned `OnUpdate` loop in the current build. Native ToT/FoT
+updates do run per frame and reach the addon's presentation post-hooks. The
+absence of a custom poller is not a claim of zero per-frame addon work.
 
 ## 2. Unit frames
 
@@ -91,8 +93,9 @@ is restricted. A positive minion result alone does not classify a combat pet.
 The native [unit API](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_APIDocumentationGenerated/UnitDocumentation.lua)
 defines minions to include pets, totems and guardians.
 
-Health-update hooks prefer the actual bar's bound unit over the event argument;
+Health-update hooks require the actual bar's current readable bound unit;
 an event may name another alias such as target while the bar belongs to focus.
+Missing or inaccessible bindings do not fall back to the event argument.
 The actual owned-bar check still excludes auxiliary and unrelated status bars.
 This closes a skipped-refresh path; it does not prove that an aliased native
 event caused every reported focus reset.
@@ -310,9 +313,9 @@ is reanchored to the exact center of the existing Loss of Control frame.
 
 ## 14. Derived-frame repair notes
 
-The following 0.2.73 behavior is historical. Its grey UNKNOWN-state fallback
-and private-border geometry manipulation have been superseded by the current
-color rules and the rollback in section 17:
+The following 0.2.73 behavior is historical. All three entries have been
+superseded: the grey fallback by the current color rules, private-border
+geometry by section 17, and derived debuff re-entry by section 27:
 
 - derived health colors fail closed to neutral grey while player/pet identity witnesses are unreadable or disagree, instead of reusing an incorrect semantic tint;
 - native ToT/FoT debuffs are restored when Blizzard's global `showDispelDebuffs` option would otherwise filter friendly derived units down to `HARMFUL|RAID`;
@@ -603,3 +606,37 @@ Targeted-nameplate font size remains native. The inspected target-selection
 Lua updates health/level selection without resizing the name font; this does
 not establish whether native C++ scaling has a beta regression. No font or
 CVar workaround follows from the screenshot alone.
+
+## 27. Current native bindings and final presentation writers
+
+Version 0.2.102 requires the current readable native frame/bar binding before
+applying a tracked unit's names, color and bar presentation. The native vehicle
+layout can reuse PlayerFrame for vehicle and PetFrame for player while keeping
+the same frame objects. A known object alone cannot authorize literal-player
+or literal-pet presentation. Unsupported or unavailable bindings remain native;
+the existing native update hooks resume presentation when bindings return.
+
+The level-number preference observes both Show and SetShown. Enabling levels
+does not forcibly reveal the vehicle-bound player's level; target/focus retain
+native CheckLevel rules for corpses, battle pets and unknown levels, after the
+same current-binding check. Source fixtures model independent C widget methods;
+they are not evidence of live internal Show/SetShown dispatch or taint safety.
+
+Communities SetMember lays out the rank icon before the addon's primary-name
+post-hook. After a successful readable replacement, the addon updates only
+the existing LEFT anchor using the current readable name width and presence
+icon width. Hidden or inaccessible geometry stays native. SetPoint replaces
+the native anchor without clearing it first, so a denied write retains the
+previous placement. The native member formatter and parsing policy are unchanged.
+
+Party pet rows now anchor first to the visible native party border, matching
+CompactPartyFrame.UpdateLayout. With no visible border, the existing reordered
+member anchor remains. Player-last order and combat deferral are unchanged.
+
+The derived AuraUtil.RefreshAuras re-entry was removed. Re-entering that native
+renderer from an addon hook can replace an icon before a protected expiration
+comparison or duration calculation fails, leaving mismatched icon/timer state.
+Friendly ToT/FoT small debuff lists therefore follow native showDispelDebuffs
+filtering when enabled. The global CVar is not changed. bjarkiPortraits remains
+an independent portrait-aura renderer; this limitation concerns the native small
+debuff list. Removing the adapter also removes its duplicate list pass.
