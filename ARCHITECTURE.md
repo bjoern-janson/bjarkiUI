@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-This document describes the current implementation of **bjarkiUI 0.2.98-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
+This document describes the current implementation of **bjarkiUI 0.2.99-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -41,6 +41,13 @@ Both health and power fills use the atlas:
 `UI-HUD-CoolDownManager-Bar`
 
 The addon does not replace the underlying health or power values.
+
+The native Target/Focus
+[classification update](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_UnitFrame/Mainline/TargetFrame.lua)
+replaces the health texture after UnitFrame_Update returns. Version 0.2.99
+post-hooks CheckClassification on the current Target and Focus instances and
+restores the requested atlas after that writer. The callback resolves only
+those owned frames; classification geometry, masks and RGB rules are retained.
 
 ### Health colors
 
@@ -244,10 +251,11 @@ In particular:
 
 ## 12. Small presentation suppressions
 
-The current build also makes three narrow presentation changes without replacing the surrounding Blizzard systems:
+The current build also makes these narrow presentation changes without replacing the surrounding Blizzard systems:
 
 - raises the default `UIErrorsFrame` vertically while preserving its horizontal center;
-- hides dispel-type borders reached through older public compact aura renderers, while leaving their icons, cooldowns, stacks and separate dispel overlay intact; current private aura borders are outside those hooks;
+- hides dispel-type borders reached through older public compact aura renderers, while leaving their icons, cooldowns and stacks intact; current private aura borders are outside those hooks;
+- disables the native whole-frame dispel color overlay through its supported CVar; the separate dispel indicator remains available;
 - hides Guild and Legacy-system notification pips on the Micro Menu while keeping the buttons functional.
 
 
@@ -318,9 +326,9 @@ a zero-sized border. That writes addon-owned state into a compact frame later us
 by native secret-health/heal-prediction code, and can taint Blizzard's
 `CompactUnitFrame_OnUpdate` path.
 
-The addon no longer modifies compact aura-renderer settings or private-aura border
-geometry. Colored debuff borders therefore remain native for now rather than
-trading a cosmetic change for secret-value taint.
+The addon no longer writes synthetic compact-frame aura settings or private-aura
+border geometry. Current private icon borders remain native. The supported
+whole-frame overlay CVar described in section 26 controls a different layer.
 
 Party-order reconnect recovery also no longer installs `OnShow`/`OnHide`
 scripts on compact member frames. `UNIT_CONNECTION` is observed by a separate
@@ -522,6 +530,17 @@ border scale still yields an icon-sized border; hiding a dispel glyph selects
 a colored no-glyph atlas. Neither removes the border. The earlier negative
 geometry workaround remains removed. The current private border request is
 unresolved, with its native owner identified.
+
+The whole-frame dispel color overlay has a separate supported control:
+[raidFramesDispelIndicatorOverlay](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_SettingsDefinitions_Frame/Mainline/InterfaceOverrides.lua).
+Version 0.2.99 sets known enabled values to Disabled (0) through C_CVar during
+the existing compact-border installation lifecycle. Missing APIs, failed or
+protected reads, unknown values and failed writes are handled without accessing
+private frame objects. Native code hides the overlay border, gradient and
+background together and stops its animations. The separate dispel indicator
+and the private harmful-icon border retain their native behavior.
+This persistent setting is shared by normal compact party and raid frames;
+the same lifecycle disables it again if a known enabled value is restored.
 
 The existing /bui audit reports public private-container API availability and
 client ownership of private-border visibility without inspecting private

@@ -1,11 +1,36 @@
 # Known issues and bugs
 
-Status recorded 2026-10-09 for **bjarkiUI 0.2.98-local**.
+Status recorded 2026-10-09 for **bjarkiUI 0.2.99-local**.
 
 The Battleground observations below reflect user reports and diagnostic output.
 They remain open until checked in the live client against this build.
 A report describes a visible symptom; it does not by itself establish the
 failing code path or root cause.
+
+## Target/Focus health artwork in 0.2.99
+
+The native classification update can replace the requested health atlas after
+the existing UnitFrame_Update hook restores presentation. Actual-source checks
+reproduce this on full refreshes, roster refreshes and classification-only
+updates while the Druid RGB remains correct. The new per-frame post-hook restores
+only the atlas after that writer, retaining native geometry and color policy.
+
+The reported olive Focus fill is consistent with an artwork/compositing change.
+The screenshot does not prove that a flight landing triggered this path or
+that this overwrite accounts for every rendered color difference. Final
+appearance still needs a client check.
+
+## Whole-frame dispel overlay in 0.2.99
+
+The rectangular debuff-color highlight around compact Party/Raid frames is
+separate from the small aura icon's border. The supported
+raidFramesDispelIndicatorOverlay CVar is now set to Disabled (0) through the
+existing compact-frame lifecycle when its current value is known and enabled.
+Native code hides the overlay border, gradient and background together and
+stops its animations. The separate dispel droplet remains available.
+The setting persists and applies to normal compact party and raid frames.
+
+This does not remove the private harmful-icon border described below.
 
 ## Readable ping sender display in 0.2.96
 
@@ -146,7 +171,7 @@ protected execution need an in-client check.
 
 ## Verification boundary
 
-No live WoW test has confirmed these reports fixed in 0.2.98-local. See
+No live WoW test has confirmed these reports fixed in 0.2.99-local. See
 [`ARCHITECTURE.md`](ARCHITECTURE.md) for the frame/color implementation and
 reported BG diagnostics. Pet portraits and aura category failures are tracked
 in the [bjarkiPortraits issue list](https://github.com/bjoern-janson/bjarkiPortraits/blob/main/KNOWN_ISSUES.md).

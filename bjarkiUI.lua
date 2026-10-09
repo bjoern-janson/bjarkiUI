@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.98-local"
+local BJARKI_UI_VERSION = "0.2.99-local"
 local PRD_ATLAS = "UI-HUD-CoolDownManager-Bar"
 local CLASS_SATURATION = 1.18
 local CLASS_BRIGHTNESS = 1.08
@@ -1658,6 +1658,22 @@ local function installHooks()
             end
         end)
     end
+    -- CheckClassification runs after UnitFrame_Update and replaces the health
+    -- texture. Restore the requested atlas after that exact native writer;
+    -- classification geometry, masks, and color selection stay native/owned.
+    if hooksecurefunc then
+        for _, unit in ipairs({ "target", "focus" }) do
+            local frame = unitFrame(unit)
+            if frame and type(frame.CheckClassification) == "function" then
+                hooksecurefunc(frame, "CheckClassification", function(self)
+                    local currentUnit = trackedFrame(self)
+                    if currentUnit == "target" or currentUnit == "focus" then
+                        applyAtlas(healthBar(currentUnit))
+                    end
+                end)
+            end
+        end
+    end
     -- Nameplates, raid frames, and raid-style party frames share
     -- CompactUnitFrame_UpdateName. Strip only secondary player names after
     -- Blizzard finishes its own name/visibility/color update.
@@ -1879,7 +1895,30 @@ local function neutralizeCompactDebuffFrames(frame)
     end
 end
 
+local function disableCompactDispelOverlay()
+    local api = C_CVar
+    if type(api) ~= "table" or type(api.GetCVar) ~= "function"
+        or type(api.SetCVar) ~= "function"
+    then
+        return
+    end
+
+    local ok, value = pcall(api.GetCVar, "raidFramesDispelIndicatorOverlay")
+    if not ok or isSecret(value)
+        or (type(value) ~= "string" and type(value) ~= "number")
+    then
+        return
+    end
+    value = tonumber(value)
+    if value ~= 1 and value ~= 2 then return end
+
+    -- Native overlay visibility owns the frame-wide border, gradient, and
+    -- background together. Separate dispel icons and aura borders are untouched.
+    pcall(api.SetCVar, "raidFramesDispelIndicatorOverlay", "0")
+end
+
 local function installCompactDebuffBorderNeutralization()
+    disableCompactDispelOverlay()
     if not hooksecurefunc then return end
 
     -- Older public compact renderers color borders through this helper.
