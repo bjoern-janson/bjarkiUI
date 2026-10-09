@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.102-local"
+local BJARKI_UI_VERSION = "0.2.103-local"
 local PRD_ATLAS = "UI-HUD-CoolDownManager-Bar"
 local CLASS_SATURATION = 1.18
 local CLASS_BRIGHTNESS = 1.08
@@ -1322,22 +1322,38 @@ local function applyDamageMeterUnitPrimaryName(frame, combatSource)
     local creatureID = combatSource.sourceCreatureID
     if not isSecret(creatureID) and creatureID ~= nil then return end
 
-    -- This API explicitly permits opaque GUID arguments. Its result must be a
-    -- readable token before any player classification or UnitName call.
+    -- This API explicitly permits opaque GUID arguments. A readable result may
+    -- be classified; an opaque result may only reach an accepting native consumer.
     local sourceGUID = combatSource.sourceGUID
     if not isSecret(sourceGUID) and type(sourceGUID) ~= "string" then return end
     local okUnit, mappedUnit = pcall(UnitTokenFromGUID, sourceGUID)
-    local unit = okUnit and readableUnitToken(mappedUnit)
-    if not unit or not isPlayerUnit(unit) then return end
+    if not okUnit then return end
 
-    -- A readable mismatch vetoes a stale unit mapping. An opaque source GUID
-    -- is only forwarded to the native mapper, never compared or inspected.
-    if not isSecret(sourceGUID) then
-        local currentGUID = readableUnitGUID(unit)
-        if not currentGUID or currentGUID ~= sourceGUID then return end
+    local primary, canDisplay
+    if isSecret(mappedUnit) then
+        -- UnitName explicitly accepts an opaque token. Outside regional mode
+        -- its first component is already the native primary display value;
+        -- transport it whole, including any multiword NPC component. Never
+        -- classify this token, inspect either name result, or cache a mapping.
+        -- A readable source GUID still requires the readable round trip below.
+        if not isSecret(sourceGUID) or readableBool(RegionalUniqueNamesEnabled) ~= false
+            or type(UnitName) ~= "function" then return end
+        local okName, name = pcall(UnitName, mappedUnit)
+        if not okName or (not isSecret(name) and type(name) ~= "string") then return end
+        primary, canDisplay = name, true
+    else
+        local unit = readableUnitToken(mappedUnit)
+        if not unit or not isPlayerUnit(unit) then return end
+
+        -- A readable mismatch vetoes a stale unit mapping. An opaque source GUID
+        -- is only forwarded to the native mapper, never compared or inspected.
+        if not isSecret(sourceGUID) then
+            local currentGUID = readableUnitGUID(unit)
+            if not currentGUID or currentGUID ~= sourceGUID then return end
+        end
+
+        primary, canDisplay = primaryName(unit)
     end
-
-    local primary, canDisplay = primaryName(unit)
     if not canDisplay then return end
 
     local deathRecapID = frame.deathRecapID
@@ -2362,6 +2378,118 @@ petStateEvents:SetScript("OnEvent", function()
 end)
 
 -- Read-only diagnostics. This intentionally reports state without repairing it.
+local function printDamageMeterNameAudit()
+    local count = { rows = 0, hooked = 0, sourceSecret = 0, textSecret = 0, guidSecret = 0,
+        tokenSecret = 0, tokenMissing = 0, playerUnknown = 0, prefixSecret = 0, unavailable = 0 }
+    local seen = {}
+    local function valueState(value)
+        if isSecret(value) then return "secret" end
+        if type(canaccessvalue) == "function" and readableBool(canaccessvalue, value) ~= true then
+            return "unavailable"
+        end
+        return "readable"
+    end
+    local function accessibleTable(value)
+        return valueState(value) == "readable" and type(value) == "table"
+            and (type(canaccesstable) ~= "function" or readableBool(canaccesstable, value) == true)
+    end
+    local function visible(frame)
+        if not accessibleTable(frame) then count.unavailable = count.unavailable + 1; return false end
+        if readableBool(frame.IsForbidden, frame) == true then
+            count.unavailable = count.unavailable + 1; return false
+        end
+        local shown = readableBool(frame.IsShown, frame)
+        if shown == nil then count.unavailable = count.unavailable + 1 end
+        return shown == true
+    end
+    local function inspect(frame, source)
+        if not visible(frame) or seen[frame] then return end
+        seen[frame] = true
+        count.rows = count.rows + 1
+        if damageMeterNameRegionHooks[frame] then count.hooked = count.hooked + 1 end
+        local sourceState = valueState(frame.sourceName)
+        if sourceState == "secret" then count.sourceSecret = count.sourceSecret + 1
+        elseif sourceState == "unavailable" then count.unavailable = count.unavailable + 1 end
+        local okRegion, region = pcall(frame.GetName, frame)
+        local okText, text
+        if okRegion and accessibleTable(region) then okText, text = pcall(region.GetText, region) end
+        if not okText then count.unavailable = count.unavailable + 1
+        elseif valueState(text) == "secret" then count.textSecret = count.textSecret + 1
+        elseif valueState(text) == "unavailable" then count.unavailable = count.unavailable + 1 end
+
+        -- Only inspect the current protected nonlocal-source route. Names are
+        -- never parsed or printed, and no lookup result survives this command.
+        if sourceState ~= "secret" then return end
+        local creature, localPlayer = frame.isCreature, frame.isLocalPlayer
+        if valueState(creature) ~= "readable" or type(creature) ~= "boolean"
+            or valueState(localPlayer) ~= "readable" or type(localPlayer) ~= "boolean" then
+            count.unavailable = count.unavailable + 1; return
+        end
+        if creature or localPlayer then return end
+        if not accessibleTable(source) then count.unavailable = count.unavailable + 1; return end
+        local creatureID = source.sourceCreatureID
+        if valueState(creatureID) == "unavailable" then count.unavailable = count.unavailable + 1; return end
+        if valueState(creatureID) == "readable" and creatureID ~= nil then return end
+
+        local prefixSecret = readableBool(frame.ShouldShowClassification, frame) == true
+            and isSecret(frame.classification)
+        local colored = frame.isClassColorDesired
+        if isSecret(colored) then prefixSecret = true
+        elseif valueState(colored) == "readable" and colored == true then
+            local displayType = frame.sourceDisplayType
+            if isSecret(displayType) then prefixSecret = true
+            elseif valueState(displayType) == "readable"
+                and displayType == Enum.DamageMeterSourceDisplayType.Enemy then
+                prefixSecret = prefixSecret or isSecret(frame.factionGroup)
+            end
+        end
+        if prefixSecret then count.prefixSecret = count.prefixSecret + 1 end
+
+        local guid = source.sourceGUID
+        local guidState = valueState(guid)
+        if guidState == "secret" then count.guidSecret = count.guidSecret + 1 end
+        if guidState == "unavailable" then count.unavailable = count.unavailable + 1; return end
+        if not UnitTokenFromGUID or (guidState == "readable" and type(guid) ~= "string") then
+            count.tokenMissing = count.tokenMissing + 1; return
+        end
+        local okToken, token = pcall(UnitTokenFromGUID, guid)
+        if not okToken then count.tokenMissing = count.tokenMissing + 1; return end
+        local tokenState = valueState(token)
+        if tokenState == "secret" then count.tokenSecret = count.tokenSecret + 1; return end
+        if tokenState == "unavailable" then count.unavailable = count.unavailable + 1; return end
+        if type(token) ~= "string" or token == "" then count.tokenMissing = count.tokenMissing + 1; return end
+        local okPlayer, player = pcall(UnitIsPlayer, token)
+        if not okPlayer or valueState(player) ~= "readable" or type(player) ~= "boolean" then
+            count.playerUnknown = count.playerUnknown + 1
+        end
+    end
+    local function inspectWindow(window)
+        if not visible(window) then return end
+        local ok, scrollBox = pcall(window.GetScrollBox, window)
+        if not ok or not accessibleTable(scrollBox)
+            or not pcall(scrollBox.ForEachFrame, scrollBox, inspect) then
+            count.unavailable = count.unavailable + 1
+        end
+        local okLocal, localEntry = pcall(window.GetLocalPlayerEntry, window)
+        if okLocal and valueState(localEntry) == "readable" and localEntry ~= nil then inspect(localEntry) end
+    end
+    local meter = _G.DamageMeter
+    if not accessibleTable(meter) or not pcall(meter.ForEachSessionWindow, meter, inspectWindow) then
+        count.unavailable = count.unavailable + 1
+    end
+    local function out(message)
+        if DEFAULT_CHAT_FRAME then DEFAULT_CHAT_FRAME:AddMessage("|cff74c7ecbjarkiUI|r: " .. message) end
+    end
+    out("names version=" .. BJARKI_UI_VERSION .. " rows=" .. count.rows .. " hooked=" .. count.hooked
+        .. " sourceSecret=" .. count.sourceSecret .. " textSecret=" .. count.textSecret
+        .. " unavailable=" .. count.unavailable)
+    local regional = readableBool(RegionalUniqueNamesEnabled)
+    out("names guidSecret=" .. count.guidSecret .. " tokenSecret=" .. count.tokenSecret .. " tokenMissing=" .. count.tokenMissing
+        .. " playerUnknown=" .. count.playerUnknown .. " prefixSecret=" .. count.prefixSecret
+        .. " regional=" .. (regional == nil and "unknown" or tostring(regional))
+        .. " UnitName=" .. tostring(type(UnitName) == "function"))
+end
+
 local function printUIAudit()
     local function out(message)
         if DEFAULT_CHAT_FRAME then
@@ -2486,11 +2614,14 @@ SlashCmdList.BJARKIUI = function(message)
     if command == "audit" then
         printUIAudit()
         return
+    elseif command == "names" then
+        printDamageMeterNameAudit()
+        return
     elseif command == "colors" then
         printHealthColorAudit()
         return
     elseif command == "" or command == "help" then
-        print("bjarkiUI: /bui levels [on|off] | audit | colors")
+        print("bjarkiUI: /bui levels [on|off] | audit | colors | names")
         return
     end
     if previousBJarkiUISlash then

@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-This document describes the current implementation of **bjarkiUI 0.2.102-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
+This document describes the current implementation of **bjarkiUI 0.2.103-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -159,8 +159,12 @@ Damage Meter rows are recycled, so name normalization is attached near the final
 For a protected nonlocal source name, version 0.2.100 can use the current native
 Init record to ask UnitTokenFromGUID for a current unit. The
 [unit API](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_APIDocumentationGenerated/UnitDocumentation.lua)
-permits an opaque GUID argument, but the returned token must be independently
-readable and positively identified as a player. Explicit non-creature and
+permits an opaque GUID argument. A readable returned token must be positively
+identified as a player. Version 0.2.103 also permits an opaque mapped token to
+reach UnitName when the source GUID is opaque and regional mode is explicitly
+false. UnitName accepts that argument and its first component is transported
+unchanged, without classifying or comparing the opaque token. An unknown NPC's
+complete multiword component therefore stays intact. Explicit non-creature and
 nonlocal row state is required; known creature IDs and readable GUID mismatch
 veto the adapter. A readable source GUID additionally requires a matching
 readable current GUID. No combat-source record or unit mapping is retained.
@@ -173,6 +177,12 @@ initial visible-row scans provide the current source record; no new event or
 hook is added. The native UpdateName caller is Entry.Init. An external standalone
 UpdateName call without source context may temporarily restore the full label
 until the next native source refresh. Existing readable/local paths are retained.
+
+`/bui names` reports two anonymous summaries for currently shown native meter
+windows and rows. It counts access/mapping/prefix states without calling UnitName,
+printing name contents or identities, refreshing presentation, or retaining source data.
+Hidden windows, hidden rows and stale hook-only entries are excluded. This
+on-demand command adds no recurring work or new native hooks.
 
 ## 4. Highlights and status presentation
 

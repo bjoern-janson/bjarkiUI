@@ -1,11 +1,35 @@
 # Known issues and bugs
 
-Status recorded 2026-10-09 for **bjarkiUI 0.2.102-local**.
+Status recorded 2026-10-09 for **bjarkiUI 0.2.103-local**.
 
 The Battleground observations below reflect user reports and diagnostic output.
 They remain open until checked in the live client against this build.
 A report describes a visible symptom; it does not by itself establish the
 failing code path or root cause.
+
+## Opposing-faction meter names in 0.2.103
+
+The meter adapter rejected an opaque UnitTokenFromGUID result before the native
+UnitName call, although both APIs permit protected arguments in addon code.
+For an opaque source GUID and explicit nonregional mode, that mapped token now
+reaches UnitName and its first component passes unchanged through the existing
+text sink. The code does not inspect, parse, compare or retain opaque identities.
+Readable source GUIDs still require the existing readable matching round trip.
+Known creature, source, local-player, rank and faction-formatting checks remain.
+
+The repaired path passes focused cases for enemy prefixes, death rows, recycled
+rows and complete multiword native components. The screenshot cannot establish
+that its particular rows supplied an opaque mapped token. Secondary names can
+remain when mapping is unavailable, regional mode is enabled/unknown, a readable
+GUID cannot be verified, or required native row/prefix/rank information is
+inaccessible. A standalone external UpdateName still lacks current source data
+until native initialization runs again.
+
+`/bui names` inspects currently shown native rows and prints two anonymous access
+summaries. It does not call UnitName or print name contents, changes no
+presentation and records no identity.
+Use it while the failure is visible. Source execution with modeled native APIs
+does not certify the live secret/taint engine or universal BG surname removal.
 
 ## Native binding and presentation repairs in 0.2.102
 
