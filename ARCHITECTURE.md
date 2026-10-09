@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-Current maintenance reference for **bjarkiUI 0.2.104-local**, reviewed
+Current maintenance reference for **bjarkiUI 0.2.105-local**, reviewed
 2026-10-09. Runtime behavior is defined by the source; native API contracts and
 source reproductions do not certify live protected execution or pixel output.
 Repair history and outstanding reports are recorded in [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
@@ -106,9 +106,16 @@ and `PowerBarColor`; values and power-type calculation remain native.
 4. **Unresolved derived identity:** when player or pet identity remains unknown
    and no preceding source supplied RGB, preserve the native tint.
 5. **Remaining readable state:** disconnected/dead `(0.5, 0.5, 0.5, 1)`;
-   tap denied with explicit `UnitPlayerControlled=false` and `UnitIsEnemy=false`
+   tap denied with explicit `UnitPlayerControlled=false`
    `(0.9, 0.9, 0.9, 1)`; nonfriend with a readable numeric threat status
    `(1, 0, 0, 1)`; then readable `UnitSelectionColor`.
+
+The NPC tap fallback follows native
+[`CompactUnitFrame_IsTapDenied`](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_UnitFrame/Shared/CompactUnitFrame.lua):
+hostility does not disqualify an otherwise readable tap-denied NPC from gray.
+Matching readable native RGB still takes precedence. In particular, native
+nameplates can choose an optional threat-health color ahead of their tap-gray
+branch; the addon continues to copy that actual native color.
 
 Direct positive player identity outranks a stale pet witness. Player identity
 uses readable `UnitIsPlayer` and readable GUID prefix evidence; disagreement

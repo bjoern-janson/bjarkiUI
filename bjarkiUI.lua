@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.104-local"
+local BJARKI_UI_VERSION = "0.2.105-local"
 local PRD_ATLAS = "UI-HUD-CoolDownManager-Bar"
 local CLASS_SATURATION = 1.18
 local CLASS_BRIGHTNESS = 1.08
@@ -714,10 +714,9 @@ local function applyHealthColor(bar, unit)
 
     local tapDenied = readableBool(UnitIsTapDenied, unit)
     local playerControlled = readableBool(UnitPlayerControlled, unit)
-    local enemy = readableBool(UnitIsEnemy, "player", unit)
-    if tapDenied == true and playerControlled == false and enemy == false then
-        -- Matches Blizzard compact/nameplate convention for an NPC whose tap
-        -- belongs elsewhere.
+    if tapDenied == true and playerControlled == false then
+        -- Blizzard's NPC tap-gray rule is independent of hostility. Keep it
+        -- ahead of ordinary threat/selection red when native RGB is unavailable.
         setHealthColor(bar, 0.9, 0.9, 0.9, 1)
         return
     end

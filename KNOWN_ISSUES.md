@@ -1,11 +1,37 @@
 # Known issues and bugs
 
-Status recorded 2026-10-09 for **bjarkiUI 0.2.104-local**.
+Status recorded 2026-10-09 for **bjarkiUI 0.2.105-local**.
 
 The observations below reflect user reports and diagnostic output.
 They remain open until checked in the live client against this build.
 A report describes a visible symptom; it does not by itself establish the
 failing code path or root cause.
+
+## Tagged NPC gray-to-red fallback in 0.2.105
+
+The open-world report describes a tagged mob turning from gray to red while
+a warlock channels Drain Life. The affected surface and live API state were
+not captured, so the spell is not established as the cause.
+
+The direct NPC fallback incorrectly required `UnitIsEnemy=false` in addition
+to a readable denied tap and `UnitPlayerControlled=false`. Native
+[`CompactUnitFrame_IsTapDenied`](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_UnitFrame/Shared/CompactUnitFrame.lua)
+has no hostility requirement. When a matched native color was unavailable,
+this extra condition let an otherwise gray tagged NPC fall through to red.
+The fallback now uses the native tap predicate without that extra condition.
+
+Focused source cases reproduce native-gray/owned-red mismatches both without
+a matched nameplate and with unreadable native RGB during health refreshes.
+The correction keeps those owned bars gray. The fixture also distinguishes
+native party threat-health red, which can legitimately precede native tap
+gray. Matching readable native RGB remains the preferred color source, so the
+addon still follows that red presentation when Blizzard selects it.
+
+These cases execute actual addon/native Lua with controlled C API/widget
+returns; they do not reproduce a live Drain Life cast or certify protected
+execution. If the issue recurs, `/bui colors` while the same target remains
+selected can distinguish the owned bar from a readable matched native plate.
+The report remains open for live confirmation.
 
 ## Derived dungeon names in 0.2.104
 
