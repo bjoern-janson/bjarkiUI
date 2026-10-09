@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.95-local"
+local BJARKI_UI_VERSION = "0.2.96-local"
 local PRD_ATLAS = "UI-HUD-CoolDownManager-Bar"
 local CLASS_SATURATION = 1.18
 local CLASS_BRIGHTNESS = 1.08
@@ -910,6 +910,75 @@ local function senderNameFilter(event, decorated, text, sender, language, channe
     return count > 0 and replaced or decorated
 end
 
+local function shortenPingVisibleRun(text, fullName)
+    if isSecret(text) or isSecret(fullName) or type(text) ~= "string"
+        or type(fullName) ~= "string" then return text end
+    local primary = primaryDisplayName(fullName)
+    if not primary or primary == fullName then return text end
+
+    local parts, index, replaced = {}, 1, false
+    while index <= #text do
+        local pipe = text:find("|", index, true)
+        local finish = pipe and pipe - 1 or #text
+        local visible = text:sub(index, finish)
+        if not replaced then
+            local first, last = visible:find(fullName, 1, true)
+            if first then
+                local before, after = visible:sub(first - 1, first - 1), visible:sub(last + 1, last + 1)
+                -- Match the complete readable name, not part of a larger word.
+                if (first == 1 or not before:match("[%w_\128-\255]"))
+                    and (after == "" or not after:match("[%w_\128-\255]")) then
+                    visible = visible:sub(1, first - 1) .. primary .. visible:sub(last + 1)
+                    replaced = true
+                end
+            end
+        end
+        parts[#parts + 1] = visible
+        if not pipe then break end
+
+        -- Preserve color and role-icon markup. Unknown or malformed markup
+        -- leaves the original label intact, including any earlier match.
+        local kind = text:sub(pipe + 1, pipe + 1)
+        local last
+        if kind == "A" or kind == "T" then
+            local closing = text:find(kind == "A" and "|a" or "|t", pipe + 2, true)
+            if closing then last = closing + 1 end
+        elseif kind == "c" and text:sub(pipe + 2, pipe + 9):match("^%x%x%x%x%x%x%x%x$") then
+            last = pipe + 9
+        elseif kind == "r" or kind == "|" then
+            last = pipe + 1
+        end
+        if not last then return text end
+        parts[#parts + 1] = text:sub(pipe, last)
+        index = last + 1
+    end
+    return table.concat(parts)
+end
+
+local function pingSenderNameFilter(_, event, text, sender, ...)
+    if event ~= "CHAT_MSG_PING" or isSecret(text) or isSecret(sender)
+        or type(sender) ~= "string" then return false end
+
+    -- PING bypasses the decorated-sender filter and uses this preformatted
+    -- label directly. Change its visible name, preserving the player link.
+    local shortened = sender:gsub("(|Hplayer:([^:|]+)[^|]*|h)(.-)(|h)",
+        function(open, fullName, visible, close)
+            return open .. shortenPingVisibleRun(visible, fullName) .. close
+        end, 1)
+    if shortened ~= sender then return false, text, shortened, ... end
+
+    -- Plain labels need an exact readable name witness. Native role-only
+    -- labels and unavailable names remain unchanged.
+    local guid = select(10, ...)
+    if isSecret(guid) or not senderIsPlayer(event, guid)
+        or type(GetPlayerInfoByGUID) ~= "function" then return false end
+    local ok, _, _, _, _, _, fullName = pcall(GetPlayerInfoByGUID, guid)
+    if not ok or isSecret(fullName) or type(fullName) ~= "string" then return false end
+    shortened = shortenPingVisibleRun(sender, fullName)
+    if shortened ~= sender then return false, text, shortened, ... end
+    return false
+end
+
 local communitiesNameHookInstalled = false
 local communitiesChatNameHookInstalled = false
 local communitiesMemberRefreshHookInstalled = false
@@ -1597,6 +1666,9 @@ local function installHooks()
     end
     if ChatFrameUtil and ChatFrameUtil.AddSenderNameFilter then
         ChatFrameUtil.AddSenderNameFilter(senderNameFilter)
+    end
+    if ChatFrameUtil and ChatFrameUtil.AddMessageEventFilter then
+        ChatFrameUtil.AddMessageEventFilter("CHAT_MSG_PING", pingSenderNameFilter)
     end
     installCommunitiesPrimaryNames()
     installDamageMeterPrimaryNames()

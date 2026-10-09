@@ -1,11 +1,25 @@
 # Known issues and bugs
 
-Status recorded 2026-10-09 for **bjarkiUI 0.2.95-local**.
+Status recorded 2026-10-09 for **bjarkiUI 0.2.96-local**.
 
 The Battleground observations below reflect user reports and diagnostic output.
 They remain open until checked in the live client against this build.
 A report describes a visible symptom; it does not by itself establish the
 failing code path or root cause.
+
+## Readable ping sender display in 0.2.96
+
+The native ping formatter bypasses the ordinary sender-name filter. A dedicated
+CHAT_MSG_PING filter now shortens readable sender labels when a player hyperlink
+or an exact readable GUID-name lookup supplies the character name. It preserves
+role text/icons, hyperlink destinations, the ping body and remaining arguments.
+Unknown names and unsupported markup stay native.
+
+Protected messages skip addon filters, and protected sender strings cannot be
+parsed. Chat lockdown can apply in PvP, encounters and communication-restricted
+maps such as dungeons and raids. Secondary names can therefore remain in those
+pings. The reported Mana Devourer screenshot does not establish which arguments
+were readable, and this build has not been validated in the live client.
 
 ## Source repairs in 0.2.95
 
@@ -132,7 +146,7 @@ protected execution need an in-client check.
 
 ## Verification boundary
 
-No live WoW test has confirmed these reports fixed in 0.2.95-local. See
+No live WoW test has confirmed these reports fixed in 0.2.96-local. See
 [`ARCHITECTURE.md`](ARCHITECTURE.md) for the frame/color implementation and
 reported BG diagnostics. Pet portraits and aura category failures are tracked
 in the [bjarkiPortraits issue list](https://github.com/bjoern-janson/bjarkiPortraits/blob/main/KNOWN_ISSUES.md).

@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-This document describes the current implementation of **bjarkiUI 0.2.95-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
+This document describes the current implementation of **bjarkiUI 0.2.96-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -88,10 +88,29 @@ Current surfaces include:
 - player/target/focus/derived unit-frame names;
 - compact raid/raid-style party/nameplate player names;
 - ordinary chat sender display;
+- readable ping sender display;
 - Communities/Guild roster and Communities chat display;
 - Blizzard Damage Meter source labels.
 
 The implementation tries to change only visible text. Hyperlink payloads, combat-source records, roster records, and other identity data remain native.
+
+The native
+[PING formatter](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_ChatFrameBase/Mainline/ChatFrameOverrides.lua)
+uses its preformatted sender argument directly, bypassing the ordinary sender-name
+filter. A single CHAT_MSG_PING event filter changes only the local readable
+sender display. Player-link destinations stay intact; plain labels require an
+exact readable name returned for the sender's readable player GUID. Role labels,
+color/atlas/texture markup, ping bodies and remaining event arguments are preserved.
+Unknown names and unsupported display markup retain native text.
+
+Blizzard's
+[message-filter registry](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_ChatFrameBase/Shared/ChatFrameFilters.lua)
+skips addon callbacks when the message is inaccessible. The adapter also rejects
+protected sender text before parsing it. The
+[chat-lockdown predicate](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_APIDocumentationGenerated/SecretPredicatesDocumentation.lua)
+includes restricted combat and communication-restricted maps. Protected pings can
+therefore retain secondary names in instances or PvP. No private formatter,
+message-history record or global text writer is modified.
 
 For positively identified players, a protected UnitName component can be passed
 unchanged to the native text widget only when RegionalUniqueNamesEnabled is
