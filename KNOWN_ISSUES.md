@@ -1,11 +1,50 @@
 # Known issues and bugs
 
-Status recorded 2026-10-09 for **bjarkiUI 0.2.99-local**.
+Status recorded 2026-10-09 for **bjarkiUI 0.2.100-local**.
 
 The Battleground observations below reflect user reports and diagnostic output.
 They remain open until checked in the live client against this build.
 A report describes a visible symptom; it does not by itself establish the
 failing code path or root cause.
+
+## Primary-name transport in 0.2.100
+
+The existing ToT/FoT hook already follows the native name writer. Its helper
+previously rejected every name when player identity was unavailable. In
+explicit nonregional mode the native first UnitName component can now pass
+unchanged to the text sink in that state. Known NPC names remain untouched;
+unknown multiword NPC components stay whole. Player-only parsing still requires
+positive identity, and protected combined names in regional/unknown mode remain
+native. The screenshot does not establish which predicate or name was readable.
+
+Damage Meter creation, reuse and late native name writes are already observed.
+The remaining protected-source case can now use a current native source-to-unit
+mapping when its returned token is readable and positively identifies a player.
+Known creature IDs, unavailable classification, readable GUID mismatch and
+unsupported formatting fail without changing the label. Rank, death-row and
+readable native prefix formatting are preserved through supported text sinks.
+The source record and unit mapping are never cached.
+
+Protected/unmapped sources can still display secondary names. An external
+standalone UpdateName call without source context may restore the full label
+until the next native source initialization. The focused checks establish the
+supported transport paths; they do not prove the screenshot entered those states
+or validate the live secret/taint engine.
+
+## Party visibility and order in 0.2.100
+
+A shown/hidden member can change independently of the parent layout. The old
+visible-member anchor chain could then overlap a returning member or retain a
+gap after the existing connection timer had finished. The native visibility
+notification now queues the same existing next-tick ordering step for current
+party-member objects only. Desired order remains party1 through party4, then
+player; native unit assignments and member scripts are retained.
+
+The reproduced path uses a member-only UNIT_PET refresh with native pet display
+disabled. Ordinary offline/dead status updates alone preserve anchors in the
+source checks. The exact logout/death timing of the reported incident remains
+unobserved. Combat defers repair until the existing regen path; unavailable unit
+identity still prevents reordering.
 
 ## Target/Focus health artwork in 0.2.99
 
@@ -171,7 +210,7 @@ protected execution need an in-client check.
 
 ## Verification boundary
 
-No live WoW test has confirmed these reports fixed in 0.2.99-local. See
+No live WoW test has confirmed these reports fixed in 0.2.100-local. See
 [`ARCHITECTURE.md`](ARCHITECTURE.md) for the frame/color implementation and
 reported BG diagnostics. Pet portraits and aura category failures are tracked
 in the [bjarkiPortraits issue list](https://github.com/bjoern-janson/bjarkiPortraits/blob/main/KNOWN_ISSUES.md).

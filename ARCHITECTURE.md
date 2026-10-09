@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-This document describes the current implementation of **bjarkiUI 0.2.99-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
+This document describes the current implementation of **bjarkiUI 0.2.100-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -119,17 +119,38 @@ includes restricted combat and communication-restricted maps. Protected pings ca
 therefore retain secondary names in instances or PvP. No private formatter,
 message-history record or global text writer is modified.
 
-For positively identified players, a protected UnitName component can be passed
-unchanged to the native text widget only when RegionalUniqueNamesEnabled is
-readable and explicitly false. The native
+The first UnitName component can be passed unchanged to the native text widget
+when RegionalUniqueNamesEnabled is readable and explicitly false. The native
 [Camelot name helper](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_FrameXMLUtil/Camelot/NameUtil.lua)
 returns that component directly in this mode, and the
 [FontString API](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_APIDocumentationGenerated/SimpleFontStringAPIDocumentation.lua)
 accepts protected text. A separate readable flag authorizes the write; the
-protected name is never parsed, compared, logged or cached. Regional full-name
-mode, unknown mode and unknown player identity retain native text.
+protected name is never parsed, compared, logged or cached. Version 0.2.100
+permits this raw transport even when player identity is unavailable or its
+readable witnesses disagree. Known NPCs remain untouched; an unknown NPC's
+multiword component is transported whole. The existing string parsing still
+requires positive player identity. Regional or unknown mode does not authorize
+opaque combined-name shortening.
 
 Damage Meter rows are recycled, so name normalization is attached near the final text writer rather than only at row creation.
+
+For a protected nonlocal source name, version 0.2.100 can use the current native
+Init record to ask UnitTokenFromGUID for a current unit. The
+[unit API](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_APIDocumentationGenerated/UnitDocumentation.lua)
+permits an opaque GUID argument, but the returned token must be independently
+readable and positively identified as a player. Explicit non-creature and
+nonlocal row state is required; known creature IDs and readable GUID mismatch
+veto the adapter. A readable source GUID additionally requires a matching
+readable current GUID. No combat-source record or unit mapping is retained.
+
+The native first component goes through SetText or SetFormattedText. If a
+readable native classification/faction prefix exists, the supported
+[C_StringUtil.WrapString](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_APIDocumentationGenerated/StringUtilDocumentation.lua)
+preserves it without parsing the opaque name. Existing initialization hooks and
+initial visible-row scans provide the current source record; no new event or
+hook is added. The native UpdateName caller is Entry.Init. An external standalone
+UpdateName call without source context may temporarily restore the full label
+until the next native source refresh. Existing readable/local paths are retained.
 
 ## 4. Highlights and status presentation
 
@@ -202,7 +223,7 @@ For smaller groups, missing party slots simply disappear and the player remains 
 
 The module does **not** replace Blizzard's party comparator and does **not** call `SetFlowSortFunction()`.
 
-The current implementation lets Blizzard finish `RefreshMembers()` first. A post-hook then reanchors the already-created visible member frames. This means Blizzard keeps the native unit assignment, compact-unit refresh, and normal frame setup; the addon changes only the final out-of-combat anchors.
+The current implementation observes `RefreshMembers()`, the cached native layout writer and native member visibility notifications. Each queues the same coalesced repair for the next tick, where current membership and combat state are checked again. Blizzard keeps the native unit assignment, compact-unit refresh and normal frame setup; the addon changes only the final out-of-combat anchors.
 
 Full raid ordering is left native. Pet-frame anchors are adjusted to remain under the visually reordered party block.
 
@@ -281,18 +302,27 @@ color rules and the rollback in section 17:
 
 ## 15. Party-order lifecycle recovery
 
-Version 0.2.74 keeps the custom raid-style party order stable across member
-relogs, disconnect/reconnect transitions, and other compact-frame lifecycle
-changes.
+Version 0.2.74 introduced additional party-order lifecycle recovery. Its
+member-script subscriptions were subsequently removed as described in section
+17. Version 0.2.100 restores the missing visibility observation through the
+existing native notification rather than installing member scripts.
 
 Two native paths are covered explicitly:
 
 - CompactPartyFrame caches `UpdateLayout` as `updateLayoutFunc` during OnLoad,
   so bjarkiUI post-hooks that actual cached native writer rather than relying on
   the public method alone.
-- individual compact member frames can hide/show while a unit token disappears
-  and returns; their visibility transitions now trigger a bounded visual-order
-  reapply out of combat.
+- individual compact member frames can hide/show without a parent refresh.
+  A post-hook on the native CompactUnitFrame_OnVisiblityChanged notification
+  matches only the current party's member objects and queues the existing
+  deferred visual-order repair. Native scripts and callback tables are retained.
+
+One source reproduction has pet display disabled: the container skips its
+UNIT_PET parent update while a member's own UNIT_PET handler calls UpdateAll
+and changes its visibility. The previous compressed anchor chain could then
+overlap the returning member or retain a gap. The observer covers the actual
+visibility transition rather than assuming which logout/death event preceded
+it. Ordinary offline/dead status updates alone did not reproduce anchor changes.
 
 Blizzard still owns unit assignment and compact-frame refresh. The addon only
 reasserts anchors after native lifecycle/layout writes.
@@ -393,9 +423,10 @@ visual layout.
 - reconnect/disconnect recovery uses that same deferred path instead of a
   separate scheduling mechanism.
 
-The maintenance invariant is that **presentation authority follows readable
-identity and runs outside Blizzard's protected state-transition stack whenever
-possible**.
+Semantic rewriting follows readable identity; a permitted native text component
+can also be forwarded unchanged to its text sink. Party anchor changes run
+outside Blizzard's native state-transition stack on the target client's timer
+path and remain deferred during combat.
 
 
 ## 21. Compact debuff-border ownership

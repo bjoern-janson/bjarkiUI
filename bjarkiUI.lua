@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.99-local"
+local BJARKI_UI_VERSION = "0.2.100-local"
 local PRD_ATLAS = "UI-HUD-CoolDownManager-Bar"
 local CLASS_SATURATION = 1.18
 local CLASS_BRIGHTNESS = 1.08
@@ -819,17 +819,26 @@ local function primaryDisplayName(value)
 end
 
 local function primaryName(unit)
-    if not isPlayerUnit(unit) or not UnitName then return nil end
+    local player, playerReadable = playerUnitState(unit)
+    if not UnitName or (playerReadable and not player) then return nil end
+    local nonregional = readableBool(RegionalUniqueNamesEnabled) == false
+    if not playerReadable and not nonregional then return nil end
     local ok, name = pcall(UnitName, unit)
     if not ok then return nil end
     if isSecret(name) then
         -- Camelot's native first-name helper returns this component unchanged
         -- outside regional full-name mode. Forward it only to the text sink;
         -- never parse, compare, or infer the contents of a protected name.
-        if readableBool(RegionalUniqueNamesEnabled) == false then return name, true end
+        if nonregional then return name, true end
         return nil
     end
     if type(name) ~= "string" then return nil end
+    if not playerReadable then
+        -- In nonregional mode the native first component is also a complete
+        -- NPC name. Transport it unchanged when identity is unavailable;
+        -- only positive player identity can authorize our string parsing.
+        return name, true
+    end
     local primary = primaryDisplayName(name)
     return primary, primary ~= nil
 end
@@ -1258,7 +1267,91 @@ local function normalizeDamageMeterEntryName(frame)
     if state then state.guard = false end
 end
 
-local function installDamageMeterEntryNameHook(frame)
+local function applyDamageMeterUnitPrimaryName(frame, combatSource)
+    if not frame or type(combatSource) ~= "table" or not UnitTokenFromGUID
+        or not isSecret(frame.sourceName)
+    then
+        return
+    end
+
+    -- Use only the current native Init record. Never retain its GUID or a unit
+    -- mapping on this recycled row, and preserve the independent local path.
+    local creature, localPlayer = frame.isCreature, frame.isLocalPlayer
+    if isSecret(creature) or creature ~= false
+        or isSecret(localPlayer) or localPlayer ~= false then return end
+    local creatureID = combatSource.sourceCreatureID
+    if not isSecret(creatureID) and creatureID ~= nil then return end
+
+    -- This API explicitly permits opaque GUID arguments. Its result must be a
+    -- readable token before any player classification or UnitName call.
+    local sourceGUID = combatSource.sourceGUID
+    if not isSecret(sourceGUID) and type(sourceGUID) ~= "string" then return end
+    local okUnit, mappedUnit = pcall(UnitTokenFromGUID, sourceGUID)
+    local unit = okUnit and readableUnitToken(mappedUnit)
+    if not unit or not isPlayerUnit(unit) then return end
+
+    -- A readable mismatch vetoes a stale unit mapping. An opaque source GUID
+    -- is only forwarded to the native mapper, never compared or inspected.
+    if not isSecret(sourceGUID) then
+        local currentGUID = readableUnitGUID(unit)
+        if not currentGUID or currentGUID ~= sourceGUID then return end
+    end
+
+    local primary, canDisplay = primaryName(unit)
+    if not canDisplay then return end
+
+    local deathRecapID = frame.deathRecapID
+    if isSecret(deathRecapID) or type(deathRecapID) ~= "number" then return end
+    local isDeath = deathRecapID ~= 0
+    local index, displayName = frame.index, primary
+    if not isDeath then
+        if isSecret(index) or type(index) ~= "number"
+            or isSecret(DAMAGE_METER_SOURCE_NAME)
+            or type(DAMAGE_METER_SOURCE_NAME) ~= "string" then return end
+
+        -- Preserve the native classification/faction prefix. If the native
+        -- decision is unavailable to addon code, leave the full label native.
+        if type(frame.GetClassificationAtlasElement) ~= "function"
+            or type(frame.GetSourceTypeAtlasElement) ~= "function" then return end
+        local okAtlas, atlas = pcall(frame.GetClassificationAtlasElement, frame)
+        if not okAtlas or isSecret(atlas) then return end
+        if atlas == nil then
+            okAtlas, atlas = pcall(frame.GetSourceTypeAtlasElement, frame)
+            if not okAtlas or isSecret(atlas) then return end
+        end
+        if atlas ~= nil then
+            if type(atlas) ~= "string" or type(CreateAtlasMarkup) ~= "function"
+                or not C_StringUtil or type(C_StringUtil.WrapString) ~= "function"
+            then
+                return
+            end
+            local okMarkup, markup = pcall(CreateAtlasMarkup, atlas)
+            if not okMarkup or isSecret(markup) or type(markup) ~= "string" then return end
+            local okWrap, wrapped = pcall(C_StringUtil.WrapString, primary, markup .. " ", "")
+            if not okWrap then return end
+            displayName = wrapped
+        end
+    end
+
+    local okRegion, nameRegion = pcall(frame.GetName, frame)
+    if not okRegion or not nameRegion then return end
+    if isDeath and type(nameRegion.SetText) ~= "function" then return end
+    if not isDeath and type(nameRegion.SetFormattedText) ~= "function" then return end
+    local state = damageMeterNameRegionHooks[frame]
+    if not state or state.guard then return end
+
+    -- Both native text sinks accept protected arguments. The primary component
+    -- and formatted replacement are never parsed, compared, logged, or cached.
+    state.guard = true
+    if isDeath then
+        pcall(nameRegion.SetText, nameRegion, primary)
+    else
+        pcall(nameRegion.SetFormattedText, nameRegion, DAMAGE_METER_SOURCE_NAME, index, displayName)
+    end
+    state.guard = false
+end
+
+local function installDamageMeterEntryNameHook(frame, combatSource)
     if not frame or not hooksecurefunc then return end
 
     if not damageMeterNameRegionHooks[frame] then
@@ -1286,6 +1379,7 @@ local function installDamageMeterEntryNameHook(frame)
     end
 
     normalizeDamageMeterEntryName(frame)
+    applyDamageMeterUnitPrimaryName(frame, combatSource)
 end
 
 local function hookDamageMeterWindow(sessionWindow)
@@ -1295,8 +1389,8 @@ local function hookDamageMeterWindow(sessionWindow)
         return
     end
 
-    hooksecurefunc(sessionWindow, "InitEntry", function(_self, frame, _elementData)
-        installDamageMeterEntryNameHook(frame)
+    hooksecurefunc(sessionWindow, "InitEntry", function(_self, frame, elementData)
+        installDamageMeterEntryNameHook(frame, elementData)
     end)
     damageMeterWindowHooks[sessionWindow] = true
 
@@ -1304,8 +1398,8 @@ local function hookDamageMeterWindow(sessionWindow)
     if type(sessionWindow.GetScrollBox) == "function" then
         local ok, scrollBox = pcall(sessionWindow.GetScrollBox, sessionWindow)
         if ok and scrollBox and type(scrollBox.ForEachFrame) == "function" then
-            pcall(scrollBox.ForEachFrame, scrollBox, function(frame)
-                installDamageMeterEntryNameHook(frame)
+            pcall(scrollBox.ForEachFrame, scrollBox, function(frame, elementData)
+                installDamageMeterEntryNameHook(frame, elementData)
             end)
         end
     end
@@ -1328,8 +1422,8 @@ local function installDamageMeterPrimaryNames()
         and _G.DamageMeterSourceEntryMixin
         and type(_G.DamageMeterSourceEntryMixin.Init) == "function"
     then
-        hooksecurefunc(_G.DamageMeterSourceEntryMixin, "Init", function(frame)
-            installDamageMeterEntryNameHook(frame)
+        hooksecurefunc(_G.DamageMeterSourceEntryMixin, "Init", function(frame, combatSource)
+            installDamageMeterEntryNameHook(frame, combatSource)
         end)
         damageMeterSourceInitHookInstalled = true
     end
