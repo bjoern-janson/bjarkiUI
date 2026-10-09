@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.103-local"
+local BJARKI_UI_VERSION = "0.2.104-local"
 local PRD_ATLAS = "UI-HUD-CoolDownManager-Bar"
 local CLASS_SATURATION = 1.18
 local CLASS_BRIGHTNESS = 1.08
@@ -835,41 +835,43 @@ local function primaryDisplayName(value)
     return withoutRealm:match("^%S+")
 end
 
-local function primaryName(unit)
+local function primaryName(unit, allowUnmodified)
     local player, playerReadable = playerUnitState(unit)
     if not UnitName or (playerReadable and not player) then return nil end
     local nonregional = readableBool(RegionalUniqueNamesEnabled) == false
-    if not playerReadable and not nonregional then return nil end
+    if not playerReadable and not nonregional and not allowUnmodified then return nil end
     local ok, name = pcall(UnitName, unit)
     if not ok then return nil end
     if isSecret(name) then
-        -- Camelot's native first-name helper returns this component unchanged
-        -- outside regional full-name mode. Forward it only to the text sink;
-        -- never parse, compare, or infer the contents of a protected name.
-        if nonregional then return name, true end
+        -- Forward the component unchanged in nonregional mode. Owned derived
+        -- frames can also retain a complete current name when primary-only
+        -- formatting is unavailable; never inspect or split protected text.
+        if nonregional or allowUnmodified then return name, true end
         return nil
     end
     if type(name) ~= "string" then return nil end
     if not playerReadable then
-        -- In nonregional mode the native first component is also a complete
-        -- NPC name. Transport it unchanged when identity is unavailable;
-        -- only positive player identity can authorize our string parsing.
+        -- The first component also preserves a complete NPC name. Unknown
+        -- identity only permits unchanged transport, including the derived
+        -- frame fallback; positive player identity is required for parsing.
         return name, true
     end
     local primary = primaryDisplayName(name)
     return primary, primary ~= nil
 end
 
-local function applyPrimaryNameToFrame(frame, unit)
+local function applyPrimaryNameToFrame(frame, unit, allowUnmodified)
     if not frame or not frame.name or not frame.name.SetText then return end
-    local name, canDisplay = primaryName(unit)
+    local name, canDisplay = primaryName(unit, allowUnmodified)
     if canDisplay then pcall(frame.name.SetText, frame.name, name) end
 end
 
 local function applyPrimaryName(unit)
     local frame = unitFrame(unit)
     if not frame or readableUnitToken(frame.unit) ~= unit then return end
-    applyPrimaryNameToFrame(frame, unit)
+    -- Keep the current actor's name on derived frames even when its primary
+    -- component cannot be established. A protected full name stays whole.
+    applyPrimaryNameToFrame(frame, unit, unit == "targettarget" or unit == "focustarget")
 end
 
 local function applyCompactPrimaryName(frame)

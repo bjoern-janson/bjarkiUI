@@ -1,11 +1,38 @@
 # Known issues and bugs
 
-Status recorded 2026-10-09 for **bjarkiUI 0.2.103-local**.
+Status recorded 2026-10-09 for **bjarkiUI 0.2.104-local**.
 
-The Battleground observations below reflect user reports and diagnostic output.
+The observations below reflect user reports and diagnostic output.
 They remain open until checked in the live client against this build.
 A report describes a visible symptom; it does not by itself establish the
 failing code path or root cause.
+
+## Derived dungeon names in 0.2.104
+
+The reported ToT label can show a previous mob/player name beside a current
+portrait. The addon has no previous-target name cache, and the native child
+frame's name source is its own targettarget/focustarget token.
+
+A conditional native reproduction exposes one retention path: with regional
+names enabled and local surname display disabled, GetUnitFirstName's separator
+pattern can return nil for the current first component. UnitFrame_Update then
+keeps the old label while updating the portrait. The previous addon policy
+could not supply a replacement when player identity or the regional component
+was protected. This reproduction does not establish those exact inputs in the
+two screenshots; protected name data alone is not a failed lookup.
+
+Owned, correctly bound ToT/FoT frames now permit the fresh UnitName component to
+reach SetText unchanged when primary-only formatting is unavailable. A combined
+or protected component may retain its surname. No protected content is parsed,
+compared or cached, and no player identity is inferred from a portrait or alias.
+Explicit known-NPC rejection preserves native NPC/follower labels; other name
+surfaces keep their prior policy. Missing/erroring name results or a rejected
+text write still leave native presentation in place.
+
+Focused cases exercise the actual native formatter/update body and addon path
+with controlled API/widget returns. They cover regional retention, both derived
+frames, protected text, unit changes and unaffected name surfaces. Live dungeon
+confirmation is still needed.
 
 ## Opposing-faction meter names in 0.2.103
 

@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-This document describes the current implementation of **bjarkiUI 0.2.103-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
+This document describes the current implementation of **bjarkiUI 0.2.104-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -153,6 +153,23 @@ readable witnesses disagree. Known NPCs remain untouched; an unknown NPC's
 multiword component is transported whole. The existing string parsing still
 requires positive player identity. Regional or unknown mode does not authorize
 opaque combined-name shortening.
+
+Version 0.2.104 also permits unchanged current-name transport on the two owned
+derived frames, after their existing readable binding check. ToT and FoT can
+therefore display a fresh UnitName component when regional/unknown mode or
+protected player identity prevents primary-name shortening. The component may
+contain a surname; it is displayed whole. Known non-player rejection remains
+intact, preserving native NPC and follower labels. Other name surfaces retain
+their existing policy.
+
+This closes a reproduced native name-retention path: UnitFrame_Update only
+writes a truthy formatted name before updating the portrait independently. In
+regional self-name mode, Camelot GetUnitFirstName can return nil when its
+separator pattern does not match, leaving the previous label. The derived
+fallback uses the fresh current-token component through the existing post-hook
+and events. It creates no name cache or inferred unit mapping. The screenshots
+do not establish their exact regional/formatter state, and a missing/erroring
+UnitName or unusable text sink can still prevent recovery.
 
 Damage Meter rows are recycled, so name normalization is attached near the final text writer rather than only at row creation.
 
