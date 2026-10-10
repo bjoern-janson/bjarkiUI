@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-Current maintenance reference for **bjarkiUI 0.2.107-local**, reviewed
+Current maintenance reference for **bjarkiUI 0.2.108-local**, reviewed
 2026-10-10. Runtime behavior is defined by the source; native API contracts and
 source reproductions do not certify live protected execution or pixel output.
 Repair history and outstanding reports are recorded in [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
@@ -315,32 +315,35 @@ and writes no alignment fields onto native frames.
 
 ### Player health optical calibration
 
-Two same-character screenshots put the player's health-fill upper edge and
-health status glyphs approximately **one screen pixel below** the target's.
-The mana bars and mana glyphs already coincide. The initial direction
-description was opposite to the repeatable glyph/fill measurement.
+Two same-character screenshots motivated a one-to-two pixel adjustment to the
+Player health fill and text relative to Target, while the separate mana bars
+were already acceptable. The first attempted alignment **moved upward**, based
+on a mistaken interpretation of the desired direction; the user confirmed
+that this moved the health display the wrong way. Appearance, not source XML
+alone, determines whether the final correction meets the request.
 
-Native [PlayerFrame.xml](https://github.com/Gethe/wow-ui-source/blob/943764493e6b16d63ded3ab304150d1f05e58b57/Interface/AddOns/Blizzard_UnitFrame/Mainline/PlayerFrame.xml)
-declares the HealthBarsContainer at (85,-40). However, a live diagnostic on
-0.2.106 returned **HPanchor 1 true TOPLEFT TOPLEFT 85 -41 true**: one point,
-the correct parent, and Y=-41. The reason for the difference from XML is
-not established. Version 0.2.106 accepted only -40 and therefore silently
-skipped the correction on this client.
+The native [PlayerFrame.xml](https://github.com/Gethe/wow-ui-source/blob/943764493e6b16d63ded3ab304150d1f05e58b57/Interface/AddOns/Blizzard_UnitFrame/Mainline/PlayerFrame.xml)
+declares a single `TOPLEFT (85,-40)` anchor for
+`PlayerFrameContentMain.HealthBarsContainer`. A live inspection instead
+reported `HPanchor 1 true TOPLEFT TOPLEFT 85 -41 true`. Why that native-like
+point differed from XML is not established. Build 0.2.106 expected -40 and
+silently skipped. Build 0.2.107 recognized -41 and moved the container up
+to -40, but in the opposite direction to the user's desired correction.
 
-Version 0.2.107 moves only that observed single TOPLEFT anchor **(85,-41) →
-(85,-40)** outside combat. This shifts the complete Player health container,
-its health text, masks and heal/absorb overlays together. Already-corrected
--40, previous -39, custom/unknown/protected anchors receive no write.
-Player ManaBarArea, portrait, Target/Focus and Edit Mode layout remain unchanged.
-One UI unit is approximately one screenshot pixel at this scale, not a promise
-for every display scale.
+**Version 0.2.108** recognizes either the original -41 or the previously
+adjusted -40, and applies **TOPLEFT (85,-42)**, moving the whole health
+container down (two UI units from 0.2.107, one from the first live anchor).
+The mana bar, portrait, Target/Focus, accepted Edit Mode export and their
+native color/formatting responsibilities are unchanged. Only single,
+readable, correctly parented, finite native-like anchors are eligible.
+Already at -42, or a different/custom anchor, the method is a no-op.
+Login, world entry, Edit Mode layout updates and combat exit retry the same
+idempotent adjustment outside combat; no per-frame loop is introduced.
 
-Login, entering-world, Edit Mode layout updates and combat exit reconcile
-the recognized geometry without stacking an offset. The helper requires a
-readable single anchor, expected parent/points and readable out-of-combat state;
-otherwise it leaves the native frame untouched. There is no new per-frame
-hook or poll. Source-executed tests cover 20 scenarios; a live in-game capture
-is still needed to confirm the final optical alignment.
+Source-executed guarded cases verify these conditional transitions but do
+not establish the on-screen pixel result at an arbitrary UI scale. Check
+the installed version, current anchor and a fresh same-character screenshot
+after applying this build.
 
 ### Highlights, levels and loss layers
 

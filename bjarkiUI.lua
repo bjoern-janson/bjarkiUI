@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.107-local"
+local BJARKI_UI_VERSION = "0.2.108-local"
 local PRD_ATLAS = "UI-HUD-CoolDownManager-Bar"
 local CLASS_SATURATION = 1.18
 local CLASS_BRIGHTNESS = 1.08
@@ -1969,13 +1969,14 @@ local function alignPlayerHealthContent()
         or math.abs(x - 85) > 0.000001
     then return end
 
-    -- A live client reports the native container at Y=-41, despite -40 in
-    -- PlayerFrame.xml. Earlier versions assumed -40 and silently did nothing.
-    -- Align that observed layout one unit upward. Once at -40, do not touch
-    -- the point again; never accumulate or alter other/custom anchors.
-    if math.abs(y + 40) < 0.000001 then return end
-    if math.abs(y + 41) > 0.000001 then return end
-    pcall(container.SetPoint, container, "TOPLEFT", main, "TOPLEFT", x, -40)
+    -- Live screenshots establish the requested direction: DOWN. Version
+    -- 0.2.107 moved the player health group UP (-41 -> -40), opposite to the
+    -- user's intended adjustment. The client can have the native -41 point
+    -- or the prior addon-corrected -40 point. Move either down to -42.
+    -- Stop there; never accumulate or rewrite an unrelated/custom anchor.
+    if math.abs(y + 42) < 0.000001 then return end
+    if math.abs(y + 40) > 0.000001 and math.abs(y + 41) > 0.000001 then return end
+    pcall(container.SetPoint, container, "TOPLEFT", main, "TOPLEFT", x, -42)
 end
 
 local compactDebuffBorderHookInstalled = false

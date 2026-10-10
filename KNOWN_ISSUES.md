@@ -1,35 +1,40 @@
 # Known issues and bugs
 
-Status recorded 2026-10-10 for **bjarkiUI 0.2.107-local**.
+Status recorded 2026-10-10 for **bjarkiUI 0.2.108-local**.
 
 The observations below reflect user reports and diagnostic output.
 They remain open until checked in the live client against this build.
 A report describes a visible symptom; it does not by itself establish the
 failing code path or root cause.
 
-## Player health-bar optical alignment in 0.2.107
+## Player health-bar optical direction correction in 0.2.108
 
-Matching player/target screenshots show the Player health-fill upper edge and
-health status glyphs about one screen pixel **below** the Target. Mana fill
-and mana text were already aligned. The initial description of the direction
-was opposite to the repeatable visual measurement.
+The user reported the Player health texture and status text sitting one or
+two pixels **too high** relative to the Target. The original image-derived
+measurement was interpreted in the opposite direction, prompting an
+unwanted upward move. The in-game health-container diagnostic reported:
 
-The live `/run` anchor inspection on installed 0.2.106 returned:
+```text
+HPanchor 1 true TOPLEFT TOPLEFT 85 -41 true
+```
 
-    HPanchor 1 true TOPLEFT TOPLEFT 85 -41 true
+Build .106 expected -40 and made no change. Build .107 accepted -41 and moved
+up to -40, which the user explicitly reported as the **opposite** of the desired
+movement. Version .108 instead moves the recognized native-like -41 or
+previous .107 -40 anchor **down to -42**. This is two units below the .107
+position and one unit below the original measured live anchor.
 
-The container had one readable, correctly parented TOPLEFT anchor, but Y=-41
-instead of the -40 declared in Blizzard's XML. The .106 guard silently
-rejected this value, explaining the absence of visible change. The cause
-of the client's -41 anchor is not established.
+Only the Player health container moves: the health fill, text, masking
+and overlays remain together, while mana and other frames are unchanged.
+Single readable native-like points, verified parent, finite coordinates and
+out-of-combat permission are required. Already -42 and nonmatching, custom,
+protected or unavailable points are untouched. Repeated refreshes do not
+accumulate adjustments.
 
-The .107 fix accepts only that observed native-like -41 point and changes it
-to **-40** outside combat. -40 is then treated as already aligned; the code
-does not reapply or accumulate the offset. Previous -39/custom anchors,
-protected geometry, unavailable combat state, and failed writes remain
-untouched. Mana, portrait circles, Target/Focus and Edit Mode coordinates
-do not move. Source-executed guard checks pass in 20 scenarios; confirm
-the final pixels in the client after installing .107.
+All 30 targeted source-executed cases pass, both shipped Lua files compile,
+and the complete archive matches the reviewed source. The post-install
+screen geometry still needs a live check; no tested result should be
+interpreted as a successful visual calibration until then.
 
 ## Dungeon meter secondary names — October 10 follow-up
 
