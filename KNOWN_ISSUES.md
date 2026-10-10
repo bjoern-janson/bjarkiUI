@@ -1,11 +1,27 @@
 # Known issues and bugs
 
-Status recorded 2026-10-10 for **bjarkiUI 0.2.105-local**.
+Status recorded 2026-10-10 for **bjarkiUI 0.2.106-local**.
 
 The observations below reflect user reports and diagnostic output.
 They remain open until checked in the live client against this build.
 A report describes a visible symptom; it does not by itself establish the
 failing code path or root cause.
+
+## Player health-bar optical alignment in 0.2.106
+
+Two same-character screenshots show the player orange health-fill upper edge
+one screen pixel **below** target; its matching `100%` and `1,667` health
+glyphs are one pixel lower. Mana fills and numeric text already coincide. This
+is an image-derived relative measurement, not a measured native UI scale.
+It is opposite to the initially described vertical direction.
+
+The dedicated Player health container's recognized native single anchor
+`TOPLEFT (85,-40)` now becomes `(85,-39)` outside combat. It carries
+health text/mask/absorb decorations with the health fill, while leaving the
+Player mana bar and all portrait/frame/Edit Mode positions untouched.
+Missing/secret/custom anchors and combat skip changes; repeated refreshes do
+not accumulate displacement. Source-level guard checks pass; the client must
+confirm whether the final visible border/health glyphs match at the user's scale.
 
 ## Dungeon meter secondary names — October 10 follow-up
 

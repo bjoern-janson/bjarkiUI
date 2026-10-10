@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-Current maintenance reference for **bjarkiUI 0.2.105-local**, reviewed
+Current maintenance reference for **bjarkiUI 0.2.106-local**, reviewed
 2026-10-10. Runtime behavior is defined by the source; native API contracts and
 source reproductions do not certify live protected execution or pixel output.
 Repair history and outstanding reports are recorded in [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
@@ -312,6 +312,31 @@ remain intact; the ratio also handles small Focus mode. Guarded `SetPoint` and
 protected or unrecognized geometry stays native. Combat-time resets wait for
 combat exit. The adapter reads no aura counts, visibility or screen positions
 and writes no alignment fields onto native frames.
+
+### Player health optical calibration
+
+Two same-character screenshots put the player's health-fill upper edge and
+health status glyphs approximately **one screen pixel below** the target's.
+Their mana bars and mana glyphs are already aligned. The screenshot's initial
+direction description is opposite to the measured content coordinates; this
+adjustment uses the repeatable glyph and fill geometry.
+
+The native [PlayerFrame.xml](https://github.com/Gethe/wow-ui-source/blob/943764493e6b16d63ded3ab304150d1f05e58b57/Interface/AddOns/Blizzard_UnitFrame/Mainline/PlayerFrame.xml)
+anchors `PlayerFrameContentMain.HealthBarsContainer` at single `TOPLEFT`
+`(85, -40)` relative to `PlayerFrameContentMain`. The addon moves that one
+recognized anchor to `(85, -39)`, carrying the native health fill, its status
+text, health mask, and healing/absorb overlays together. The sibling
+`ManaBarArea`, portrait, Target/Focus frames and Edit Mode coordinates are
+unchanged. This is one **UI unit**, roughly one screenshot pixel at the current
+scale, not a guarantee for every client UI scale.
+
+Login, entering-world, Edit Mode layout updates and combat exit reconcile the
+known anchor idempotently. The helper requires a readable single native point,
+matched parent, finite offsets, and a readable **out-of-combat** state.
+Already-adjusted, custom, unavailable or protected layouts receive no write.
+There is no per-frame hook, recurring poll or accumulated adjustment. Native
+mask/texture styling and text-format ownership remain unchanged; final optical
+results need a post-install client screenshot.
 
 ### Highlights, levels and loss layers
 

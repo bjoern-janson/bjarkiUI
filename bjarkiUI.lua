@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.105-local"
+local BJARKI_UI_VERSION = "0.2.106-local"
 local PRD_ATLAS = "UI-HUD-CoolDownManager-Bar"
 local CLASS_SATURATION = 1.18
 local CLASS_BRIGHTNESS = 1.08
@@ -1945,6 +1945,37 @@ local function installDerivedFrameAlignment()
     end
 end
 
+-- Player health artwork and its three text fields sit in one native
+-- HealthBarsContainer; mana is a separate sibling. In matching full-bar
+-- screenshots the player health glyphs begin one screen pixel below target,
+-- while mana already lines up. Correct only this native health group.
+-- Reconcile known XML anchors, never accumulate offsets across refreshes.
+local function alignPlayerHealthContent()
+    if readableBool(InCombatLockdown) ~= false then return end
+    local frame = _G.PlayerFrame
+    local main = frame and frame.PlayerFrameContent
+        and frame.PlayerFrameContent.PlayerFrameContentMain
+    local container = main and main.HealthBarsContainer
+    if not container or not container.GetNumPoints or not container.GetPoint
+        or not container.SetPoint then return end
+
+    local counted, count = pcall(container.GetNumPoints, container)
+    if not counted or isSecret(count) or count ~= 1 then return end
+    local anchored, point, relativeTo, relativePoint, x, y =
+        pcall(container.GetPoint, container, 1)
+    if not anchored or isSecret(point) or isSecret(relativeTo) or isSecret(relativePoint)
+        or point ~= "TOPLEFT" or relativeTo ~= main or relativePoint ~= "TOPLEFT"
+        or not readableGeometryNumber(x) or not readableGeometryNumber(y)
+        or math.abs(x - 85) > 0.000001
+    then return end
+
+    -- PlayerFrame.xml's native Y is -40. Our corrected Y is -39.
+    -- Leave unknown/custom anchors untouched and do not stack corrections.
+    if math.abs(y + 39) < 0.000001 then return end
+    if math.abs(y + 40) > 0.000001 then return end
+    pcall(container.SetPoint, container, "TOPLEFT", main, "TOPLEFT", x, -39)
+end
+
 local compactDebuffBorderHookInstalled = false
 local compactDebuffUpdateHookInstalled = false
 local compactDebuffAuraUpdateHookInstalled = false
@@ -2267,6 +2298,7 @@ events:SetScript("OnEvent", function(_, event, unit)
         installLossOfControlPresentation()
         installHooks()
         installDerivedFrameAlignment()
+        alignPlayerHealthContent()
         installCompactDebuffBorderNeutralization()
         installMicroMenuChildOffset()
         installGuildNotificationPipSuppression()
@@ -2279,6 +2311,7 @@ events:SetScript("OnEvent", function(_, event, unit)
         anchorUIErrorsFrame()
         installLossOfControlPresentation()
         installDerivedFrameAlignment()
+        alignPlayerHealthContent()
         installCompactDebuffBorderNeutralization()
         installMicroMenuChildOffset()
         installGuildNotificationPipSuppression()
@@ -2287,11 +2320,13 @@ events:SetScript("OnEvent", function(_, event, unit)
         applyAll()
     elseif event == "EDIT_MODE_LAYOUTS_UPDATED" then
         installDerivedFrameAlignment()
+        alignPlayerHealthContent()
         installMicroMenuChildOffset()
         anchorCombatText()
         applyAll()
     elseif event == "PLAYER_REGEN_ENABLED" then
         installDerivedFrameAlignment()
+        alignPlayerHealthContent()
     elseif event == "PLAYER_TARGET_CHANGED" then
         applyUnit("target"); applyUnit("targettarget")
         applyPrimaryName("target"); applyPrimaryName("targettarget")
