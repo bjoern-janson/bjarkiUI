@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-Current maintenance reference for **bjarkiUI 0.2.106-local**, reviewed
+Current maintenance reference for **bjarkiUI 0.2.107-local**, reviewed
 2026-10-10. Runtime behavior is defined by the source; native API contracts and
 source reproductions do not certify live protected execution or pixel output.
 Repair history and outstanding reports are recorded in [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
@@ -317,26 +317,30 @@ and writes no alignment fields onto native frames.
 
 Two same-character screenshots put the player's health-fill upper edge and
 health status glyphs approximately **one screen pixel below** the target's.
-Their mana bars and mana glyphs are already aligned. The screenshot's initial
-direction description is opposite to the measured content coordinates; this
-adjustment uses the repeatable glyph and fill geometry.
+The mana bars and mana glyphs already coincide. The initial direction
+description was opposite to the repeatable glyph/fill measurement.
 
-The native [PlayerFrame.xml](https://github.com/Gethe/wow-ui-source/blob/943764493e6b16d63ded3ab304150d1f05e58b57/Interface/AddOns/Blizzard_UnitFrame/Mainline/PlayerFrame.xml)
-anchors `PlayerFrameContentMain.HealthBarsContainer` at single `TOPLEFT`
-`(85, -40)` relative to `PlayerFrameContentMain`. The addon moves that one
-recognized anchor to `(85, -39)`, carrying the native health fill, its status
-text, health mask, and healing/absorb overlays together. The sibling
-`ManaBarArea`, portrait, Target/Focus frames and Edit Mode coordinates are
-unchanged. This is one **UI unit**, roughly one screenshot pixel at the current
-scale, not a guarantee for every client UI scale.
+Native [PlayerFrame.xml](https://github.com/Gethe/wow-ui-source/blob/943764493e6b16d63ded3ab304150d1f05e58b57/Interface/AddOns/Blizzard_UnitFrame/Mainline/PlayerFrame.xml)
+declares the HealthBarsContainer at (85,-40). However, a live diagnostic on
+0.2.106 returned **HPanchor 1 true TOPLEFT TOPLEFT 85 -41 true**: one point,
+the correct parent, and Y=-41. The reason for the difference from XML is
+not established. Version 0.2.106 accepted only -40 and therefore silently
+skipped the correction on this client.
 
-Login, entering-world, Edit Mode layout updates and combat exit reconcile the
-known anchor idempotently. The helper requires a readable single native point,
-matched parent, finite offsets, and a readable **out-of-combat** state.
-Already-adjusted, custom, unavailable or protected layouts receive no write.
-There is no per-frame hook, recurring poll or accumulated adjustment. Native
-mask/texture styling and text-format ownership remain unchanged; final optical
-results need a post-install client screenshot.
+Version 0.2.107 moves only that observed single TOPLEFT anchor **(85,-41) →
+(85,-40)** outside combat. This shifts the complete Player health container,
+its health text, masks and heal/absorb overlays together. Already-corrected
+-40, previous -39, custom/unknown/protected anchors receive no write.
+Player ManaBarArea, portrait, Target/Focus and Edit Mode layout remain unchanged.
+One UI unit is approximately one screenshot pixel at this scale, not a promise
+for every display scale.
+
+Login, entering-world, Edit Mode layout updates and combat exit reconcile
+the recognized geometry without stacking an offset. The helper requires a
+readable single anchor, expected parent/points and readable out-of-combat state;
+otherwise it leaves the native frame untouched. There is no new per-frame
+hook or poll. Source-executed tests cover 20 scenarios; a live in-game capture
+is still needed to confirm the final optical alignment.
 
 ### Highlights, levels and loss layers
 
