@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-This document describes the current implementation of **bjarkiUI 0.2.90-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
+This document describes the repository's **bjarkiUI 0.2.90-local** implementation and includes a clearly labeled **0.2.134-local field-study appendix** (section 24). The later tested local ZIP has **not** been merged into the repository source; statements about each implementation are scoped accordingly. This is a maintenance reference, not a guarantee about undocumented client behavior.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -362,7 +362,7 @@ loaded after `PLAYER_LOGIN`, bjarkiUI waits for the relevant
 as installed.
 
 
-## 22. Reported Battleground class-color gaps
+## 23. Reported Battleground class-color gaps
 
 Recent user reports (2026-10-08) say opposing-faction class-colored health
 bars remain white or otherwise incorrect in Battlegrounds. The same problem
@@ -382,3 +382,137 @@ disappear. The user restored them with `show=1` and `mode=nil`; frames returned,
 while opposite-faction class colors remained unresolved. Do not change those
 CVars as a color workaround. Check frame availability, current unit binding,
 readable class evidence, and the final native color writer as separate steps.
+## 24. Field study: local 0.2.134, native bar rendering, and compact chrome (2026-10-11)
+
+> **Version boundary.** This section documents a **tested local ZIP**, `bjarkiUI-0.2.134-local`, rather than the implementation on the repository's `main` branch. As inspected during this audit, `main` still had `bjarkiUI-0.2.90-local` and the preceding sections describe that older snapshot. **Do not infer that these local changes have been pushed or released.** The user has not requested a source-code merge. This is an additive maintenance record of what was observed, tested, rejected, and left unresolved.
+>
+> Local ZIP SHA-256: `eb590f56a727cfb7bb88504ecfe1f5e37abafa99f1e21b77b48c57dc5d076030`. Main Lua source SHA-256 (inside ZIP): `5a40129f822ca994a8be92581a61e49eac6d9ca931107e5b31d861cbfb68ac97`.
+
+### 24.1. Evidence categories and visual coverage
+
+The final review examined **four user-supplied in-game PNG screenshots**, capturing the addon in multiple conditions, not just a single still frame:
+
+| Capture | Scene / what it exercises | Visible outcome / scope |
+| --- | --- | --- |
+| SS1 (1186 × 613) | Player, target, focus, PRD, full mana | Orange Druid HP and blue mana present with readable text and stable frame borders; minor native rendering differences are not proved absent. |
+| SS2 (1228 × 725) | Hostile target/focus with derived player ToT/ToF, PRD | Red hostile health and orange player-derived health follow intended semantic colors; the compact silver borders and separators are visually legible. |
+| SS3 (1232 × 728) | Druid form with Rage and secondary Mana | Red primary resource and blue secondary mana appear on PRD/frames as appropriate; reduced fill reflects changing resources, not missing textures. |
+| SS4 (1221 × 751) | Druid form with Energy and secondary Mana | Yellow Energy and blue alternate Mana display distinctly; compact derived-frame chrome remains visible across resource changes. |
+
+The images support **visual acceptance under those sampled states**. They do **not** independently prove pixel identity, persistence across all UI scales, frame reuse, dungeon/BG behavior, or zero taint in combat. Earlier screenshot-by-screenshot pixel claims were occasionally stronger than the evidence and should not be treated as engineering invariants.
+
+### 24.2. Rendering model: do not conflate four independently owned surfaces
+
+A unit frame is not one monolithic colored rectangle. At least four distinct native owners interact:
+
+1. **Layout / geometry:** parent frame, health StatusBar, mana/other power StatusBar, and their separate anchors/heights;
+2. **Fill artwork:** the StatusBarTexture atlas and its own RGB multiplier/desaturation;
+3. **Masks and chrome:** health/power mask textures plus the frame's metallic/nameplate `FrameTexture` artwork;
+4. **Status text:** independently anchored FontStrings, sometimes parented to the bar container rather than the StatusBar itself.
+
+Consequences confirmed during iterations:
+
+- Moving the player `HealthBarsContainer` does **not** reliably move the mana StatusBar or the health text in the same way. It can expose gaps or border overlap.
+- Increasing health-bar height changes the texture's sampling/coverage and may not move the mask or border. An apparent one-pixel gap is not automatically an anchor error.
+- Tinting an already-colored native atlas multiplies hues. Atlas choice, RGB multiplier, and masking must be debugged separately.
+- **Frame level precedes draw layer.** Changing `SetDrawLayer` on a texture in a parent frame cannot be relied upon to draw over distinct higher-level StatusBar child frames. An overlay child frame with its own higher frame level was the observed successful mechanism.
+
+### 24.3. Geometry reference and what was actually adjusted
+
+| Surface | Native reference or diagnostic | Local 0.2.134 behavior |
+| --- | --- | --- |
+| Player HP | Blizzard's runtime `PlayerFrame_ToPlayerArt` normally sets a **19-UI-unit** health bar, notwithstanding a 20-unit XML default. | Keeps the accepted `.114`–`.116` composition: HP fill height 20.5 and relative top offset +0.5 under a narrowly recognized player-art layout. Health text is adjusted independently. |
+| Player resource | Separate `ManaBarArea.ManaBar`; runtime normal position corresponds to X=85, Y=-61. | Keeps the visually accepted resource position X=85, Y=-62, with native text anchored inside it. |
+| ToT compact HP | Native `TargetofTargetFrameTemplate` uses 70 × 10, anchored `BOTTOMRIGHT` to parent `RIGHT` at (-6, -2.5). | 10-unit native ToT HP reference. |
+| ToF compact HP | Same native template; observed health heights were 10.000018 and 9.999895 (ToT/ToF), a floating-point distinction, not a meaningful design difference. | ToF-only +0.25 height adjustment = nominal 10.25. Bottom-right anchor stays fixed; top edge changes. |
+| ToT/ToF resource | Native 74 × 7 `ManaBar`, `TOPLEFT` relative to `HealthBar.BOTTOMLEFT`, X=-4, Y=-1. | Both compact resources use the tested Y=0 anchor, removing the native 1-UI-unit separation. |
+| Compact effective scale | In a user diagnostic, both ToT and ToF reported ~0.825. | No change to overall compact scales or vertical parent-frame anchors. Horizontal portrait alignment is a separately guarded existing feature. |
+
+The user's in-game measurement of the native compact seam showed **about 0.75 screen pixels** between HP bottom and mana top for both frames, after considering their location and scale. The later Y=0 change improved that seam, but **did not by itself produce fully pronounced silver chrome**.
+
+**Guarding lesson:** WoW's returned geometry often has floating-point noise. A check expecting exactly `10` within `1e-6` was too strict and silently skipped the intended adjustment. The accepted local height helper now uses 0.005 tolerance and guards the anchor type/relative frame and native-like height. **Residual issue:** it does not require the expected X/Y anchor offsets, so an unfamiliar layout with the same anchor type and 10-unit height can still be adjusted. That is a compatibility hardening opportunity, not an observed failure in the four screenshots.
+
+### 24.4. Decisive compact-frame chrome discovery
+
+The silver frame/health-to-resource separator on ToT and ToF belongs to the compact parent frame's Blizzard **`FrameTexture`**, whose XML declares it in a `BACKGROUND` layer; the health and mana StatusBars are separate child frames. The user tested manually creating a new, mouse-transparent child frame at **`ManaBar:GetFrameLevel() + 1`**, copying the native `FrameTexture` atlas at its native dimensions and centering it over the compact frame. That improved the ToF chrome without relocating its bars. Applying the same mechanism to ToT then produced the visually accepted 0.2.134 state.
+
+Implementation in `alignCompactChrome(unit)`:
+
+- Applies **only** to `targettarget` and `focustarget` and only when combat state is explicitly readable and `false`.
+- Resolves the live compact frame, its `ManaBar`, and original `FrameTexture`; reads the atlas and mana frame level with guarded calls.
+- Creates one overlay frame per compact frame using `CreateFrame("Frame", nil, frame)`, `SetAllPoints()`, `SetFrameLevel(manaLevel + 1)`, and a centered `CreateTexture(nil, "OVERLAY")` with the original atlas (`useAtlasSize=true`).
+- Keeps the overlay mouse-transparent; retains the underlying native border rather than hiding it; stores overlay state in a weak-keyed table.
+- Revisits the cached overlay on supported lifecycle boundaries to update its atlas/frame level if Blizzard changes them; **does not add a polling loop**.
+
+The earlier `.133` attempt was **ineffective**: it guarded for `FrameTexture:GetDrawLayer() == "ARTWORK"`, but the original compact chrome is declared `BACKGROUND`. Even changing that one guard would not solve cross-frame ordering by itself.
+
+**Do not silently generalize the overlay:** it intentionally duplicates the visual chrome. It may need reevaluation under alternative UI scale, explicit focus-size changes, future atlas changes, and protected frame transitions. If initialization fails *after* creating its shell but *before* recording it, the current helper can leave a partial shell and retry later. The tested happy path is one overlay per compact frame, not a proof of leak-free failure behavior.
+
+### 24.5. Health color fidelity with native Blizzard textures
+
+The sequence matters:
+
+1. `.126` removed addon-owned **health texture replacements** to restore native Blizzard health artwork. The corresponding class-tinted fill became olive/muddy in actual play; a native colored texture multiplied by the adjusted Druid color was not hue-neutral.
+2. A manual `HealthBar:GetStatusBarTexture():SetDesaturated(true)` test restored the intended orange visual. `.127` applied the same principle to the handled health bars.
+3. The local `setHealthColor` path first completes any relevant StatusBarDesaturated reset and RGB write, and **then** calls `neutralizeNativeHealthArtwork()` to desaturate the underlying texture only. `applyUnit()` also performs that neutralization after its color-selection path, covering identity-transition fallbacks.
+4. This preserves native geometry/texture luminance while allowing class, pet, hostile, tap-denied, and NPC color selection to remain separately determined. It **does not** imply that all native health layers, heals, damage-loss overlays, or combat animations were exhaustively tested.
+
+`CLASS_SATURATION = 1.18` and `CLASS_BRIGHTNESS = 1.08` remain the adjusted-class palette parameters. Native player identity is preferred only when positively supported; uncertain ToT/ToF identity no longer authorizes a guessed class tint. Existing BG/opposing-faction class-color limitations should remain documented as **not exhaustively validated**, despite positive screenshots in ordinary play.
+
+### 24.6. PRD and native power atlas selection
+
+Health and power are **separate** on PRD. The local code no longer assumes one blue mana atlas for all power types:
+
+- `UnitPowerType` determines the **current primary power token**; for native unit frames the atlas is type-specific and uses the appropriate player/target/compact family.
+- Fully colored resource atlases use an **RGB multiplier of (1,1,1)**; applying a blue/red/yellow `PowerBarColor` again can distort their native highlights. `GetAtlas()` confirming an atlas name does not establish that its final pixels are correct if the multiplier or mask is wrong.
+- PRD primary **Mana**: native mana artwork (portrait-off preferred, same-resource fallback); **Rage**: red Rage artwork; **Energy**: the neutral `UI-HUD-CoolDownManager-Bar` texture with yellow `(1,1,0)` tint. The energy exception deliberately avoids a bright top edge bleeding through PRD's dedicated border.
+- Druid Cat/Bear **alternate Mana** is drawn through `PersonalResourceDisplayFrame.AlternatePowerBar`, not `PowerBar`. Its active power token remains MANA even when `UnitPowerType("player")` returns ENERGY or RAGE. The helper must pass an **explicit `"MANA"` override**.
+- PRD health is separate again: default green receives a 20% blend toward white; class-color mode uses the adjusted class palette. An earlier in-game default-green readout was approximately `(0.200, 0.839, 0.200)` and was evidence the health tint actually applied; it did not mean the PRD primary resource was green.
+
+A previous leading/trailing-edge issue appeared when portrait-attached Mana atlases were stretched across PRD. A portrait-off candidate is preferred and a same-resource fallback is used if unavailable. The final screenshots show plausible native gradients, **not a mathematical proof that all atlas endpoints clip perfectly at every fractional resource value**.
+
+### 24.7. Experiment ledger: what to keep and what not to repeat
+
+| Versions | Observation / lesson | Disposition |
+| --- | --- | --- |
+| 0.2.107–.109 | Flipping container offset -40 / -42 / -41 moved the HP artwork but left status text/mana relationships inconsistent. | Avoid whole-container guessing. |
+| .110–.113 | A 20-unit guard skipped against the actual 19-unit runtime bar; enlarging bars created top-border bleed and moved resource status text. | Require live geometry and independent text anchors. |
+| .114–.116 | Separating HP text/fill alignment from resource bar placement produced the accepted player baseline. | **Retain** unless repeatable regression. |
+| .117–.118 | PRD tint looked unchanged until RGB diagnostics clarified color mode and showed the 20% white blend. | Test actual RGB and native class-color setting. |
+| .119–.123 | Atlas assignments alone were insufficient. White multipliers exposed blue native Mana artwork; type-specific Energy/Rage artwork and a separately styled Druid alternate Mana were necessary; PRD Energy needed neutral fill to avoid top bleed. | **Retain** type-specific semantics. |
+| .124–.125 | Nudging the entire derived frame moved name/portrait/resource along with HP. | Rejected whole-frame Y adjustments. |
+| .126–.127 | Native health texture + class tint turned orange to olive; desaturating the native fill after RGB writes restored intended colors. | **Retain** local color/texture separation. |
+| .128–.130 | Overly strict float-height comparison prevented `.128` from applying; later ToF height changes improved a subset of the fill but not silver chrome. | ToF nominal 10.25 accepted; no more speculative height hunts. |
+| .131–.132 | Moving compact mana Y=-1 → 0 reduced the visible native seam; applies to ToF and then ToT. | **Retain** with native-anchor guards. |
+| .133 | Parent `SetDrawLayer` attempt had a false `ARTWORK` guard and could not reliably exceed child frame levels. | Rejected mechanism. |
+| **.134** | New border-artwork child frame at mana frame level +1, overlaid on both compact bars, visually improved chrome. | **Current tested local baseline**, subject to live limitations below. |
+
+### 24.8. Double-check: scope, tests, and boundaries
+
+The local `.134` ZIP contains only `bjarkiUI.lua`, `PartyOrder.lua`, and the two `.toc` manifests. ZIP integrity passed, both Lua files parsed, and `PartyOrder.lua` was byte-identical to `.133`. A diff against `.133` shows the functional delta confined to the compact chrome helper; no unrelated unit-frame/resource algorithms were changed by that build.
+
+Targeted **mock execution**, not WoW client execution, passed for:
+
+- one compact chrome overlay per ToT/ToF, mouse transparency, native atlas, correct frame level, repeated application, combat gating, and updating level/atlas on simulated native changes;
+- mana/energy/rage PRD selection, form-specific alternate Mana, unit-frame atlas mapping, missing-atlas fallback, and repeatability;
+- native health-desaturation after RGB setting, idempotence, and texture replacement recovery;
+- compact ToT native 10 / ToF 10.25, both mana anchors at Y=0, out-of-combat safeguards, and repeated application.
+
+**Important discovered limitations:**
+
+- The compact-health helper validates anchor kind/parent and near-native height but not its expected X/Y offsets. In an adversarial mock with a changed X offset it still applies. A later hardening pass should explicitly guard all relevant offsets, *without changing the accepted visual result*.
+- On partial failure inside new overlay creation, the shell is not cached until all operations succeed. Retrying can leave an untracked partial frame. Track creation before risky setup or dispose safely when an API contract permits.
+- `atlasAvailable` can optimistically try an atlas when the client lacks an atlas-query API; final visual success still depends on client texture support.
+- Native hooks, `pcall`, and `issecretvalue` checks reduce obvious taint hazards but **do not prove zero taint**, secure-stack compatibility, or safety during every combat transition. In particular, creating/releveling child frames of unit frames should remain out of combat and be tested with error capture.
+- The screenshots do not settle enemy BG class colors, all pet/guardian state changes, dungeon behavior, alternate UI scale, focus resize, or whether `bjarkiPortraits` always tracks reusable ToT/ToF auras. These are separate validation tasks.
+
+### 24.9. Preferred future debugging protocol
+
+1. **Preserve known-good baseline** (`0.2.134-local`) and work on one variable at a time, with a clear rollback ZIP.
+2. **Read the actual native XML and live Lua writer** for the object being changed; XML defaults can be superseded at runtime (e.g., player HP 20 → 19).
+3. **Measure the exact property before patching** (`GetHeight`, `GetPoint`, `GetEffectiveScale`, `GetStatusBarTexture():GetAtlas`, `GetStatusBarColor`, relevant `GetFrameLevel`). Use guarded out-of-combat commands; do not infer the code executed from how a screenshot looks.
+4. **Test a reversible minimal hypothesis** in game; require an observable result, and distinguish a test not being applied from the tested mechanism being wrong.
+5. **Record whether the failed variant was skipped by a guard**, had no visible effect, or caused a genuine regression; do not bundle those outcomes together as “failed.”
+6. **Respect ownership boundaries:** data identity → color entitlement; resource token → atlas entitlement; bar anchoring → geometry; texture/parent frame level → border layering. A correct RGB value does not authorize moving a bar.
+7. **Audit implementation separately from screenshots**: compile/syntax, mocks, idempotence, combat gates, secret-value reads, lifecycle, and behavior under unsupported layouts. Claim “tested in mock” rather than “taint-free.”
+8. **Keep local/repository version provenance explicit.** Updating this document alone must not be described as merging `0.2.134-local` into `main`.
