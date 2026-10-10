@@ -1,7 +1,7 @@
 # bjarkiUI architecture
 
 Current maintenance reference for **bjarkiUI 0.2.105-local**, reviewed
-2026-10-09. Runtime behavior is defined by the source; native API contracts and
+2026-10-10. Runtime behavior is defined by the source; native API contracts and
 source reproductions do not certify live protected execution or pixel output.
 Repair history and outstanding reports are recorded in [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
 
@@ -212,12 +212,18 @@ does not change the meter's policy or promise surname removal.
 
 ### Damage Meter lifecycle and source policy
 
+The October 10 native review uses Forever **1.60.1.70338**, commit
+`943764493e6b16d63ded3ab304150d1f05e58b57`. The
+[comparison from build 70291](https://github.com/Gethe/wow-ui-source/compare/9465cb273b5513495d8ecc12fbb19930dd6b8957...943764493e6b16d63ded3ab304150d1f05e58b57)
+changes only `version.txt`; the native Lua, XML and generated API bodies remain
+unchanged. This investigation changes no runtime behavior or addon version.
+
 Rows/windows are recycled. Weak tables retain only hook/guard state, not
 source identities. Installation post-hooks `DamageMeterSourceEntryMixin.Init`
 and each session window's `InitEntry`, scans already existing rows/local
 entries, and discovers future windows after `SetupSessionWindow`. The ordinary
 native name writer is `UpdateName`, called by
-[`Entry.Init`](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_DamageMeter/DamageMeterEntry.lua)
+[`Entry.Init`](https://github.com/Gethe/wow-ui-source/blob/943764493e6b16d63ded3ab304150d1f05e58b57/Interface/AddOns/Blizzard_DamageMeter/DamageMeterEntry.lua)
 before addon initialization post-hooks. Each name region's guarded `SetText`
 post-hook preserves the readable/local paths after later writes.
 
@@ -231,7 +237,7 @@ local facts.
 For a **protected nonlocal source name**, the current native Init record may
 supply `sourceGUID` to `UnitTokenFromGUID`. This adapter requires explicit
 `isCreature=false`, `isLocalPlayer=false`, and no readable known creature ID.
-The pinned [unit API](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_APIDocumentationGenerated/UnitDocumentation.lua)
+The pinned [unit API](https://github.com/Gethe/wow-ui-source/blob/943764493e6b16d63ded3ab304150d1f05e58b57/Interface/AddOns/Blizzard_APIDocumentationGenerated/UnitDocumentation.lua)
 accepts opaque arguments for both the mapper and `UnitName`:
 
 - A readable mapped token must be positively identified as a player. A
@@ -245,27 +251,46 @@ accepts opaque arguments for both the mapper and `UnitName`:
 Death rows require readable death-recap state and use `SetText`. Normal rows
 also require readable rank/index, format and native classification/faction
 prefix decisions, then use `SetFormattedText`. A readable prefix is preserved
-with [C_StringUtil.WrapString](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_APIDocumentationGenerated/StringUtilDocumentation.lua),
+with [C_StringUtil.WrapString](https://github.com/Gethe/wow-ui-source/blob/943764493e6b16d63ded3ab304150d1f05e58b57/Interface/AddOns/Blizzard_APIDocumentationGenerated/StringUtilDocumentation.lua),
 without parsing opaque name contents. Inaccessible required prefix/rank/source
 state leaves the native label intact. A standalone external `UpdateName` call
 without current source context can temporarily restore a full protected label
 until native initialization refreshes it again.
 
-Native [session-window refresh](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_DamageMeter/DamageMeterSessionWindow.lua)
-reinitializes visible rows from current source data. Controlled tests exercise
-mapping becoming available on the next native refresh without a totals change;
-the latest dungeon investigation reproduced no conforming resolver/refresh
-defect and introduced no new runtime fix. The readable-token unavailable
-`UnitIsPlayer` case is synthetic: the pinned schema returns a non-nil Boolean
-with no secret-return annotation. It is not evidence that this predicate
-becomes unknown for the reported live readable token.
+Native [session-window refresh](https://github.com/Gethe/wow-ui-source/blob/943764493e6b16d63ded3ab304150d1f05e58b57/Interface/AddOns/Blizzard_DamageMeter/DamageMeterSessionWindow.lua)
+reinitializes visible rows from the selected session's current source data.
+The October 10 investigation passes **56/56 actual-source cases** on the
+unchanged addon. They include the native current/historical session getters,
+event routing, recycled rows, and mapping becoming available on a later refresh
+without a totals change. C APIs, widgets, post-hooks and secrecy are modeled;
+these cases do not emulate the live secret/taint engine or prove the screenshot's
+inputs. No new resolver/refresh defect or runtime fix was established. The
+readable-token unavailable `UnitIsPlayer` case remains synthetic: the pinned
+schema returns a non-nil Boolean with no secret-return annotation. It is not
+evidence that this predicate becomes unknown for the reported live readable token.
 
-**Live dungeon secondary-name retention remains open.** The repeated screenshot
-shows `Akirts Ud` and `Sedria Forev...`, but no actual `/bui names` output.
-It does not establish mapping, regional mode, secrecy, identity or prefix
-access for those rows. The user left the dungeon/reset the meter, so that
-state is unavailable. Neither source tests nor the derived 0.2.104 fallback
-establish universal primary-name display or repair of this screenshot.
+The inspected native meter module,
+[C_DamageMeter contract](https://github.com/Gethe/wow-ui-source/blob/943764493e6b16d63ded3ab304150d1f05e58b57/Interface/AddOns/Blizzard_APIDocumentationGenerated/DamageMeterDocumentation.lua)
+and [Edit Mode settings](https://github.com/Gethe/wow-ui-source/blob/943764493e6b16d63ded3ab304150d1f05e58b57/Interface/AddOns/Blizzard_EditMode/Shared/EditModeSettingDisplayInfo.lua)
+expose no primary-only source-name option. Native row formatting consumes
+`combatSource.name` whole. The
+[UnitSurnameOwn setting](https://github.com/Gethe/wow-ui-source/blob/943764493e6b16d63ded3ab304150d1f05e58b57/Interface/AddOns/Blizzard_SettingsDefinitions_Frame/Nameplates.lua)
+controls **My surname**; meter formatting does not consult it. Camelot
+`NameUtil.GetUnitFirstName` performs ordinary Lua parsing in regional mode,
+so calling it does not authorize parsing protected names. A displayed label
+is not proof of readable text, and a matching primary name in the current roster
+does not establish the identity of a historical source.
+
+**Live dungeon secondary-name retention remains open.** The earlier report
+showed `Akirts Ud` and `Sedria Forev...`; that live state was lost after the user
+left the dungeon/reset the meter. A new October 10 screenshot shows `Si Yam`,
+`Panoh Panoh`, `Magey Vent...`, `Jon Foreverpvp` and `Bjarki`, again without
+`/bui names` output. It supplies new evidence of the visible recurrence, but
+does not establish mapping, regional mode, secrecy, identity or prefix access.
+The earlier reset does not describe the new screenshot's live state. Capture
+both diagnostic lines with the affected rows and selected session visible,
+as specified in section 9. Neither source tests nor the derived 0.2.104
+fallback establish universal primary-name display or repair of these reports.
 
 ## 5. Geometry and status presentation
 
@@ -438,12 +463,26 @@ Diagnostics are read-only and never repair presentation:
 `UnitName`, prints no names/GUIDs/tokens, retains no identity and adds no recurring
 work or hooks. Counters are aggregate boundaries, not per-actor proof;
 `unavailable` can count multiple failures for a row, and `prefixSecret=0` does
-not prove formatting succeeds. Capture both lines while the affected rows are
-still visible. Unknown/secret diagnostic state is evidence about that access
-boundary, not a diagnosis of the screenshot's root cause.
+not prove formatting succeeds. While the affected rows and selected session
+remain visible, run `/bui names` and capture both complete output lines:
 
-Pinned native references use Forever source commit
-`9465cb273b5513495d8ecc12fbb19930dd6b8957` (build `70291`). Focused source
+```text
+names version=... rows=... hooked=... sourceSecret=... textSecret=... unavailable=...
+names guidSecret=... tokenSecret=... tokenMissing=... playerUnknown=... prefixSecret=... regional=... UnitName=...
+```
+
+Keep the meter visible in the capture and identify **Current**, **Overall** or
+the numbered historical fight. Capture before leaving/resetting; if presentation
+changes after combat, a second capture of the same rows/session can distinguish
+the transition. Unknown/secret diagnostic state is evidence about that access
+boundary, not a diagnosis of the screenshot's root cause. Aggregate counters
+do not identify every per-row GUID-round-trip or name-output rejection.
+
+Earlier native references retain Forever source commit
+`9465cb273b5513495d8ecc12fbb19930dd6b8957` (build `70291`). The October 10 meter
+review verified **1.60.1.70338**, commit
+`943764493e6b16d63ded3ab304150d1f05e58b57`; its comparison changes only
+`version.txt`, so those earlier source bodies remain valid. Focused source
 fixtures execute actual addon helpers and selected native formatter, entry,
 window and update bodies with modeled WoW APIs/widgets/secret propagation.
 They verify conditional control flow, geometry and lifecycle rules; they do

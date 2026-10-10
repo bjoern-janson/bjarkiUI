@@ -1,11 +1,68 @@
 # Known issues and bugs
 
-Status recorded 2026-10-09 for **bjarkiUI 0.2.105-local**.
+Status recorded 2026-10-10 for **bjarkiUI 0.2.105-local**.
 
 The observations below reflect user reports and diagnostic output.
 They remain open until checked in the live client against this build.
 A report describes a visible symptom; it does not by itself establish the
 failing code path or root cause.
+
+## Dungeon meter secondary names — October 10 follow-up
+
+The new Damage Done screenshot shows `Si Yam`, `Panoh Panoh`, `Magey Vent...`,
+`Jon Foreverpvp` and `Bjarki`. It confirms another visible recurrence, but
+contains no `/bui names` output and does not establish those rows' mapping,
+regional mode, source/text secrecy, identity or native prefix access.
+
+This is separate from the earlier dungeon report showing `Akirts Ud` and
+`Sedria Forev...`. The user left/reset after that earlier report, losing its
+live state. That history does not establish whether the new screenshot's
+affected state is still available to inspect.
+
+Fresh native verification found Forever **1.60.1.70338**, commit
+`943764493e6b16d63ded3ab304150d1f05e58b57`. The
+[comparison from 70291](https://github.com/Gethe/wow-ui-source/compare/9465cb273b5513495d8ecc12fbb19930dd6b8957...943764493e6b16d63ded3ab304150d1f05e58b57)
+changes only `version.txt`; meter Lua, XML and generated API contracts are
+unchanged. The unmodified **0.2.105-local** addon passes **56/56 actual-source
+cases**, including native session selection, event routing, row reuse and a
+mapping becoming available without a totals change. C APIs, widgets,
+post-hooks and secrecy are modeled. These checks do not reproduce the live
+secret/taint engine or identify the screenshot's failed path. No new runtime
+fix was established, and this investigation changes no addon version.
+
+The inspected native meter,
+[C_DamageMeter API](https://github.com/Gethe/wow-ui-source/blob/943764493e6b16d63ded3ab304150d1f05e58b57/Interface/AddOns/Blizzard_APIDocumentationGenerated/DamageMeterDocumentation.lua)
+and [Edit Mode options](https://github.com/Gethe/wow-ui-source/blob/943764493e6b16d63ded3ab304150d1f05e58b57/Interface/AddOns/Blizzard_EditMode/Shared/EditModeSettingDisplayInfo.lua)
+expose no primary-only source-name setting. Native
+[row formatting](https://github.com/Gethe/wow-ui-source/blob/943764493e6b16d63ded3ab304150d1f05e58b57/Interface/AddOns/Blizzard_DamageMeter/DamageMeterEntry.lua)
+uses the full `combatSource.name`; the separate **My surname**
+([UnitSurnameOwn](https://github.com/Gethe/wow-ui-source/blob/943764493e6b16d63ded3ab304150d1f05e58b57/Interface/AddOns/Blizzard_SettingsDefinitions_Frame/Nameplates.lua))
+preference is not consulted by the meter. Ordinary Lua name helpers do not
+grant permission to split protected text, and a current roster member with
+the same primary name cannot identify an unmapped historical source. The
+existing supported native component transports remain in place; universal
+secondary-name removal is not established.
+
+While the affected rows and selected session remain visible, run:
+
+```text
+/bui names
+```
+
+Capture both complete lines with the meter visible, before leaving/resetting:
+
+```text
+names version=... rows=... hooked=... sourceSecret=... textSecret=... unavailable=...
+names guidSecret=... tokenSecret=... tokenMissing=... playerUnknown=... prefixSecret=... regional=... UnitName=...
+```
+
+Identify whether the selected session is **Current**, **Overall** or a numbered
+historical fight. If the display changes after combat, capture the same
+rows/session again. `/bjarkiui names` is equivalent; `/bjui` is not registered.
+The command prints anonymous aggregate access counters, calls no `UnitName`,
+changes no presentation and retains no identities. The counters narrow the
+remaining branch; they are not per-row proof or a guarantee that formatting
+succeeds. The live report remains open.
 
 ## Tagged NPC gray-to-red fallback in 0.2.105
 
@@ -338,7 +395,7 @@ protected execution need an in-client check.
 
 ## Verification boundary
 
-No live WoW test has confirmed these reports fixed in 0.2.101-local. See
+No live WoW test has confirmed these reports fixed in 0.2.105-local. See
 [`ARCHITECTURE.md`](ARCHITECTURE.md) for the frame/color implementation and
 reported BG diagnostics. Pet portraits and aura category failures are tracked
 in the [bjarkiPortraits issue list](https://github.com/bjoern-janson/bjarkiPortraits/blob/main/KNOWN_ISSUES.md).
@@ -360,7 +417,7 @@ The target and party content rectangles in the supplied crop already align
 within roughly one pixel, while their native bevels differ. No party X change
 is included. The scoreboard partly obscures the focus portrait; full-circle
 clearance would require a much larger move than the requested small nudge.
-Today's build 70291 also adds Druid/Rogue class-resource frames and changes
+Build 70291 also added Druid/Rogue class-resource frames and changed
 Druid alternate-mana visibility. Because PRD uses a center anchor and its
 height follows visible bars, exact post-maintenance outer-edge alignment
 requires a fresh live view.
