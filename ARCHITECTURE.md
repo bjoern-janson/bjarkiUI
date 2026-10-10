@@ -1,384 +1,532 @@
 # bjarkiUI architecture
 
-This document describes the current implementation of **bjarkiUI 0.2.90-local** as it exists in the repository. It is intended as a maintenance reference rather than a statement about undocumented client guarantees.
-
-The addon is deliberately small. The runtime consists of:
-
-- `bjarkiUI.lua` — unit-frame presentation, names, highlights, Edit Mode setup, combat text placement, and event hooks.
-- `PartyOrder.lua` — visual ordering of raid-style party frames.
-- two matching `.toc` manifests.
-
-`ARCHITECTURE.md` is not loaded by the game.
-
-## 1. General approach
-
-bjarkiUI mostly leaves Blizzard frame ownership and data sources intact and changes presentation after native updates.
-
-The main recurring pattern is:
-
-1. resolve the Blizzard frame or region that owns a visual element;
-2. wait for, or hook after, the native update that normally writes it;
-3. apply the smaller presentation change;
-4. avoid replacing the surrounding Blizzard system.
-
-There is no addon-owned `OnUpdate` loop in the current build.
-
-## 2. Unit frames
-
-The addon styles six unit tokens:
-
-- `player`
-- `target`
-- `focus`
-- `targettarget`
-- `focustarget`
-- `pet`
-
-Health and power bars are resolved through the current Blizzard frame structure with older/global fallbacks where useful.
-
-Both health and power fills use the atlas:
-
-`UI-HUD-CoolDownManager-Bar`
-
-The addon does not replace the underlying health or power values.
-
-### Health colors
-
-The health-color path currently prefers:
-
-1. positively identified players -> class color;
-2. positively identified combat pets -> green;
-3. disconnected/dead units -> grey;
-4. tap-denied NPCs -> light grey;
-5. hostile units with readable threat state -> red;
-6. otherwise -> Blizzard selection color when readable.
-
-Player class colors receive a small saturation/brightness adjustment.
-
-For `targettarget` and `focustarget`, the native frames are reusable. The addon therefore reapplies the current unit's presentation when Blizzard rebinds those frames. It also hooks the final health-bar color write on those two derived frames so a later native tint does not leave the color from the previous referent.
-
-If the derived referent cannot provide a readable replacement color, the current implementation clears the stale tint to neutral grey rather than preserving the previous unit's color.
-
-### Power colors
-
-Power bars use Blizzard's current power token and `PowerBarColor` when readable. The addon changes the bar artwork but not the power value or type calculation.
-
-## 3. Names
-
-Player names are shortened to their primary name on the surfaces the addon explicitly handles.
-
-Current surfaces include:
-
-- player/target/focus/derived unit-frame names;
-- compact raid/raid-style party/nameplate player names;
-- ordinary chat sender display;
-- Communities/Guild roster and Communities chat display;
-- Blizzard Damage Meter source labels.
-
-The implementation tries to change only visible text. Hyperlink payloads, combat-source records, roster records, and other identity data remain native.
-
-Damage Meter rows are recycled, so name normalization is attached near the final text writer rather than only at row creation.
-
-## 4. Highlights and status presentation
-
-Threat/combat/resting highlights reuse Blizzard textures and geometry.
-
-The common visual intensity is currently:
-
-`HIGHLIGHT_SCALE = 0.25`
-
-The player frame's native pulsing status texture is hidden. Resting uses a static yellow copy of the native player flash geometry instead.
-
-Pet attack/threat cues are also scaled to the same general intensity.
-
-## 5. Level display
-
-Level rings are hidden and level text is reduced slightly.
-
-Level numbers are controlled by the per-character setting:
-
-`bjarkiUISettings.showLevelNumbers`
-
-Commands:
-
-- `/bui levels`
-- `/bui levels on`
-- `/bui levels off`
-
-When level numbers are shown again, target/focus defer to Blizzard's own level checks where available.
-
-## 6. Edit Mode and bottom UI
-
-On first use, the addon can import a named Edit Mode layout called `bjarkiUI`.
-
-Once a layout with that name exists, the addon treats it as user-owned and does not continuously overwrite its coordinates.
-
-The Micro Menu correction is separate from the serialized Edit Mode layout. The addon leaves `MicroMenuContainer` in place and offsets the visible `MicroMenu` child downward by one UI unit after Blizzard anchors it.
-
-This avoids moving the shared container that other bottom-bar elements may use as an anchor.
-
-## 7. Combat text
-
-Outgoing world combat text uses two CVars:
-
-- `WorldTextScreenY_v2 = 0.0425`
-- `WorldTextCritScreenY_v2 = 0.0550`
-
-Incoming player hit text is anchored above the Personal Resource Display using Blizzard's existing combat-text frame.
-
-The previous experimental PRD movement-speed/duel-distance module is not present in 0.2.67.
-
-## 8. Party frame ordering
-
-`PartyOrder.lua` changes only the visual order of raid-style party member frames.
-
-Desired vertical order is:
-
-`party1 -> party2 -> party3 -> party4 -> player`
-
-For smaller groups, missing party slots simply disappear and the player remains last.
-
-The module does **not** replace Blizzard's party comparator and does **not** call `SetFlowSortFunction()`.
-
-The current implementation lets Blizzard finish `RefreshMembers()` first. A post-hook then reanchors the already-created visible member frames. This means Blizzard keeps the native unit assignment, compact-unit refresh, and normal frame setup; the addon changes only the final out-of-combat anchors.
-
-Full raid ordering is left native. Pet-frame anchors are adjusted to remain under the visually reordered party block.
-
-## 9. Event model
-
-The main file uses scoped events rather than a general polling loop.
-
-Examples:
-
-- target/focus changes refresh the corresponding unit and derived unit;
-- `UNIT_TARGET` is registered only for target/focus because only those tokens can change ToT/FoT;
-- power/name events are registered only for the unit tokens the addon paints;
-- NPC color-state events are scoped to target/focus/derived targets;
-- `UNIT_PET` refreshes only the local pet presentation.
-
-Optional Blizzard modules such as Communities and Damage Meter are hooked when they load.
-
-`PartyOrder.lua` installs on login/world-entry/module availability, derives the visible party order from the current assigned unit tokens, and reapplies after both `RefreshMembers()` and direct `UpdateLayout()` paths. It does not initiate Blizzard compact-frame refreshes.
-
-## 10. Protected and secret values
-
-WoW: Forever can expose secret/protected values through otherwise ordinary-looking APIs.
-
-The addon generally checks values before comparing, pattern-matching, or performing arithmetic on them, especially around:
-
-- unit identity;
-- class/power/color values;
-- chat/combat-source strings;
-- frame color components.
-
-This is an implementation constraint rather than a complete emulation of Blizzard's protected execution model. Live-client behavior remains the final check for taint-sensitive paths.
-
-## 11. Practical maintenance rules
-
-The current source is easiest to maintain when changes stay local to the native object that owns the presentation.
-
-In particular:
-
-- do not style auxiliary bars merely because they share a unit token;
-- do not move `MicroMenuContainer` to correct the visible menu;
-- do not drive Blizzard compact-frame refreshes from custom party sorting;
-- remember that ToT/FoT and Damage Meter rows are reused;
-- prefer event/post-update corrections over permanent polling;
-- keep documentation files out of the `.toc` load list.
-
-
-## 12. Small presentation suppressions
-
-The current build also makes three narrow presentation changes without replacing the surrounding Blizzard systems:
-
-- raises the default `UIErrorsFrame` vertically while preserving its horizontal center;
-- hides dispel-type colored borders on harmful aura icons in compact Party/Raid frames while leaving the icons, cooldowns, stacks, and separate dispel overlay intact;
-- hides Guild and Legacy-system notification pips on the Micro Menu while keeping the buttons functional.
-
-
-## 13. Loss of Control presentation
-
-The default Loss of Control frame remains Blizzard-owned. bjarkiUI post-hooks the
-native display/timer writers and reduces the visible presentation to the spell
-icon only. The red line textures, black backing, ability label, timer frame,
-numeric countdown, and seconds label are hidden after native updates. The icon
-is reanchored to the exact center of the existing Loss of Control frame.
-
-
-## 14. Derived-frame repair notes
-
-Version 0.2.73 hardens Target-of-Target / Focus-of-Target presentation in three places:
-
-- derived health colors fail closed to neutral grey while player/pet identity witnesses are unreadable or disagree, instead of reusing an incorrect semantic tint;
-- native ToT/FoT debuffs are restored when Blizzard's global `showDispelDebuffs` option would otherwise filter friendly derived units down to `HARMFUL|RAID`;
-- compact Party/Raid debuff borders are suppressed by feeding the secure private-aura renderer zero border geometry through its ordinary frame settings, rather than attempting to hide forbidden `PrivateAuraMixin` regions after render.
-
-
-## 15. Party-order lifecycle recovery
-
-Version 0.2.74 keeps the custom raid-style party order stable across member
-relogs, disconnect/reconnect transitions, and other compact-frame lifecycle
-changes.
-
-Two native paths are covered explicitly:
-
-- CompactPartyFrame caches `UpdateLayout` as `updateLayoutFunc` during OnLoad,
-  so bjarkiUI post-hooks that actual cached native writer rather than relying on
-  the public method alone.
-- individual compact member frames can hide/show while a unit token disappears
-  and returns; their visibility transitions now trigger a bounded visual-order
-  reapply out of combat.
-
-Blizzard still owns unit assignment and compact-frame refresh. The addon only
-reasserts anchors after native lifecycle/layout writes.
-
-
-## 16. Communities chat secret-message boundary
-
-Version 0.2.75 removes the direct wrapper around
-`CommunitiesFrame.Chat:FormatMessage`.
-
-Forever can supply `FormatMessage` with a secret message table. Calling the
-native formatter from an addon-owned replacement taints that execution before
-Blizzard indexes the secret table.
-
-Guild/Communities secondary-name shortening now happens only after Blizzard's
-native ScrollingMessageFrame has completed rendering. bjarkiUI registers an
-`AddOnDisplayRefreshedCallback`, reads only accessible visible FontString text,
-preserves the complete `playerCommunity` hyperlink payload, and shortens only
-the hyperlink's display text.
-
-The C_Club message table and native formatter remain untouched.
-
-
-## 17. Compact-frame taint rollback
-
-Version 0.2.76 removes the 0.2.73 compact Party/Raid debuff-border suppression.
-
-The previous implementation wrote a synthetic negative `debuffBorderScale` directly
-onto Blizzard compact unit frames so the secure private-aura renderer would compute
-a zero-sized border. That writes addon-owned state into a compact frame later used
-by native secret-health/heal-prediction code, and can taint Blizzard's
-`CompactUnitFrame_OnUpdate` path.
-
-The addon no longer modifies compact aura-renderer settings or private-aura border
-geometry. Colored debuff borders therefore remain native for now rather than
-trading a cosmetic change for secret-value taint.
-
-Party-order reconnect recovery also no longer installs `OnShow`/`OnHide`
-scripts on compact member frames. `UNIT_CONNECTION` is observed by a separate
-addon event frame and the visual reanchor is deferred to the next tick, outside
-Blizzard's compact-unit update stack.
-
-
-## 18. Compact debuff border presentation
-
-Version 0.2.77 restores the requested removal of compact Party/Raid debuff borders
-without writing addon-owned values into Blizzard compact-frame Lua state.
-
-The addon post-hooks Blizzard's final `AuraUtil.SetAuraBorderAtlas` presentation
-write. After Blizzard has already consumed the secret aura/dispel data, bjarkiUI
-identifies compact Party/Raid aura textures only from their fixed frame ancestry
-and sets that border Texture's alpha to zero.
-
-No `CompactUnitFrame` fields, private-aura settings, aura tables, health values,
-or heal-prediction state are read or modified. Because private aura frames are
-pooled, a border hidden by bjarkiUI is restored to alpha 1 if that same Texture is
-later reused on a non-compact presentation.
-
-
-## 19. Conservative hardening and audit
-
-Version 0.2.78 makes no new presentation claims. It narrows two UNKNOWN-state
-paths and adds read-only diagnostics.
-
-- tap-denied NPC coloring now requires an explicit readable
-  `UnitPlayerControlled == false`; UNKNOWN no longer authorizes an NPC tint;
-- Damage Meter normal name shortening requires an explicit readable
-  `isCreature == false`; secret/UNKNOWN creature status falls through to the
-  independently warranted local-player path only;
-- Loss of Control post-hooks track installation independently, so one unavailable
-  Blizzard method cannot prevent the other from being retried later;
-- `/bui audit` reports hook state, derived-frame availability, and compact-party
-  `debuffBorderScale` values without repairing or mutating them.
-
-
-## 20. Protected-input and party-order hardening
-
-Version 0.2.79 tightens presentation ownership without changing the intended
-visual layout.
-
-- Blizzard-provided unit-token fields are checked for secrecy/readability before
-  comparison, pattern matching, or use as unit API arguments.
-- compact-party ordering treats the assigned unit token as the warrant for
-  reordering. If a shown member's token is inaccessible, the addon leaves the
-  native layout untouched instead of inferring identity from frame position.
-- party-frame visibility, Edit Mode state, raid state, and title height are read
-  through guarded helpers rather than assumed to be ordinary values.
-- post-hooks on Blizzard party layout writers no longer reanchor frames inside
-  the native update call stack. They coalesce one repair for the next tick,
-  where live membership and combat state are checked again.
-- reconnect/disconnect recovery uses that same deferred path instead of a
-  separate scheduling mechanism.
-
-The maintenance invariant is that **presentation authority follows readable
-identity and runs outside Blizzard's protected state-transition stack whenever
-possible**.
-
-
-## 21. Compact debuff-border ownership
-
-Version 0.2.80 corrected the intended native write boundary for the colored
-compact debuff border to `CompactUnitFrame_UtilSetDebuff`, while retaining a
-narrow `AuraUtil.SetAuraBorderAtlas` compatibility path.
-
-## 22. Compact debuff-border lifecycle hardening
-
-Version 0.2.81 tightens that implementation after live validation showed the
-per-aura hook alone was insufficient on the tested client.
-
-The addon now has three non-invasive final presentation boundaries:
-
-1. `CompactUnitFrame_UtilSetDebuff` — catches the native type-color write;
-2. `CompactUnitFrame_UpdateDebuffs` — performs a final sweep after the full
-   debuff refresh;
-3. `CompactUnitFrame_UpdateAuras` — covers builds that route aura refresh
-   through that path.
-
-The update hooks operate only on frames positively identified in their parent
-chain as:
-
-- `CompactPartyFrameMemberN`
-- `CompactRaidGroupNMemberN`
-- `CompactRaidFrameN`
-
-The sweep changes only the existing `debuffFrame.border` alpha. It does not
-inspect aura data, alter debuff selection, touch icons/cooldowns/stacks, change
-health bars, or write compact-frame state.
-
-Hook installation is also retryable. If Blizzard's compact-frame module is
-loaded after `PLAYER_LOGIN`, bjarkiUI waits for the relevant
-`ADDON_LOADED` boundary instead of permanently recording an uninstalled hook
-as installed.
-
-
-## 22. Reported Battleground class-color gaps
-
-Recent user reports (2026-10-08) say opposing-faction class-colored health
-bars remain white or otherwise incorrect in Battlegrounds. The same problem
-affects enemy Target-of-Target and Focus-of-Target bars. This is not live-
-validated against 0.2.90-local; the pushed source should not be described as a
-confirmed fix.
-
-A prior `/bui colors` capture showed the enemy target and targettarget as
-`player=true` but `class=unknown`, with no usable nameplate color in that
-diagnostic context. This records an UNKNOWN input at that point in the path; it
-does not prove whether the cause is client API visibility, unit-token timing,
-or refresh lifecycle. Trace the identity/color evidence before changing color
-fallbacks.
-
-During earlier ToT/FoT debugging, changing the display CVar made the frames
-disappear. The user restored them with `show=1` and `mode=nil`; frames returned,
-while opposite-faction class colors remained unresolved. Do not change those
-CVars as a color workaround. Check frame availability, current unit binding,
-readable class evidence, and the final native color writer as separate steps.
+Current maintenance reference for **bjarkiUI 0.2.108-local**, reviewed
+2026-10-10. Runtime behavior is defined by the source; native API contracts and
+source reproductions do not certify live protected execution or pixel output.
+Repair history and outstanding reports are recorded in [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
+
+## 1. Scope and ownership
+
+| File | Responsibility |
+| --- | --- |
+| [bjarkiUI.lua](bjarkiUI.lua) | Owned unit-frame bar/name presentation, chat/Communities/meter display names, highlights, levels, derived alignment, public compact borders, Loss of Control, Edit Mode import, bottom UI, combat text, events and diagnostics. |
+| [PartyOrder.lua](PartyOrder.lua) | Player-last visual ordering and pet/border anchors for Blizzard's raid-style **party** frames. |
+| [bjarkiUI.toc](bjarkiUI.toc), [bjarkiUI_Camelot.toc](bjarkiUI_Camelot.toc) | Matching runtime manifests and per-character settings declaration. |
+
+Blizzard owns unit assignment, health/power values, native refreshes, aura
+selection, combat-source records, hyperlinks and frame lifecycles. bjarkiUI
+resolves the existing presentation object, observes its native writer, then
+applies a local correction. It does not replace the surrounding systems.
+[bjarkiPortraits](https://github.com/bjoern-janson/bjarkiPortraits/blob/repair/second-pass-20261008/ARCHITECTURE.md) is an independent portrait
+aura renderer; its behavior is not part of this addon's native small debuff lists.
+
+This document is not loaded by the game. The experimental PRD movement-speed
+and duel-distance module is absent from the current runtime.
+
+## 2. Execution and protected-value boundaries
+
+The main file installs general presentation hooks on login, with separate
+availability checks for optional Communities, Damage Meter, compact-frame,
+Loss of Control and geometry adapters. Relevant `ADDON_LOADED` boundaries retry
+Communities, Damage Meter, compact borders and derived alignment. Loss of Control
+hook installation retries on login/world entry. World entry reapplies presentation;
+Edit Mode changes reapply
+derived alignment, Micro Menu placement, incoming combat-text anchoring and
+owned unit presentation. Combat exit retries derived alignment and party order.
+
+Unit traffic is scoped to the surfaces the addon paints:
+
+| Trigger | Work |
+| --- | --- |
+| Target/focus change | Refresh that primary unit and its derived target. |
+| `UNIT_TARGET` on `target`/`focus` | Refresh ToT/FoT only. |
+| `UNIT_DISPLAYPOWER`, `UNIT_NAME_UPDATE` on the six styled tokens | Power events refresh bars; name events refresh non-pet bars/names. |
+| Flags, faction and threat events on target/focus/ToT/FoT | Reevaluate health color. |
+| Nameplate addition/removal | Reevaluate the four target/focus bars. |
+| Finished native nameplate health-color update | Reevaluate only currently matching target/focus/ToT/FoT actors. |
+| `UNIT_PET` on `player` | Refresh local pet bars. |
+
+There is no addon-owned `OnUpdate` loop. Native ToT/FoT updates run per frame and
+reach addon post-hooks, so this is not a claim of zero per-frame addon work.
+Party repairs coalesce onto `C_Timer.After(0, ...)`, outside the native compact
+update stack on the target client; the source has an immediate compatibility
+fallback when that timer is unavailable.
+
+Readable Boolean helpers distinguish `true`, `false` and unavailable/secret
+inputs. Unit tokens must be readable before comparison, pattern matching or
+identity queries. Secret values cannot authorize string parsing, class
+inference, palette lookup or arithmetic. Narrow native transports may forward
+opaque components unchanged to APIs that explicitly accept them, with a
+separate readable condition authorizing the operation.
+
+Sensitive hook/recursion/ownership state lives in addon-owned weak tables.
+There is no source/GUID/name-to-unit mapping cache. In particular, the addon
+does not write synthetic compact aura settings, install compact member
+`OnShow`/`OnHide` scripts, wrap Communities' native `FormatMessage`, or reenter
+`AuraUtil.RefreshAuras` from a derived-frame hook. These boundaries prevent
+known source paths that enter native secret-health/message/aura work from
+addon-tainted execution. `pcall` and modeled tests are not a taint guarantee.
+
+## 3. Bound unit frames and bars
+
+Bar artwork and color cover `player`, `target`, `focus`, `targettarget`,
+`focustarget` and `pet`. Resolvers prefer the current nested Blizzard frame
+structure and retain older/global fallbacks. Names cover the five non-pet
+frames.
+
+An object reference alone does not authorize a unit's presentation. The normal
+unit pass requires each present health/power bar's readable `unit` binding to
+equal the requested token; names require the frame's current readable binding.
+Health/power update hooks route by the actual bar's bound token and verify it
+is the resolved owned bar, excluding auxiliary damage/absorb bars. They do not
+borrow the event's unit argument when a binding is missing. This matters when
+vehicle layout reuses `PlayerFrame` for a vehicle and `PetFrame` for the player.
+Unsupported bindings retain native presentation until native hooks see a
+supported binding again.
+
+Both fills use `UI-HUD-CoolDownManager-Bar`, with texel snapping bias `0` and
+pixel-grid snapping disabled where supported. Target/Focus
+[`CheckClassification`](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_UnitFrame/Mainline/TargetFrame.lua)
+writes the health texture after `UnitFrame_Update`, so an instance post-hook
+restores the atlas after that final artwork writer. Native classification
+geometry and masks remain intact. Power color uses readable `UnitPowerType`
+and `PowerBarColor`; values and power-type calculation remain native.
+
+### Health-color authority
+
+`applyHealthColor` first verifies the bar's current token. An explicit
+`UnitExists=false` produces no replacement. The remaining precedence is:
+
+1. **Positive player identity:** adjusted readable class RGB, then native
+   class-color transport, then matching readable native health-bar RGB.
+2. **Positive combat-pet identity:** `(0, 1, 0, 1)`, ahead of untyped native RGB.
+3. **Other or unknown identity:** a positively identified same-actor player
+   alias may supply adjusted class RGB; otherwise a matching native health bar
+   may supply its actual readable RGB.
+4. **Unresolved derived identity:** when player or pet identity remains unknown
+   and no preceding source supplied RGB, preserve the native tint.
+5. **Remaining readable state:** disconnected/dead `(0.5, 0.5, 0.5, 1)`;
+   tap denied with explicit `UnitPlayerControlled=false`
+   `(0.9, 0.9, 0.9, 1)`; nonfriend with a readable numeric threat status
+   `(1, 0, 0, 1)`; then readable `UnitSelectionColor`.
+
+The NPC tap fallback follows native
+[`CompactUnitFrame_IsTapDenied`](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_UnitFrame/Shared/CompactUnitFrame.lua):
+hostility does not disqualify an otherwise readable tap-denied NPC from gray.
+Matching readable native RGB still takes precedence. In particular, native
+nameplates can choose an optional threat-health color ahead of their tap-gray
+branch; the addon continues to copy that actual native color.
+
+Direct positive player identity outranks a stale pet witness. Player identity
+uses readable `UnitIsPlayer` and readable GUID prefix evidence; disagreement
+is unknown. A class token alone never establishes a player. A readable
+non-player identity blocks contradictory player-class evidence from aliases.
+Pets are identified by the local-pet relation or `UnitIsOtherPlayersPet`;
+`UnitIsMinion=false` can establish non-pet identity, but `true` alone cannot
+distinguish pets from totems/guardians.
+
+Readable class sources are tried in order: direct unit, matching party/raid
+alias, matching nameplate alias, and for ToT/FoT only, matching `player`,
+`target`, then `focus`. A readable `UnitIsUnit=false` rejects the match; readable
+unequal GUIDs also veto a positive comparison. With no readable relation,
+matching readable GUIDs can establish the relation. No color or identity is
+retained between referents.
+
+Class RGB comes from `CUSTOM_CLASS_COLORS` or `RAID_CLASS_COLORS`. With
+`maximum = max(r, g, b)`, each component is adjusted as
+`min(1, (maximum + (component - maximum) * 1.18) * 1.08)`, with alpha `1`.
+Copied native health-bar RGB is used exactly, without reverse-mapping it to a
+class or adjusting it again. Name/FontString colors, unmatched nameplates,
+cast/power bars and unreadable copied components are not color witnesses.
+
+The native player path independently requires positive player identity, then
+forwards `UnitClassBase` to `C_ClassColor.GetClassColor` and
+`ColorMixin:GetRGB` directly to `SetStatusBarColor(..., 1)`. The pinned
+[class-color](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_APIDocumentationGenerated/ClassColorDocumentation.lua)
+and [status-bar](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_APIDocumentationGenerated/SimpleStatusBarAPIDocumentation.lua)
+contracts accept protected arguments. Opaque tokens/components never enter the
+readable class adjustment or diagnostics. A readable call-success result
+controls fallback, so copied white RGB does not preempt available native class
+rendering. The write guard releases even after a failed write; successful
+color paths also request `SetStatusBarDesaturated(false)` where supported.
+
+ToT/FoT frames are reused. The `UnitFrame_Update` post-hook reapplies current
+presentation after rebinding; a guarded post-hook on each derived bar's final
+`SetStatusBarColor` catches later native tints. The
+[`CompactUnitFrame_UpdateHealthColor`](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_UnitFrame/Shared/CompactUnitFrame.lua)
+observer follows finished native nameplate color selection and rejects
+forbidden/unreadable frames or non-nameplate tokens. It does not invoke a
+native refresh or change threat policy. An unwarranted replacement causes no
+write; unknown derived identity never creates a neutral-grey fallback.
+
+## 4. Display names
+
+The shared unit/chat/Communities helper `primaryDisplayName` removes a
+recognizable local realm suffix, then takes the first non-whitespace token.
+This is a display
+operation; identity records and hyperlink destinations remain native.
+
+| Surface | Boundary and policy |
+| --- | --- |
+| Player/target/focus/ToT/FoT | Native update post-hooks and scoped events; current frame binding required. |
+| Compact nameplates, party and raid | After `CompactUnitFrame_UpdateName`, using its readable assigned unit. |
+| Ordinary chat sender | Sender-name filter; readable sender/player evidence required. SAY/YELL/EMOTE without readable player GUID evidence stay native. |
+| Ping sender | One `CHAT_MSG_PING` event filter; edit only readable local sender display, preserving player-link payloads, role/color/atlas/texture markup, body and remaining arguments. Plain labels require an exact readable GUID-derived name. |
+| Communities/Guild roster | After `SetMember`/`UpdateNameFrame`, plus visible-list refresh; preserve the Timerunning icon when readable. After a successful replacement, update only the rank icon's existing LEFT anchor from readable text/presence widths. |
+| Communities chat | `AddOnDisplayRefreshedCallback` on the native ScrollingMessageFrame; shorten only readable visible `playerCommunity` hyperlink text. No C_Club message table or native formatter is touched. |
+| Damage Meter | Recycled-row final text hooks and current-source initialization adapter, detailed below. |
+
+The native
+[PING formatter](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_ChatFrameBase/Mainline/ChatFrameOverrides.lua)
+bypasses ordinary sender filtering. The
+[message-filter registry](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_ChatFrameBase/Shared/ChatFrameFilters.lua)
+skips callbacks for inaccessible messages, and the
+[chat-lockdown predicate](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_APIDocumentationGenerated/SecretPredicatesDocumentation.lua)
+includes restricted combat and communication-restricted maps. Protected pings
+and unsupported markup can retain secondary names.
+
+### Unchanged native components and derived recovery
+
+`primaryName` rejects explicitly known non-players. Positive player identity
+permits parsing a readable `UnitName` component. When
+`RegionalUniqueNamesEnabled` is readable and explicitly false, an otherwise
+unavailable/disagreeing identity permits that first component to reach the
+native text sink **unchanged**. Opaque text is transported whole, without
+inspection, comparison, logging or caching. An unknown NPC's multiword
+component is therefore not split. The
+[Camelot helper](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_FrameXMLUtil/Camelot/NameUtil.lua)
+returns this component directly in nonregional mode, and the
+[FontString contract](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_APIDocumentationGenerated/SimpleFontStringAPIDocumentation.lua)
+accepts protected text.
+
+**0.2.104 additionally permits unchanged fresh-name transport on correctly
+bound ToT/FoT frames in regional or unknown mode.** The current component may
+contain a surname. Explicit known-NPC/follower rejection still applies, and
+other surfaces retain their prior policy. This addresses a conditional native
+retention path: `GetUnitFirstName` can return nil for a regional separator
+pattern, while `UnitFrame_Update` preserves an old label and independently
+updates the portrait. The adapter supplies the current token's component; it
+does not infer identity from the portrait. Missing/erroring `UnitName` or a
+rejected text sink can still leave native text in place. This derived fallback
+does not change the meter's policy or promise surname removal.
+
+### Damage Meter lifecycle and source policy
+
+The October 10 native review uses Forever **1.60.1.70338**, commit
+`943764493e6b16d63ded3ab304150d1f05e58b57`. The
+[comparison from build 70291](https://github.com/Gethe/wow-ui-source/compare/9465cb273b5513495d8ecc12fbb19930dd6b8957...943764493e6b16d63ded3ab304150d1f05e58b57)
+changes only `version.txt`; the native Lua, XML and generated API bodies remain
+unchanged. This investigation changes no runtime behavior or addon version.
+
+Rows/windows are recycled. Weak tables retain only hook/guard state, not
+source identities. Installation post-hooks `DamageMeterSourceEntryMixin.Init`
+and each session window's `InitEntry`, scans already existing rows/local
+entries, and discovers future windows after `SetupSessionWindow`. The ordinary
+native name writer is `UpdateName`, called by
+[`Entry.Init`](https://github.com/Gethe/wow-ui-source/blob/943764493e6b16d63ded3ab304150d1f05e58b57/Interface/AddOns/Blizzard_DamageMeter/DamageMeterEntry.lua)
+before addon initialization post-hooks. Each name region's guarded `SetText`
+post-hook preserves the readable/local paths after later writes.
+
+The readable path requires explicit `isCreature=false`, a readable source
+name and readable visible text before replacing its first full-name occurrence.
+Known creature rows are rejected. An independently readable `isLocalPlayer=true`
+can instead use `UnitName("player")`, preserving readable native text where
+possible or reconstructing the existing rank/death-row label from readable
+local facts.
+
+For a **protected nonlocal source name**, the current native Init record may
+supply `sourceGUID` to `UnitTokenFromGUID`. This adapter requires explicit
+`isCreature=false`, `isLocalPlayer=false`, and no readable known creature ID.
+The pinned [unit API](https://github.com/Gethe/wow-ui-source/blob/943764493e6b16d63ded3ab304150d1f05e58b57/Interface/AddOns/Blizzard_APIDocumentationGenerated/UnitDocumentation.lua)
+accepts opaque arguments for both the mapper and `UnitName`:
+
+- A readable mapped token must be positively identified as a player. A
+  readable source GUID additionally requires a readable **matching** current
+  `UnitGUID`; unavailable or mismatching round trips are rejected.
+- An opaque mapped token is accepted only when the source GUID is also opaque
+  and regional mode is explicitly false. It reaches `UnitName` directly and
+  the complete first component is transported unchanged. The token is not
+  classified, compared or cached, and a multiword component remains whole.
+
+Death rows require readable death-recap state and use `SetText`. Normal rows
+also require readable rank/index, format and native classification/faction
+prefix decisions, then use `SetFormattedText`. A readable prefix is preserved
+with [C_StringUtil.WrapString](https://github.com/Gethe/wow-ui-source/blob/943764493e6b16d63ded3ab304150d1f05e58b57/Interface/AddOns/Blizzard_APIDocumentationGenerated/StringUtilDocumentation.lua),
+without parsing opaque name contents. Inaccessible required prefix/rank/source
+state leaves the native label intact. A standalone external `UpdateName` call
+without current source context can temporarily restore a full protected label
+until native initialization refreshes it again.
+
+Native [session-window refresh](https://github.com/Gethe/wow-ui-source/blob/943764493e6b16d63ded3ab304150d1f05e58b57/Interface/AddOns/Blizzard_DamageMeter/DamageMeterSessionWindow.lua)
+reinitializes visible rows from the selected session's current source data.
+The October 10 investigation passes **56/56 actual-source cases** on the
+unchanged addon. They include the native current/historical session getters,
+event routing, recycled rows, and mapping becoming available on a later refresh
+without a totals change. C APIs, widgets, post-hooks and secrecy are modeled;
+these cases do not emulate the live secret/taint engine or prove the screenshot's
+inputs. No new resolver/refresh defect or runtime fix was established. The
+readable-token unavailable `UnitIsPlayer` case remains synthetic: the pinned
+schema returns a non-nil Boolean with no secret-return annotation. It is not
+evidence that this predicate becomes unknown for the reported live readable token.
+
+The inspected native meter module,
+[C_DamageMeter contract](https://github.com/Gethe/wow-ui-source/blob/943764493e6b16d63ded3ab304150d1f05e58b57/Interface/AddOns/Blizzard_APIDocumentationGenerated/DamageMeterDocumentation.lua)
+and [Edit Mode settings](https://github.com/Gethe/wow-ui-source/blob/943764493e6b16d63ded3ab304150d1f05e58b57/Interface/AddOns/Blizzard_EditMode/Shared/EditModeSettingDisplayInfo.lua)
+expose no primary-only source-name option. Native row formatting consumes
+`combatSource.name` whole. The
+[UnitSurnameOwn setting](https://github.com/Gethe/wow-ui-source/blob/943764493e6b16d63ded3ab304150d1f05e58b57/Interface/AddOns/Blizzard_SettingsDefinitions_Frame/Nameplates.lua)
+controls **My surname**; meter formatting does not consult it. Camelot
+`NameUtil.GetUnitFirstName` performs ordinary Lua parsing in regional mode,
+so calling it does not authorize parsing protected names. A displayed label
+is not proof of readable text, and a matching primary name in the current roster
+does not establish the identity of a historical source.
+
+**Live dungeon secondary-name retention remains open.** The earlier report
+showed `Akirts Ud` and `Sedria Forev...`; that live state was lost after the user
+left the dungeon/reset the meter. A new October 10 screenshot shows `Si Yam`,
+`Panoh Panoh`, `Magey Vent...`, `Jon Foreverpvp` and `Bjarki`, again without
+`/bui names` output. It supplies new evidence of the visible recurrence, but
+does not establish mapping, regional mode, secrecy, identity or prefix access.
+The earlier reset does not describe the new screenshot's live state. Capture
+both diagnostic lines with the affected rows and selected session visible,
+as specified in section 9. Neither source tests nor the derived 0.2.104
+fallback establish universal primary-name display or repair of these reports.
+
+## 5. Geometry and status presentation
+
+### Derived portrait alignment
+
+Only the recognized single `TOPRIGHT` -> parent `BOTTOMRIGHT` anchor is
+adjusted, after readable out-of-combat and finite positive scale checks. The
+pinned [native frame definitions](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_UnitFrame/Mainline/TargetFrame.xml)
+put the parent portrait center `55` units left of its right edge and the
+derived center `96.5` units left of its right edge. The one-unit left optical
+correction gives:
+
+`x = 95.5 - 55 * (parentEffectiveScale / derivedEffectiveScale)`
+
+At equal scale, native `x=12` becomes `40.5`, a `28.5`-unit rightward move.
+Current native Y, sizes, parent Edit Mode placement and aura-row constraints
+remain intact; the ratio also handles small Focus mode. Guarded `SetPoint` and
+`SetScale` post-hooks reapply X without clearing the point first. Missing,
+protected or unrecognized geometry stays native. Combat-time resets wait for
+combat exit. The adapter reads no aura counts, visibility or screen positions
+and writes no alignment fields onto native frames.
+
+### Player health optical calibration
+
+Two same-character screenshots motivated a one-to-two pixel adjustment to the
+Player health fill and text relative to Target, while the separate mana bars
+were already acceptable. The first attempted alignment **moved upward**, based
+on a mistaken interpretation of the desired direction; the user confirmed
+that this moved the health display the wrong way. Appearance, not source XML
+alone, determines whether the final correction meets the request.
+
+The native [PlayerFrame.xml](https://github.com/Gethe/wow-ui-source/blob/943764493e6b16d63ded3ab304150d1f05e58b57/Interface/AddOns/Blizzard_UnitFrame/Mainline/PlayerFrame.xml)
+declares a single `TOPLEFT (85,-40)` anchor for
+`PlayerFrameContentMain.HealthBarsContainer`. A live inspection instead
+reported `HPanchor 1 true TOPLEFT TOPLEFT 85 -41 true`. Why that native-like
+point differed from XML is not established. Build 0.2.106 expected -40 and
+silently skipped. Build 0.2.107 recognized -41 and moved the container up
+to -40, but in the opposite direction to the user's desired correction.
+
+**Version 0.2.108** recognizes either the original -41 or the previously
+adjusted -40, and applies **TOPLEFT (85,-42)**, moving the whole health
+container down (two UI units from 0.2.107, one from the first live anchor).
+The mana bar, portrait, Target/Focus, accepted Edit Mode export and their
+native color/formatting responsibilities are unchanged. Only single,
+readable, correctly parented, finite native-like anchors are eligible.
+Already at -42, or a different/custom anchor, the method is a no-op.
+Login, world entry, Edit Mode layout updates and combat exit retry the same
+idempotent adjustment outside combat; no per-frame loop is introduced.
+
+Source-executed guarded cases verify these conditional transitions but do
+not establish the on-screen pixel result at an arbitrary UI scale. Check
+the installed version, current anchor and a fresh same-character screenshot
+after applying this build.
+
+### Highlights, levels and loss layers
+
+Threat flashes keep each frame's native artwork/geometry. Player, target,
+focus, pet threat and pet attack textures receive native vertex alpha times
+`HIGHLIGHT_SCALE=0.25`, once through a guarded vertex-color writer. Protected
+components are rejected before arithmetic or guard entry.
+
+The player's pulsing `StatusTexture` is hidden. Resting uses an addon texture
+copying the native player flash atlas/anchor, with static RGBA
+`(1.0, 0.88, 0.25, 0.25)`, synchronized after native status/art updates. Only
+the player health bar's auxiliary `AnimatedLossBar` gets alpha `0`. Its
+[native animation](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_UnitFrame/Mainline/UnitFrame.lua)
+changes visibility/value without resetting frame alpha; no animation poller is
+added. Health values, absorbs and other units' loss layers stay native.
+
+Player/target/focus level rings are hidden and fonts shrink by one unit,
+minimum `1`. Per-character `bjarkiUISettings.showLevelNumbers` defaults true;
+`/bui levels` toggles and `/bui levels on|off` selects it. Both `Show` and
+`SetShown` are observed to enforce hiding. Enabling requires a current matching
+binding: the player uses its native level update, and target/focus defer to
+`CheckLevel` for corpses, battle pets and unknown/high levels. A vehicle-bound
+player level is not forcibly revealed.
+
+Loss of Control remains Blizzard-owned. Independent retryable post-hooks on
+`SetUpDisplay` and `SetTime` hide red lines, black backing, ability/type labels,
+timer frame and countdown/seconds text. The existing icon alone is anchored
+`CENTER` -> frame `CENTER`, `(0, 0)`; event selection and timer data remain native.
+
+## 6. Player-last party layout
+
+[PartyOrder.lua](PartyOrder.lua) changes only final visual anchors for raid-style
+party frames. Normal shown entries follow `party1`, `party2`, `party3`,
+`party4`, then `player`; missing slots disappear. Any extra readable assigned
+tokens precede the player. If a shown member's token is unavailable, the module
+leaves native order intact. Edit Mode's forced preview repeats the player
+token, so that specific preview orders native member slots 2..N, then slot 1.
+Full raids stay native.
+
+`RefreshMembers`, the cached `updateLayoutFunc` (or `UpdateLayout` fallback),
+the existing native `CompactUnitFrame_OnVisiblityChanged` notification for
+current party members, and scoped `UNIT_CONNECTION` all queue the same repair.
+Login/world entry/module availability, Edit Mode and combat exit retry
+installation/order. The deferred callback reevaluates current members and
+combat state; no anchor changes run during positively detected combat.
+Native unit assignment, member scripts, callback tables and refresh remain
+Blizzard's responsibility. The module never calls `SetFlowSortFunction`,
+replaces a comparator or initiates compact-frame refreshes.
+
+Vertical layout chains member `TOP` to previous `BOTTOM`; horizontal layout
+chains `LEFT` to previous `RIGHT`. The first member anchors at party
+`TOP`/`TOPLEFT`, Y `-titleHeight`. A shown border wraps the first/last members
+with `TOPLEFT (-2, 2)` and `BOTTOMRIGHT (2, -3)`. Pets anchor first to the shown
+native party border, otherwise to the reordered first member horizontally or
+last member vertically. Horizontal pets start `TOPLEFT` -> `BOTTOMLEFT` and
+continue `LEFT` -> previous shown pet's `RIGHT`; vertical pets use `TOP` ->
+previous shown pet/anchor `BOTTOM`. This retains the native border relation
+while keeping pets below the reordered block.
+
+## 7. Compact aura borders and native debuff selection
+
+Three separate native layers must not be conflated:
+
+| Layer | Current behavior |
+| --- | --- |
+| Older **public** compact debuff borders | Hide final border Texture alpha on positively identified party/raid ancestry. Icons, cooldowns, stacks and selection stay native. |
+| Current **private** harmful-icon borders | Remain client-owned; public hooks cannot reach their secure renderer. The requested removal is unresolved. |
+| Whole-frame dispel overlay | Disable known enabled values `1`/`2` of supported `raidFramesDispelIndicatorOverlay` with CVar value `0`. Separate dispel indicators and private aura borders remain native. |
+
+Public compatibility observes `CompactUnitFrame_UtilSetDebuff`, final sweeps
+after `CompactUnitFrame_UpdateDebuffs`/`UpdateAuras`, and
+`AuraUtil.SetAuraBorderAtlas`. Ownership is established through readable,
+non-forbidden fixed ancestry matching `CompactPartyFrameMemberN`,
+`CompactRaidGroupNMemberN` or `CompactRaidFrameN`. No aura/secret-health data or
+compact-frame settings are edited. A weak marker is created after a successful
+alpha-zero write, and a marked pooled Texture returning to positively
+non-compact ancestry is restored to alpha `1`. Inaccessible ancestry/write
+failure defers both presentation and ownership changes for a later retry.
+
+The current private renderer's
+[TOC](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_PrivateAurasUI/Blizzard_PrivateAurasUI.toc)
+selects a secure environment and its
+[XML](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_PrivateAurasUI/Blizzard_PrivateAurasUI.xml)
+uses forbidden templates hidden from public execution. Its own AuraUtil copy
+writes harmful borders. Inspected public settings expose size, border scale
+and dispel indicators, but no private-icon border-visibility switch: zero
+scale still leaves an icon-sized border, and hiding a glyph chooses a colored
+no-glyph atlas. Synthetic negative border geometry remains removed.
+
+The supported [overlay setting](https://github.com/Gethe/wow-ui-source/blob/9465cb273b5513495d8ecc12fbb19930dd6b8957/Interface/AddOns/Blizzard_SettingsDefinitions_Frame/Mainline/InterfaceOverrides.lua)
+hides its border/gradient/background and stops its animations. It is a
+persistent setting shared by compact party/raid frames; the installation
+lifecycle disables a known enabled value again on its next pass. Missing APIs,
+protected/unknown values and failed writes do not lead to private-object access.
+
+Friendly native ToT/FoT small debuff lists follow Blizzard's `showDispelDebuffs`
+filter when enabled. The addon does not change that CVar or reenter the native
+aura renderer. This avoids replacing an icon before a protected duration
+calculation fails, and leaves portrait auras to the independent addon.
+
+## 8. Edit Mode, bottom UI and combat text
+
+The supplied Edit Mode export is version `5`, `59` records, named `bjarkiUI`.
+If no layout of that name exists and character-layout capacity permits, the
+addon converts the export, saves it as a character layout, announces it with
+`OnLayoutAdded` (or activates via the fallback API), and records completion.
+Missing APIs, failed conversion/save or exhausted capacity leave installation
+unchecked for retry. After a successful save, activation/notification is
+best-effort and installation is marked checked. **A layout with that name is the
+installation marker and becomes user-owned**; normal Edit Mode changes are
+not continuously overwritten. Existing layouts need an explicit import to
+adopt revised serialized coordinates.
+
+Current BuffFrame X is `238.3`, Y `-100.0`; DebuffFrame remains anchored to it
+at `(-16.0, -4.0)`. The X was calibrated from `244.0` to move the measured
+reference icon approximately six screen pixels left; that estimate does not
+certify final client rendering. The serialized export in the source is the
+authority for the other coordinates/settings.
+
+The separate Micro Menu adapter offsets only the visible child after
+`AnchorToMenuContainer`: X `0`, Y `-1`, retaining the native point relation to
+`MicroMenuContainer`. The shared container stays in place because other bottom
+UI anchors depend on it. Guild and Legacy notification pips are hidden while
+their buttons remain functional.
+
+| Presentation | Exact current setting |
+| --- | --- |
+| Outgoing ordinary world text | `WorldTextScreenY_v2 = "0.0425"` |
+| Outgoing critical world text | `WorldTextCritScreenY_v2 = "0.0550"` |
+| Incoming player hit text | Existing HitText `BOTTOM` -> Personal Resource Display `TOP`, `(0, 3)` |
+| Default UI error stack | `UIErrorsFrame TOP` -> `UIParent TOP`, `(0, -32)` |
+
+Outgoing text remains engine/world text; its two CVars are applied on
+login/world entry without a loop. Incoming text uses the native player widget
+and is reanchored on login, world entry and Edit Mode updates.
+
+## 9. Diagnostics and evidence scope
+
+The registered aliases are `/bui` and `/bjarkiui`; `/bjui` is not registered.
+Diagnostics are read-only and never repair presentation:
+
+| Command | Reports |
+| --- | --- |
+| `/bui audit` | Version; independent hook installation states; derived frame/bar/color-hook availability; public private-container API availability with `privateBorderVisibility=client-owned`; readable compact member `debuffBorderScale`, flagging negative values without changing them. |
+| `/bui colors` | For target/focus/ToT/FoT: existence, connection/death/tap state, selection RGB, player/pet/class evidence, matching plate/token/bar path and readable native/final RGB. |
+| `/bui names` | **Two anonymous summaries** for currently shown native meter windows/rows: row/hook counts; source/text access; GUID/token secrecy or missing mapping; readable-token classifier availability; prefix access; regional mode and UnitName API availability. |
+
+`names` excludes hidden windows/rows and stale hook-only entries, never calls
+`UnitName`, prints no names/GUIDs/tokens, retains no identity and adds no recurring
+work or hooks. Counters are aggregate boundaries, not per-actor proof;
+`unavailable` can count multiple failures for a row, and `prefixSecret=0` does
+not prove formatting succeeds. While the affected rows and selected session
+remain visible, run `/bui names` and capture both complete output lines:
+
+```text
+names version=... rows=... hooked=... sourceSecret=... textSecret=... unavailable=...
+names guidSecret=... tokenSecret=... tokenMissing=... playerUnknown=... prefixSecret=... regional=... UnitName=...
+```
+
+Keep the meter visible in the capture and identify **Current**, **Overall** or
+the numbered historical fight. Capture before leaving/resetting; if presentation
+changes after combat, a second capture of the same rows/session can distinguish
+the transition. Unknown/secret diagnostic state is evidence about that access
+boundary, not a diagnosis of the screenshot's root cause. Aggregate counters
+do not identify every per-row GUID-round-trip or name-output rejection.
+
+Earlier native references retain Forever source commit
+`9465cb273b5513495d8ecc12fbb19930dd6b8957` (build `70291`). The October 10 meter
+review verified **1.60.1.70338**, commit
+`943764493e6b16d63ded3ab304150d1f05e58b57`; its comparison changes only
+`version.txt`, so those earlier source bodies remain valid. Focused source
+fixtures execute actual addon helpers and selected native formatter, entry,
+window and update bodies with modeled WoW APIs/widgets/secret propagation.
+They verify conditional control flow, geometry and lifecycle rules; they do
+not emulate the live secret/taint engine or certify Battleground/dungeon output.
+Live opposing-faction colors, private icon borders, secondary-name reports and
+pixel alignment retain the scope recorded in [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
+Targeted-nameplate font size remains native; a screenshot alone does not
+establish a C++ scaling defect or warrant a font/CVar workaround.
+
+Maintenance changes should follow the current native owner and final writer,
+require the actual current binding, and reevaluate reusable frames/rows instead
+of retaining actor mappings. Keep party sorting outside native refresh stacks,
+private aura/message ownership intact, layout coordinates user-owned, and
+documentation out of the manifests. Historical experiments belong in the
+issue history, not in the current behavior contract.

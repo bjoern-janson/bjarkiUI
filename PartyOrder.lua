@@ -13,6 +13,7 @@
 local hookedFrames = setmetatable({}, { __mode = "k" })
 local queuedFrames = setmetatable({}, { __mode = "k" })
 local generatorHooked = false
+local visibilityHooked = false
 
 local function isSecret(value)
     if not issecretvalue then return false end
@@ -109,7 +110,9 @@ local function reanchorPets(frame, ordered, horizontal)
     local pets = frame and frame.petUnitFrames
     if type(pets) ~= "table" or #ordered == 0 then return end
 
-    local anchor = horizontal and ordered[1] or ordered[#ordered]
+    local border = frame.borderFrame
+    local anchor = border and shown(border) and border
+        or (horizontal and ordered[1] or ordered[#ordered])
     local previousShown
 
     for _, pet in ipairs(pets) do
@@ -213,6 +216,27 @@ local function install()
     then
         generatorHooked = true
         hooksecurefunc("CompactPartyFrame_Generate", install)
+    end
+
+    if not visibilityHooked and hooksecurefunc
+        and type(_G.CompactUnitFrame_OnVisiblityChanged) == "function"
+    then
+        visibilityHooked = true
+        -- Native member visibility can change without a party layout pass.
+        -- Observe its existing notification; keep member scripts and native
+        -- callbacks untouched, and move anchors only on the deferred tick.
+        hooksecurefunc("CompactUnitFrame_OnVisiblityChanged", function(unitFrame)
+            local party = _G.CompactPartyFrame
+            local members = party and party.memberUnitFrames
+            if type(members) ~= "table" then return end
+
+            for _, member in ipairs(members) do
+                if member == unitFrame then
+                    queueVisualOrder(party)
+                    return
+                end
+            end
+        end)
     end
 
     local frame = _G.CompactPartyFrame
