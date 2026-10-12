@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-This document describes the repository's **bjarkiUI 0.2.90-local** implementation and includes a clearly labeled **0.2.134-local field-study appendix** (section 24). The later tested local ZIP has **not** been merged into the repository source; statements about each implementation are scoped accordingly. This is a maintenance reference, not a guarantee about undocumented client behavior.
+This document now tracks **bjarkiUI 0.2.156-local**, the current source version. Sections 1–23 preserve earlier implementation notes (mostly 0.2.90-era); section 24 is a historical 0.2.134-local field study. **Section 25 supersedes earlier descriptions where behavior changed.** This is a maintenance reference, not a guarantee about undocumented WoW: Forever client behavior or taint safety.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -384,6 +384,8 @@ CVars as a color workaround. Check frame availability, current unit binding,
 readable class evidence, and the final native color writer as separate steps.
 ## 24. Field study: local 0.2.134, native bar rendering, and compact chrome (2026-10-11)
 
+> **Historical record:** The version-boundary and repository-state observations in this section describe 2026-10-11. The later 0.2.156-local source is documented in section 25.
+
 > **Version boundary.** This section documents a **tested local ZIP**, `bjarkiUI-0.2.134-local`, rather than the implementation on the repository's `main` branch. As inspected during this audit, `main` still had `bjarkiUI-0.2.90-local` and the preceding sections describe that older snapshot. **Do not infer that these local changes have been pushed or released.** The user has not requested a source-code merge. This is an additive maintenance record of what was observed, tested, rejected, and left unresolved.
 >
 > Local ZIP SHA-256: `eb590f56a727cfb7bb88504ecfe1f5e37abafa99f1e21b77b48c57dc5d076030`. Main Lua source SHA-256 (inside ZIP): `5a40129f822ca994a8be92581a61e49eac6d9ca931107e5b31d861cbfb68ac97`.
@@ -516,3 +518,35 @@ Targeted **mock execution**, not WoW client execution, passed for:
 6. **Respect ownership boundaries:** data identity → color entitlement; resource token → atlas entitlement; bar anchoring → geometry; texture/parent frame level → border layering. A correct RGB value does not authorize moving a bar.
 7. **Audit implementation separately from screenshots**: compile/syntax, mocks, idempotence, combat gates, secret-value reads, lifecycle, and behavior under unsupported layouts. Claim “tested in mock” rather than “taint-free.”
 8. **Keep local/repository version provenance explicit.** Updating this document alone must not be described as merging `0.2.134-local` into `main`.
+
+## 25. Current committed source: 0.2.156-local (2026-10-12)
+
+**Provenance:** The implementation in `bjarkiUI.lua`, `PartyOrder.lua`, and both matching manifests is taken from the accepted `bjarkiUI-0.2.156-local.zip` (ZIP SHA-256 `2bdc6f25d581a6340d54c21811573efc11ddc6a993db2e440f9fa1ce8e592ed7`). The prior 0.2.134 field study remains useful history, but is not a description of the current code. `KNOWN_ISSUES.md` continues to record unresolved Battleground/client observations, not confirmed fixes.
+
+### 25.1. Ownership and colors
+
+- The six regular unit tokens (`player`, `target`, `focus`, `targettarget`, `focustarget`, `pet`) use the neutral `UI-HUD-CoolDownManager-Bar` fill atlas. Blizzard still owns unit values, native frame/mask geometry, and status updates.
+- Player class colors use the native `RAID_CLASS_COLORS`/guarded `C_ClassColor` paths **without** the old custom `CLASS_SATURATION` and `CLASS_BRIGHTNESS` multipliers. This intentionally agrees with Blizzard's Damage Meter and class-colored PRD.
+- Positively identified combat pets use pure `(0,1,0)`, matching the usual friendly-NPC green presentation; this is an explicit tint rule, **not** an additional saturation operation. NPCs use readable selection, tagged/tap-denied, threat, and death state. UNKNOWN/protected evidence does not justify inventing an actor identity.
+- Regular Mana uses the PRD-like `(0.10, 0.25, 1.00)` tint. Energy is yellow, Rage red, and alternate Player-frame Mana gets the same Mana treatment. The PRD retains native bar textures and power values, with only the requested alternate-Mana tint and text adjustments described below.
+
+### 25.2. Pixel geometry, PRD, and Edit Mode
+
+- The accepted player resource-gap fix is a **native Mana mask adjustment**, not a bigger StatusBar: for the recognized portrait-on normal player layout, its `TOPLEFT` mask offset changes from `(-2, 2)` to `(-2, 3)`. Unfamiliar atlas, anchoring, or secret geometry causes a no-op. Keep the existing StatusBar height and text placements unchanged.
+- Player health/container positioning comes from the earlier tested narrow alignment guards. The player's Mana percentage (`LeftText`) is left at Blizzard's native anchor because an intermittent native/update-order interaction made forced percentage offsets unreliable. Center/right Mana text retains the separate guarded presentation path.
+- The PRD stays on Blizzard's native health/power/alternate-power fills. A small fixed text Y adjustment uses `+1` UI unit for Health and non-Mana primary power, `+0.5` for primary Mana and alternate Mana. Both percentage and numeric regions move together through known native anchors, **without reading secret `GetPoint()` coordinates**. Fractional rendering was judged visually at the user's tested scale; other scales are not certified.
+- The embedded Edit Mode default contains Target `Y=-158` and PRD `Y=-175`, among the complete supplied layout settings. The named `bjarkiUI` layout is installed **only when absent**; replacing the addon does not silently overwrite the user's saved Edit Mode layout.
+
+### 25.3. Compact frames and names
+
+- ToT/ToF retain native color selection plus post-update/derived-identity checks; a reused token or inaccessible class does not license stale player-class or pet-green paint.
+- The native compact frame's metallic border is copied into a higher-level, mouse-transparent **clipped chrome overlay** so its silver separator appears over both child bars while **not painting across the name field**. The repeated failed draw-layer-only patch did not work because a parent's artwork cannot reliably outrank its higher-level child frames.
+- ToT and ToF compact resource bars retain the narrow, accepted `TOPLEFT` gap correction. ToF's bounded health-height experiment and the overlay are local rendering interventions; they are not permission to move the outer portrait or to alter resource text.
+- On WoW: Forever a target/focus frame can update values and portrait without writing the new name (also seen with all addons disabled). `bjarkiUI` observes native `SetText` during `UnitFrame_Update`, then repairs a genuinely missed target/focus name write from the **current** unit when readable. This is a workaround for the observed client regression, not a replacement of normal native name writing.
+
+### 25.4. Runtime boundaries and verification
+
+- `PartyOrder.lua` continues to sort existing compact-party frames **visually**, deferring reanchoring until out of combat instead of replacing unit assignments or invoking Blizzard refresh code from an addon-owned path.
+- Small UI corrections should be event/post-write based, fail closed on secret numbers or unfamiliar geometry, and never grow cumulative offsets. Diagnostic macros that read secret `GetPoint()` values are not safe evidence in Forever.
+- The transient Player Mana seam-stripe, bronze-border, widened StatusBar, and masked-duplicate-artwork experiments from 0.2.136–0.147 were **rejected** and are not part of the 0.2.156 source. The successful native mask correction was retained. The portrait timer `/bp timery` experiment belongs only to the separate portraits addon and has been removed there.
+- **Verified for this source sync:** ZIP integrity, both Lua sources parsing, manifest contents, and Git object blob checks. In-game screenshots supported the accepted visual appearance in several tested scenarios, but **do not establish universal combat-taint safety**, every UI scale, Battleground class evidence, or behavior after all client transitions.

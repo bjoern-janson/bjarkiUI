@@ -1,7 +1,8 @@
-local BJARKI_UI_VERSION = "0.2.90-local"
+local BJARKI_UI_VERSION = "0.2.156-local"
 local PRD_ATLAS = "UI-HUD-CoolDownManager-Bar"
-local CLASS_SATURATION = 1.18
-local CLASS_BRIGHTNESS = 1.08
+-- The PRD's native Mana palette, used for all MANA fills. This does not
+-- replace Blizzard's textures or its handling of Energy/Rage/Fury/etc.
+local PRD_MANA_R, PRD_MANA_G, PRD_MANA_B = 0.10, 0.25, 1.00
 -- Preserve the accepted visual strength of the old alpha*vertex-alpha stack,
 -- but apply it once through vertex alpha so repeated Show/SetAlpha paths cannot
 -- compound the attenuation.
@@ -18,7 +19,7 @@ if bjarkiUISettings.showLevelNumbers == nil then
     bjarkiUISettings.showLevelNumbers = true
 end
 
-local EDIT_MODE_LAYOUT_STRING = [=[4 0 59 0 0 1 8 6 MicroMenuContainer -4.5 -4.0 -1 ##$$%/&('%)#+$,$ 0 1 1 7 7 UIParent 0.0 0.0 -1 ##$$%/&('%(#,# 0 2 1 7 7 UIParent 0.0 0.0 -1 ##$$%/&('%(#,# 0 3 1 5 5 UIParent -5.0 -77.0 -1 #$$$%/&('%(#,# 0 4 1 5 5 UIParent -5.0 -77.0 -1 #$$$%/&('%(#,# 0 5 1 1 4 UIParent 0.0 0.0 -1 ##$$%/&('%(#,$ 0 6 1 1 4 UIParent 0.0 -50.0 -1 ##$$%/&('%(#,$ 0 7 1 1 4 UIParent 0.0 -100.0 -1 ##$$%/&('%(#,$ 0 10 1 7 7 UIParent 0.0 -4.0 -1 ##$$&('% 0 11 1 7 7 UIParent 0.0 -4.0 -1 ##$$&('%,# 0 12 1 7 7 UIParent 0.0 -4.0 -1 ##$$&('% 1 -1 0 4 4 UIParent 0.0 -276.0 -1 #%$#%$ 2 -1 1 2 2 UIParent 0.0 0.0 -1 ##$#%(&( 3 0 0 0 0 UIParent 278.0 -160.0 -1 $#3% 3 1 0 1 1 UIParent -294.0 -160.0 -1 %#3% 3 2 0 4 4 UIParent 358.0 -160.0 -1 %#&$3% 3 3 0 0 0 UIParent 512.0 -420.0 -1 '$(#)#-k.5/#1$3#5#6,7-7$8(9, 3 4 1 0 2 CompactRaidFrameManager 0.0 -5.0 -1 ,#-=.+/#0#1#2(3#5#6(7-7$8(9( 3 5 1 5 5 UIParent 0.0 0.0 -1 &$*$3# 3 6 1 5 5 UIParent 0.0 0.0 -1 -=.+/#4$5#6(7-7$8(9( 3 7 0 1 7 PlayerFrame 34.0 25.0 -1 3% 4 -1 1 7 7 UIParent 0.0 -4.0 -1 # 5 -1 1 7 7 UIParent 0.0 -4.0 -1 # 6 0 0 1 1 UIParent 244.0 -100.0 -1 ##$#%#&.())( 6 1 0 2 8 BuffFrame -16.0 -4.0 -1 ##$#%#'+())(-# 6 2 1 1 1 UIParent 0.0 -25.0 -1 ##$#%$&.(()(+#,-,$ 7 -1 1 7 7 UIParent 0.0 -4.0 -1 # 8 -1 0 3 3 UIParent 34.0 -220.0 -1 #'$d%$&i 9 -1 1 7 7 UIParent 0.0 -4.0 -1 # 10 -1 1 0 0 UIParent 16.0 -116.0 -1 # 11 -1 1 8 8 UIParent -9.0 85.0 -1 # 12 -1 1 2 2 UIParent -110.0 -275.0 -1 #K$#%# 13 -1 1 7 7 UIParent 116.5 6.0 -1 ##$#%) 14 -1 1 6 8 MicroMenuContainer 7.0 -4.0 -1 ##$#%( 15 0 1 7 7 UIParent 0.0 0.0 -1 &- 15 1 1 7 7 UIParent 0.0 17.0 -1 &- 16 -1 1 5 5 UIParent 0.0 0.0 -1 #( 17 -1 1 1 1 UIParent 0.0 -100.0 -1 ## 18 -1 1 5 5 UIParent 0.0 0.0 -1 #- 19 -1 1 7 7 UIParent 0.0 0.0 -1 ## 20 0 1 7 7 UIParent 0.0 310.0 -1 ##$/%$&('%(-($)#+$,$-$ 20 1 1 7 7 UIParent 0.0 240.0 -1 ##$*%$&('%(-($)#+$,$-$ 20 2 1 7 7 UIParent 0.0 370.0 -1 ##$$%$&('((-($)#+$,$-$ 20 3 1 7 7 UIParent 420.0 430.0 -1 #$$$%#&('((-($)#*#+$,$-$.-.$ 21 -1 0 4 4 UIParent 0.0 -164.0 -1 ##%#&#'$($)#*U+#,&-#.#/&0$1# 22 0 1 8 7 UIParent -457.0 336.0 -1 #$$$%#&('((#)U*$+%,$-#.#/U0% 22 1 1 1 1 UIParent 0.0 -40.0 -1 &('()U*#+% 22 2 1 1 1 UIParent 0.0 -90.0 -1 &('()U*#+% 22 3 1 1 1 UIParent 0.0 -130.0 -1 &('()U*#+% 23 -1 0 8 6 MultiBarLeft -4.0 0.0 -1 ##$#%$&i'T(%)U+$,$-#.(/# 24 -1 1 1 1 UIParent 0.0 -182.0 -1 # 25 -1 1 5 7 UIParent -28.0 128.0 -1 # 26 0 1 5 3 MainActionBar 30.0 5.0 -1 #$ 26 1 1 3 5 BagsBar -30.0 5.0 -1 #$ 27 -1 1 4 4 Minimap -68.0 -68.0 -1 #+ 28 -1 1 4 4 UIParent 0.0 0.0 -1 #& 29 0 1 7 7 UIParent 0.0 450.0 -1 #($U%$&K'#(#)# 29 1 1 7 7 UIParent 0.0 425.0 -1 #($U%$&K'#(#)# 29 2 1 7 7 UIParent 0.0 400.0 -1 #($U%$&K'#(#)#]=]
+local EDIT_MODE_LAYOUT_STRING = [=[5 0 59 0 0 1 8 6 MicroMenuContainer -4.5 -4.0 -1 ##$$%/&('%)#+$,$ 0 1 1 7 7 UIParent 0.0 0.0 -1 ##$$%/&('%(#,# 0 2 1 7 7 UIParent 0.0 0.0 -1 ##$$%/&('%(#,# 0 3 1 5 5 UIParent -5.0 -77.0 -1 #$$$%/&('%(#,# 0 4 1 5 5 UIParent -5.0 -77.0 -1 #$$$%/&('%(#,# 0 5 0 6 0 MultiBarBottomRight 0.0 4.0 -1 ##$$%/&('%(#,# 0 6 0 6 0 MultiBar5 0.0 4.0 -1 ##$$%/&('%(#,# 0 7 0 0 0 UIParent 915.2 -744.0 -1 ##$$%/&('%(#,# 0 10 1 7 7 UIParent 0.0 -4.0 -1 ##$$&('% 0 11 1 7 7 UIParent 0.0 -4.0 -1 ##$$&('%,# 0 12 1 7 7 UIParent 0.0 -4.0 -1 ##$$&('% 1 -1 0 4 4 UIParent 0.0 -276.0 -1 #%$#%$ 2 -1 1 2 2 UIParent 0.0 0.0 -1 ##$#%(&( 3 0 0 0 0 UIParent 278.0 -157.0 -1 $#3% 3 1 0 1 1 UIParent -294.0 -158.0 -1 %#3% 3 2 0 4 4 UIParent 358.0 -163.0 -1 %#&$3% 3 3 0 0 0 UIParent 512.0 -420.0 -1 '$(#)#-k.5/#1$3#5#6,7-7$8(9, 3 4 0 0 0 UIParent 21.4 -0.0 -1 ,#-=.+/#0#1#2(3#5#6(7-7$8(9( 3 5 1 5 5 UIParent 0.0 0.0 -1 &$*$3# 3 6 1 5 5 UIParent 0.0 0.0 -1 -=.+/#4$5#6(7-7$8(9( 3 7 0 1 7 PlayerFrame 34.0 25.0 -1 3% 4 -1 1 7 7 UIParent 0.0 -4.0 -1 # 5 -1 1 7 7 UIParent 0.0 -4.0 -1 # 6 0 0 1 1 UIParent 238.3 -100.0 -1 ##$#%#&.())( 6 1 0 2 8 BuffFrame -16.0 -4.0 -1 ##$#%#'+())(-# 6 2 1 1 1 UIParent 0.0 -25.0 -1 ##$#%$&.(()(+#,-,$ 7 -1 1 7 7 UIParent 0.0 -4.0 -1 # 8 -1 0 3 3 UIParent 34.0 -220.0 -1 #'$d%$&i 9 -1 1 7 7 UIParent 0.0 -4.0 -1 # 10 -1 1 0 0 UIParent 16.0 -116.0 -1 # 11 -1 1 8 8 UIParent -9.0 85.0 -1 # 12 -1 1 2 2 UIParent -110.0 -275.0 -1 #K$#%# 13 -1 1 7 7 UIParent 116.5 6.0 -1 ##$#%) 14 -1 1 6 8 MicroMenuContainer 7.0 -4.0 -1 ##$#%( 15 0 1 7 7 UIParent 0.0 0.0 -1 &- 15 1 1 1 1 UIParent 0.0 17.0 -1 &- 16 -1 1 5 5 UIParent 0.0 0.0 -1 #( 17 -1 1 1 1 UIParent 0.0 -100.0 -1 ## 18 -1 1 5 5 UIParent 0.0 0.0 -1 #- 19 -1 1 7 7 UIParent 0.0 0.0 -1 ## 20 0 0 0 6 BuffIconCooldownViewer 0.0 -4.0 -1 ##$/%$&('%(-($)#+$,$-# 20 1 0 0 6 EssentialCooldownViewer 0.0 -4.0 -1 ##$*%$&('%(-($)#+$,$-# 20 2 0 1 1 UIParent -867.7 -2.0 -1 ##$$%$&('((-($)#+$,$-$ 20 3 0 2 8 DebuffFrame 0.0 -4.0 -1 #$$$%#&('#(U)#*#+$,$-#.U 21 -1 0 4 4 UIParent 0.0 -175.0 -1 ##%#&$'$($)#*U+#,&-#.#/&0$1# 22 0 1 8 7 UIParent -457.0 336.0 -1 #$$$%#&('((#)U*$+%,$-#.#/U0% 22 1 1 1 1 UIParent 0.0 -40.0 -1 &('()U*#+% 22 2 1 1 1 UIParent 0.0 -90.0 -1 &('()U*#+% 22 3 1 1 1 UIParent 0.0 -130.0 -1 &('()U*#+% 23 -1 0 8 6 MultiBarLeft -4.0 0.0 -1 ##$#%$&i'B'$(#)U+$,$-,.'/# 24 -1 1 1 1 UIParent 0.0 -182.0 -1 # 25 -1 0 0 0 UIParent 663.2 -865.0 -1 # 26 0 1 5 3 MainActionBar 30.0 5.0 -1 #$ 26 1 1 3 5 BagsBar -30.0 5.0 -1 #$ 27 -1 1 4 4 Minimap -68.0 -68.0 -1 #+ 28 -1 1 4 4 UIParent 0.0 0.0 -1 #& 29 0 1 7 7 UIParent 0.0 450.0 -1 #($U%$&K'#(#)# 29 1 1 7 7 UIParent 0.0 425.0 -1 #($U%$&K'#(#)# 29 2 1 7 7 UIParent 0.0 400.0 -1 #($U%$&K'#(#)#]=]
 local editModeLayoutChecked = false
 
 local function installEditModeLayout()
@@ -98,17 +99,18 @@ local function stripLossOfControlPresentation()
     local frame = _G.LossOfControlFrame
     if not frame then return end
 
-    for _, region in ipairs({
-        frame.RedLineTop,
-        frame.RedLineBottom,
-        frame.blackBg,
-        frame.AbilityName,
-        frame.SpellName,
-        frame.ControlName,
-        frame.LocTypeText,
-        frame.Label,
-        frame.Text,
+    for _, field in ipairs({
+        "RedLineTop",
+        "RedLineBottom",
+        "blackBg",
+        "AbilityName",
+        "SpellName",
+        "ControlName",
+        "LocTypeText",
+        "Label",
+        "Text",
     }) do
+        local region = frame[field]
         if region and region.Hide then
             pcall(region.Hide, region)
         end
@@ -119,23 +121,25 @@ local function stripLossOfControlPresentation()
         if timeLeft.Hide then
             pcall(timeLeft.Hide, timeLeft)
         end
-        for _, region in ipairs({
-            timeLeft.NumberText,
-            timeLeft.SecondsText,
+        for _, field in ipairs({
+            "NumberText",
+            "SecondsText",
         }) do
+            local region = timeLeft[field]
             if region and region.Hide then
                 pcall(region.Hide, region)
             end
         end
     end
 
-    for _, region in ipairs({
-        frame.Timer,
-        frame.CooldownText,
-        frame.Duration,
-        frame.timeLeftText,
-        frame.TimeText,
+    for _, field in ipairs({
+        "Timer",
+        "CooldownText",
+        "Duration",
+        "timeLeftText",
+        "TimeText",
     }) do
+        local region = frame[field]
         if region and region.Hide then
             pcall(region.Hide, region)
         end
@@ -196,11 +200,13 @@ local function readableUnitGUID(unit)
 end
 
 local function sameUnit(unitA, unitB)
-    if UnitIsUnit then
-        local same = readableBool(UnitIsUnit, unitA, unitB)
-        if same ~= nil then return same end
-    end
+    local same = readableBool(UnitIsUnit, unitA, unitB)
+    if same == false then return false end
     local guidA, guidB = readableUnitGUID(unitA), readableUnitGUID(unitB)
+    -- Reused unit tokens can disagree briefly. A readable GUID mismatch
+    -- vetoes copying a previous nameplate occupant's class or native tint.
+    if guidA and guidB and guidA ~= guidB then return false end
+    if same == true then return true end
     if guidA and guidB then return guidA == guidB end
 end
 
@@ -264,28 +270,120 @@ local function powerBar(unit)
     end
 end
 
-local function applyAtlas(bar)
+local function applyBarAtlas(bar, atlas)
     if not bar or not bar.GetStatusBarTexture then return end
     local texture = bar:GetStatusBarTexture()
     if not texture or not texture.SetAtlas then return end
-    pcall(texture.SetAtlas, texture, PRD_ATLAS, false)
+    if texture.GetAtlas then
+        local ok, current = pcall(texture.GetAtlas, texture)
+        if ok and not isSecret(current) and current == atlas then return end
+    end
+    -- Do not resize the StatusBarTexture: the frame, border, masking and text
+    -- retain Blizzard's existing dimensions and anchors.
+    pcall(texture.SetAtlas, texture, atlas, false)
     if texture.SetTexelSnappingBias then pcall(texture.SetTexelSnappingBias, texture, 0) end
     if texture.SetSnapToPixelGrid then pcall(texture.SetSnapToPixelGrid, texture, false) end
 end
 
+-- Uniform PRD-style grayscale fills on owned unit-frame health and resource
+-- bars. The PRD itself is not styled by this addon; Blizzard owns all three
+-- of its health/power/alternate-power bars, colors, textures and lifecycle.
+-- PowerBarColor provides the correct tint when using this neutral atlas.
+local function applyUnitBarTexture(bar)
+    applyBarAtlas(bar, PRD_ATLAS)
+end
+
 local function applyPowerColor(bar, unit)
     if not bar or not bar.SetStatusBarColor or not UnitPowerType then return end
-    local barUnit = readableUnitToken(bar.unit)
-    unit = barUnit or readableUnitToken(unit)
+    unit = readableUnitToken(bar.unit) or readableUnitToken(unit)
     if not unit then return end
 
     local ok, _, token, r, g, b = pcall(UnitPowerType, unit)
-    if not ok or isSecret(token) then return end
-    local color = PowerBarColor and token and PowerBarColor[token]
-    if color then r, g, b = color.r, color.g, color.b end
+    if not ok or isSecret(token) or type(token) ~= "string" then return end
+    local info = PowerBarColor and PowerBarColor[token]
+    if info and not isSecret(info) then
+        r, g, b = info.r, info.g, info.b
+    end
+    -- Some Forever resource palettes use a client-specific Energy entry.
+    -- Keep the familiar yellow on the grayscale PRD-style texture instead
+    -- of tinting a blue mana atlas, which previously produced green energy.
+    if token == "ENERGY" then r, g, b = 1, 1, 0 end
+    if token == "MANA" then
+        -- Match the default Personal Resource Display, including resource
+        -- changes that make Mana the primary bar again.
+        r, g, b = PRD_MANA_R, PRD_MANA_G, PRD_MANA_B
+    end
     if type(r) ~= "number" or type(g) ~= "number" or type(b) ~= "number"
         or isSecret(r) or isSecret(g) or isSecret(b) then return end
     pcall(bar.SetStatusBarColor, bar, r, g, b, 1)
+end
+
+-- Third-bar Mana can be painted independently from the main UnitPowerType.
+-- The regular PlayerFrame alternate belongs to bjarkiUI's styled unit bars;
+-- PRD is Blizzard-owned and receives only this requested Mana tint correction.
+local playerAltManaArtHooks = setmetatable({}, { __mode = "k" })
+local playerAltManaEnableHookInstalled = false
+local prdAltManaRefreshHookInstalled = false
+
+local function applyPlayerAlternateManaColor(bar)
+    local frame = _G.PlayerFrame
+    if not frame or isSecret(frame) then return end
+    bar = bar or frame.activeAlternatePowerBar
+    if not bar or isSecret(bar) then return end
+    local ok, allowed = pcall(function()
+        return frame.activeAlternatePowerBar == bar
+            and bar.powerName == "MANA"
+            and (frame.state == nil or frame.state == "player")
+    end)
+    if not ok or not allowed then return end
+    applyUnitBarTexture(bar)
+    pcall(bar.SetStatusBarColor, bar, PRD_MANA_R, PRD_MANA_G, PRD_MANA_B, 1)
+end
+
+local function installPlayerAlternateManaColor()
+    local frame = _G.PlayerFrame
+    local bar = frame and frame.activeAlternatePowerBar
+    if bar and not isSecret(bar) and hooksecurefunc and not playerAltManaArtHooks[bar] then
+        local ok, updateArt = pcall(function() return bar.UpdateArt end)
+        if ok and type(updateArt) == "function" then
+            local hooked = pcall(hooksecurefunc, bar, "UpdateArt", applyPlayerAlternateManaColor)
+            if hooked then playerAltManaArtHooks[bar] = true end
+        end
+    end
+    if hooksecurefunc and not playerAltManaEnableHookInstalled
+        and type(PlayerFrame_OnAlternatePowerBarEnabled) == "function" then
+        playerAltManaEnableHookInstalled = pcall(hooksecurefunc,
+            "PlayerFrame_OnAlternatePowerBarEnabled", installPlayerAlternateManaColor)
+    end
+    applyPlayerAlternateManaColor(bar)
+end
+
+local function applyPRDAlternateManaColor(prd)
+    prd = prd or _G.PersonalResourceDisplayFrame
+    if not prd or isSecret(prd) then return end
+    local ok, bar, powerName = pcall(function()
+        if not prd.hasBeenSetup then return end
+        local alt = prd.AlternatePowerBar
+        if not alt then return end
+        return alt, alt.powerName
+    end)
+    if not ok or not bar or isSecret(bar) or isSecret(powerName)
+        or powerName ~= "MANA" then return end
+    -- Preserve the native PRD atlas, dimensions, masks, and value logic.
+    pcall(bar.SetStatusBarColor, bar, PRD_MANA_R, PRD_MANA_G, PRD_MANA_B, 1)
+end
+
+local function installPRDAlternateManaColor()
+    local prd = _G.PersonalResourceDisplayFrame
+    if not prd or isSecret(prd) then return end
+    if hooksecurefunc and not prdAltManaRefreshHookInstalled then
+        local ok, update = pcall(function() return prd.UpdateAlternatePowerBar end)
+        if ok and type(update) == "function" then
+            prdAltManaRefreshHookInstalled = pcall(hooksecurefunc,
+                prd, "UpdateAlternatePowerBar", applyPRDAlternateManaColor)
+        end
+    end
+    applyPRDAlternateManaColor(prd)
 end
 
 local function petUnitState(unit)
@@ -310,9 +408,13 @@ local function petUnitState(unit)
         end
     end
 
-    -- Negative pet identity requires both available identity paths to be readable.
-    -- Otherwise a reused ToT/FoT frame stays UNKNOWN instead of being painted as
-    -- an NPC while its referent is still transitioning.
+    -- Minions include pets, totems, and guardians. A readable negative can
+    -- establish non-pet identity when the direct pet comparison is restricted;
+    -- a positive is not sufficient to classify a combat pet.
+    if readableBool(UnitIsMinion, unit) == false then return false, true end
+
+    -- Otherwise both available pet identity paths must be readable. Unknown
+    -- identity on a reused ToT/FoT frame cannot authorize an NPC tint.
     if localReadable and (not UnitIsOtherPlayersPet or otherReadable) then
         return false, true
     end
@@ -407,76 +509,17 @@ local function matchingNamePlate(unit)
     end
 end
 
-local adjustedClassColor
-
-local function classTokenFromRGB(r, g, b)
-    if isSecret(r) or isSecret(g) or isSecret(b)
+local function readNativeHealthBarColor(bar)
+    if not bar or isSecret(bar) then return nil end
+    local ok, r, g, b = pcall(function()
+        if bar.IsForbidden and readableBool(bar.IsForbidden, bar) ~= false then return nil end
+        if type(bar.GetStatusBarColor) == "function" then return bar:GetStatusBarColor() end
+    end)
+    if not ok or isSecret(r) or isSecret(g) or isSecret(b)
         or type(r) ~= "number" or type(g) ~= "number" or type(b) ~= "number" then
         return nil
     end
-
-    local colors = CUSTOM_CLASS_COLORS or RAID_CLASS_COLORS
-    if type(colors) ~= "table" then return nil end
-    for token, color in pairs(colors) do
-        if color and not isSecret(color.r) and not isSecret(color.g) and not isSecret(color.b)
-            and type(color.r) == "number" and type(color.g) == "number" and type(color.b) == "number"
-        then
-            local function matches(cr, cg, cb)
-                return math.abs(r - cr) <= 0.055
-                    and math.abs(g - cg) <= 0.055
-                    and math.abs(b - cb) <= 0.055
-            end
-            if matches(color.r, color.g, color.b) then return token end
-
-            -- Also recognize the saturation/brightness adjustment used by this
-            -- addon when the visible client surface is already tinted.
-            local maximum = math.max(color.r, color.g, color.b)
-            local ar = math.min(1, (maximum + (color.r - maximum) * CLASS_SATURATION) * CLASS_BRIGHTNESS)
-            local ag = math.min(1, (maximum + (color.g - maximum) * CLASS_SATURATION) * CLASS_BRIGHTNESS)
-            local ab = math.min(1, (maximum + (color.b - maximum) * CLASS_SATURATION) * CLASS_BRIGHTNESS)
-            if matches(ar, ag, ab) then return token end
-        end
-    end
-end
-
-local function classColorFromFontString(region, path)
-    if not region or type(region.GetTextColor) ~= "function" then return nil end
-    local ok, r, g, b = pcall(region.GetTextColor, region)
-    local token = ok and classTokenFromRGB(r, g, b)
-    if not token then return nil end
-    local cr, cg, cb, ca = adjustedClassColor(token)
-    if cr then return cr, cg, cb, ca, path .. ":" .. token end
-end
-
-local function namePlateTextClassColor(frame, label)
-    if not frame then return nil end
-    local candidates = {}
-    local function add(region, path)
-        if region then candidates[#candidates + 1] = { region, path } end
-    end
-
-    for _, field in ipairs({ "name", "Name", "nameText", "NameText", "unitName" }) do
-        local ok, region = pcall(function() return frame[field] end)
-        if ok and region then
-            add(region, label .. "." .. field)
-            local childOK, child = pcall(function() return region.Name end)
-            if childOK and child then add(child, label .. "." .. field .. ".Name") end
-        end
-    end
-
-    if type(frame.GetRegions) == "function" then
-        local ok, regions = pcall(function() return { frame:GetRegions() } end)
-        if ok and type(regions) == "table" then
-            for index, region in ipairs(regions) do
-                add(region, label .. ".region" .. tostring(index))
-            end
-        end
-    end
-
-    for _, candidate in ipairs(candidates) do
-        local r, g, b, a, path = classColorFromFontString(candidate[1], candidate[2])
-        if r then return r, g, b, a, path end
-    end
+    return r, g, b
 end
 
 local function namePlateHealthColor(plate, unitFrame)
@@ -529,59 +572,38 @@ local function namePlateHealthColor(plate, unitFrame)
             end
         end)
         if barOK and bar then
-            if type(bar.GetStatusBarColor) == "function" then
-                local colorOK, r, g, b = pcall(bar.GetStatusBarColor, bar)
-                local token = colorOK and classTokenFromRGB(r, g, b)
-                if token then
-                    local cr, cg, cb, ca = adjustedClassColor(token)
-                    if cr then return cr, cg, cb, ca, path .. ":" .. token end
-                end
-                if colorOK and not nativeColor
-                    and not isSecret(r) and not isSecret(g) and not isSecret(b)
-                    and type(r) == "number" and type(g) == "number" and type(b) == "number"
-                then
-                    -- Preserve the actual visible nameplate color when it uses
-                    -- a client palette this addon cannot name as a class. This
-                    -- keeps hostile NPCs red and avoids inventing white/gray.
-                    nativeColor = { r, g, b, 1, path .. ":native" }
-                end
+            local r, g, b = readNativeHealthBarColor(bar)
+            if r and not nativeColor then
+                -- Native bar RGB is presentation data, not class identity.
+                -- Copy it exactly; ordinary white text and palette matches
+                -- cannot establish a player's class.
+                nativeColor = { r, g, b, 1, path .. ":native" }
             end
         end
 
         -- Era/Forever nameplates can expose their health StatusBar as an
         -- anonymous region rather than a parentKey. Find only named healthbar
         -- StatusBars here so cast/power bars cannot become color witnesses.
-        if type(frame.GetRegions) == "function" then
-            local regionsOK, regions = pcall(function() return { frame:GetRegions() } end)
-            if regionsOK and type(regions) == "table" then
-                for index, region in ipairs(regions) do
-                    local objectType, regionName
-                    if region and region.GetObjectType then
-                        local typeOK, value = pcall(region.GetObjectType, region)
-                        if typeOK then objectType = value end
-                    end
-                    if region and region.GetName then
-                        local nameOK, value = pcall(region.GetName, region)
-                        if nameOK and type(value) == "string" then regionName = value:lower() end
-                    end
-                    if objectType == "StatusBar" and regionName
-                        and regionName:find("health", 1, true)
+        local regionsOK, regions = pcall(function()
+            if type(frame.GetRegions) == "function" then return { frame:GetRegions() } end
+        end)
+        if regionsOK and type(regions) == "table" then
+            for index, region in ipairs(regions) do
+                local infoOK, objectType, regionName = pcall(function()
+                    if not region or isSecret(region) then return nil end
+                    local kind = region.GetObjectType and region:GetObjectType()
+                    local name = region.GetName and region:GetName()
+                    return kind, name
+                end)
+                if infoOK and not isSecret(objectType) and objectType == "StatusBar"
+                    and not isSecret(regionName) and type(regionName) == "string"
+                then
+                    regionName = regionName:lower()
+                    if regionName:find("health", 1, true)
                         and regionName:find("bar", 1, true)
-                        and type(region.GetStatusBarColor) == "function"
                     then
-                        local colorOK, r, g, b = pcall(region.GetStatusBarColor, region)
-                        local token = colorOK and classTokenFromRGB(r, g, b)
-                        if token then
-                            local cr, cg, cb, ca = adjustedClassColor(token)
-                            if cr then
-                                return cr, cg, cb, ca,
-                                    label .. ".region" .. tostring(index) .. ":" .. token
-                            end
-                        end
-                        if colorOK and not nativeColor
-                            and not isSecret(r) and not isSecret(g) and not isSecret(b)
-                            and type(r) == "number" and type(g) == "number" and type(b) == "number"
-                        then
+                        local r, g, b = readNativeHealthBarColor(region)
+                        if r and not nativeColor then
                             nativeColor = {
                                 r, g, b, 1,
                                 label .. ".region" .. tostring(index) .. ":native",
@@ -593,86 +615,87 @@ local function namePlateHealthColor(plate, unitFrame)
         end
     end
 
-    for _, candidate in ipairs(candidates) do
-        local r, g, b, a, path = namePlateTextClassColor(candidate[1], candidate[2])
-        if r then return r, g, b, a, path end
-    end
     if nativeColor then return unpack(nativeColor) end
-    return nil, nil, nil, nil, "class-color-unavailable"
+    return nil, nil, nil, nil, "native-color-unavailable"
+end
+
+local function classTokenFromPlayerAlias(unit, candidate)
+    if not candidate or not sameUnit(unit, candidate) then return nil end
+
+    -- A second view of the same actor may supply missing player/class data,
+    -- but must not contradict a readable non-player identity on this token.
+    local player, readable = playerUnitState(unit)
+    if readable and not player then return nil end
+    if isPlayerUnit(candidate) then return classToken(candidate) end
 end
 
 local function classTokenFromGroupAlias(unit)
-    local function check(candidate)
-        if sameUnit(unit, candidate) then
-            return classToken(candidate)
-        end
-    end
-
     for index = 1, 4 do
-        local token = check("party" .. index)
+        local token = classTokenFromPlayerAlias(unit, "party" .. index)
         if token then return token end
     end
     for index = 1, 40 do
-        local token = check("raid" .. index)
+        local token = classTokenFromPlayerAlias(unit, "raid" .. index)
         if token then return token end
     end
 end
 
-adjustedClassColor = function(token)
-    local colors = CUSTOM_CLASS_COLORS or RAID_CLASS_COLORS
+local function nativeClassColor(token)
+    -- Use the same class-color source as Blizzard's PRD and Damage Meter.
+    -- Do not amplify saturation/brightness or infer a class from appearance.
+    local colors = RAID_CLASS_COLORS
     local color = colors and colors[token]
     if not color or isSecret(color.r) or isSecret(color.g) or isSecret(color.b)
         or type(color.r) ~= "number" or type(color.g) ~= "number" or type(color.b) ~= "number" then
         return nil
     end
-
-    local r, g, b = color.r, color.g, color.b
-    local maximum = math.max(r, g, b)
-    r = math.min(1, (maximum + (r - maximum) * CLASS_SATURATION) * CLASS_BRIGHTNESS)
-    g = math.min(1, (maximum + (g - maximum) * CLASS_SATURATION) * CLASS_BRIGHTNESS)
-    b = math.min(1, (maximum + (b - maximum) * CLASS_SATURATION) * CLASS_BRIGHTNESS)
-    return r, g, b, 1
-end
-
-local function fallbackPlayerHealthColor(unit)
-    local token = classToken(unit) or classTokenFromGroupAlias(unit)
-    if token then
-        local r, g, b, a = adjustedClassColor(token)
-        if r then return r, g, b, a end
-    end
-
-    -- When battleground restrictions hide UnitClass for an enemy, Blizzard's
-    -- visible nameplate can still expose the class tint it is already showing.
-    local plate, unitFrame, plateUnit = matchingNamePlate(unit)
-    token = classToken(plateUnit)
-        or (unitFrame and classToken(readableUnitToken(unitFrame.unit)))
-    if token then
-        local r, g, b, a = adjustedClassColor(token)
-        if r then return r, g, b, a end
-    end
-    if plate then return namePlateHealthColor(plate, unitFrame) end
+    return color.r, color.g, color.b, 1
 end
 
 local function fallbackVisibleHealthColor(unit)
-    -- A matching party/raid unit is a positive class witness even when the
-    -- derived unit token itself has protected player/class identity.
+    -- Only a matching, positively identified player alias supplies class data.
+    -- Its class token alone cannot promote a pet, NPC, or unknown actor.
     local token = classTokenFromGroupAlias(unit)
     if token then
-        local r, g, b, a = adjustedClassColor(token)
+        local r, g, b, a = nativeClassColor(token)
         if r then return r, g, b, a end
     end
 
     local plate, unitFrame, plateUnit = matchingNamePlate(unit)
-    token = classToken(plateUnit)
-        or (unitFrame and classToken(readableUnitToken(unitFrame.unit)))
+    token = classTokenFromPlayerAlias(unit, plateUnit)
     if token then
-        local r, g, b, a = adjustedClassColor(token)
+        local r, g, b, a = nativeClassColor(token)
         if r then return r, g, b, a end
+    end
+    if unit == "targettarget" or unit == "focustarget" then
+        -- The same actor can have readable class data on a primary frame even
+        -- when its derived token does not. Reuse the existing identity checks;
+        -- never infer a class from the displayed bar color.
+        token = classTokenFromPlayerAlias(unit, "player")
+            or classTokenFromPlayerAlias(unit, "target")
+            or classTokenFromPlayerAlias(unit, "focus")
+        if token then
+            local r, g, b, a = nativeClassColor(token)
+            if r then return r, g, b, a end
+        end
     end
     if plate then return namePlateHealthColor(plate, unitFrame) end
 end
 
+local function fallbackPlayerHealthColor(unit)
+    local token = isPlayerUnit(unit) and classToken(unit)
+    if token then
+        local r, g, b, a = nativeClassColor(token)
+        if r then return r, g, b, a end
+    end
+
+    -- A readable native health bar may remain available when player class data
+    -- is restricted. The shared fallback copies that RGB without naming a class.
+    return fallbackVisibleHealthColor(unit)
+end
+
 local healthColorWrites = setmetatable({}, { __mode = "k" })
+
 local function setHealthColor(bar, ...)
     if bar.SetStatusBarDesaturated then
         -- The desaturation flag is applied after the bar tint on some client
@@ -680,8 +703,35 @@ local function setHealthColor(bar, ...)
         pcall(bar.SetStatusBarDesaturated, bar, false)
     end
     healthColorWrites[bar] = true
-    pcall(bar.SetStatusBarColor, bar, ...)
+    local ok = pcall(bar.SetStatusBarColor, bar, ...)
     healthColorWrites[bar] = nil
+    -- The grayscale fill is color-neutral, so class/reaction RGB is applied
+    -- directly without desaturating Blizzard's already-neutral texture.
+    return ok
+end
+
+local function setNativePlayerClassColor(bar, unit)
+    if not isPlayerUnit(unit) then return false end
+    local ok, applied = pcall(function()
+        if type(UnitClassBase) ~= "function" then return false end
+        local api = C_ClassColor
+        if isSecret(api) or type(api) ~= "table" then return false end
+        local getClassColor = api.GetClassColor
+        if isSecret(getClassColor) or type(getClassColor) ~= "function" then return false end
+
+        local token = UnitClassBase(unit)
+        if not isSecret(token) and type(token) ~= "string" then return false end
+        local color = getClassColor(token)
+        if isSecret(color) or not color then return false end
+        local getRGB = color.GetRGB
+        if isSecret(getRGB) or type(getRGB) ~= "function" then return false end
+
+        -- Native APIs accept protected class/RGB values. Keep these components
+        -- out of readable color selection, palette adjustment, and identity.
+        local r, g, b = getRGB(color)
+        return setHealthColor(bar, r, g, b, 1)
+    end)
+    return ok and applied == true
 end
 
 local function preserveUnknownDerivedColor(bar, unit)
@@ -691,6 +741,7 @@ end
 
 local function applyHealthColor(bar, unit)
     if not bar or not bar.SetStatusBarColor or not unit then return end
+    if readableUnitToken(bar.unit) ~= unit then return end
 
     local derived = unit == "targettarget" or unit == "focustarget"
     local exists = readableBool(UnitExists, unit)
@@ -704,46 +755,39 @@ local function applyHealthColor(bar, unit)
     -- be allowed to paint a real player green.
     local player, playerReadable = playerUnitState(unit)
     if playerReadable and player then
-        local r, g, b, a = fallbackPlayerHealthColor(unit)
-        if r then
+        local r, g, b, a, source = fallbackPlayerHealthColor(unit)
+        -- Readable direct/alias class colors have no native source label.
+        -- Prefer native class RGB before the opaque native rendering path.
+        if r and not source then
             setHealthColor(bar, r, g, b, a)
             return
         end
+        if setNativePlayerClassColor(bar, unit) then return end
+        if r then setHealthColor(bar, r, g, b, a) end
 
         -- UnitSelectionColor is a faction/reaction color here, not class data;
         -- some battleground clients return white for protected enemy players.
-        -- The matching nameplate fallback above is the visible color witness.
+        -- Copied native health RGB remains the fallback if class rendering fails.
         return
-    elseif not playerReadable then
-        -- ToT/FoT often have a readable matching nameplate even when their
-        -- own derived unit token cannot expose player/class identity.
-        local r, g, b, a = fallbackVisibleHealthColor(unit)
-        if r then
-            setHealthColor(bar, r, g, b, a)
-            return
-        end
-        if derived then
-            preserveUnknownDerivedColor(bar, unit)
-            return
-        end
-    elseif not player then
-        -- Some BG unit tokens report a readable non-player state while another
-        -- view of the same visible actor is already identified as a player.
-        -- Prefer its live nameplate tint before falling through to NPC colors.
-        local r, g, b, a = fallbackVisibleHealthColor(unit)
-        if r then
-            setHealthColor(bar, r, g, b, a)
-            return
-        end
     end
 
     -- Combat pets use Blizzard's stock green health language regardless of
-    -- owner/class/faction. Do this only after ruling out a real player.
+    -- owner/class/faction. Resolve this before any untyped visible fallback,
+    -- while retaining the positive-player priority above.
     local pet, petReadable = petUnitState(unit)
     if petReadable and pet then
         setHealthColor(bar, 0, 1, 0, 1)
         return
-    elseif derived and not petReadable then
+    end
+
+    -- A matched player alias can fill an unknown identity; a matched native
+    -- health bar can supply its actual tint for either an unknown actor or NPC.
+    local r, g, b, a = fallbackVisibleHealthColor(unit)
+    if r then
+        setHealthColor(bar, r, g, b, a)
+        return
+    end
+    if derived and (not playerReadable or not petReadable) then
         preserveUnknownDerivedColor(bar, unit)
         return
     end
@@ -752,7 +796,7 @@ local function applyHealthColor(bar, unit)
     -- than staying permanently green or merely inheriting reaction color.
     -- This preserves red/yellow/green selection colors while also surfacing
     -- important state such as a tap-denied/tagged NPC becoming grey.
-    -- An unreadable/absent new referent must not inherit the old actor's tint.
+    -- Only readable NPC state below may replace the native tint.
     local connected = readableBool(UnitIsConnected, unit)
     local dead = readableBool(UnitIsDead, unit)
     if connected == false or dead == true then
@@ -762,10 +806,9 @@ local function applyHealthColor(bar, unit)
 
     local tapDenied = readableBool(UnitIsTapDenied, unit)
     local playerControlled = readableBool(UnitPlayerControlled, unit)
-    local enemy = readableBool(UnitIsEnemy, "player", unit)
-    if tapDenied == true and playerControlled == false and enemy == false then
-        -- Matches Blizzard compact/nameplate convention for an NPC whose tap
-        -- belongs elsewhere.
+    if tapDenied == true and playerControlled == false then
+        -- Blizzard's NPC tap-gray rule is independent of hostility. Keep it
+        -- ahead of ordinary threat/selection red when native RGB is unavailable.
         setHealthColor(bar, 0.9, 0.9, 0.9, 1)
         return
     end
@@ -809,9 +852,18 @@ end
 
 local function applyUnit(unit)
     local health, power = healthBar(unit), powerBar(unit)
+    -- Native player/pet frames can swap bindings. Keep unsupported or unknown
+    -- bindings native until these surfaces return to their tracked units.
+    if (health and readableUnitToken(health.unit) ~= unit)
+        or (power and readableUnitToken(power.unit) ~= unit) then return end
     installDerivedColorHook(health, unit)
-    applyAtlas(health)
-    applyAtlas(power)
+    -- Blizzard's separate red damage-loss animation can cover the player fill.
+    -- Its native animation does not change frame alpha; keep only this layer
+    -- invisible while preserving health values, absorbs, and ordinary bar tint.
+    local loss = unit == "player" and health and health.AnimatedLossBar
+    if loss and loss.SetAlpha then pcall(loss.SetAlpha, loss, 0) end
+    applyUnitBarTexture(health)
+    applyUnitBarTexture(power)
     applyHealthColor(health, unit)
     applyPowerColor(power, unit)
 end
@@ -874,21 +926,90 @@ local function primaryDisplayName(value)
     return withoutRealm:match("^%S+")
 end
 
-local function primaryName(unit)
-    if not isPlayerUnit(unit) or not UnitName then return nil end
+local function primaryName(unit, allowUnmodified)
+    local player, playerReadable = playerUnitState(unit)
+    if not UnitName or (playerReadable and not player) then return nil end
+    local nonregional = readableBool(RegionalUniqueNamesEnabled) == false
+    if not playerReadable and not nonregional and not allowUnmodified then return nil end
     local ok, name = pcall(UnitName, unit)
-    if not ok or isSecret(name) or type(name) ~= "string" then return nil end
-    return primaryDisplayName(name)
+    if not ok then return nil end
+    if isSecret(name) then
+        -- Forward the component unchanged in nonregional mode. Owned derived
+        -- frames can also retain a complete current name when primary-only
+        -- formatting is unavailable; never inspect or split protected text.
+        if nonregional or allowUnmodified then return name, true end
+        return nil
+    end
+    if type(name) ~= "string" then return nil end
+    if not playerReadable then
+        -- The first component also preserves a complete NPC name. Unknown
+        -- identity only permits unchanged transport, including the derived
+        -- frame fallback; positive player identity is required for parsing.
+        return name, true
+    end
+    local primary = primaryDisplayName(name)
+    return primary, primary ~= nil
 end
 
-local function applyPrimaryNameToFrame(frame, unit)
+local function applyPrimaryNameToFrame(frame, unit, allowUnmodified)
     if not frame or not frame.name or not frame.name.SetText then return end
-    local name = primaryName(unit)
-    if name then pcall(frame.name.SetText, frame.name, name) end
+    local name, canDisplay = primaryName(unit, allowUnmodified)
+    if canDisplay then pcall(frame.name.SetText, frame.name, name) end
+end
+
+-- WoW Forever can update a target/focus frame's portrait and values while
+-- skipping its native name SetText (seen on a completely addon-free client).
+-- Track whether Blizzard actually wrote the name during the last update.
+-- This is intentionally scoped to target/focus: other frames retain the
+-- existing primary-name logic, and native NPC names are preserved unless the
+-- current UnitFrame_Update genuinely omitted its name write.
+local nativeNameWriteObserved = setmetatable({}, { __mode = "k" })
+local nativeNameObserverInstalled = setmetatable({}, { __mode = "k" })
+
+local function installTargetNameWriteObservers()
+    if not hooksecurefunc then return end
+    for _, unit in ipairs({ "target", "focus" }) do
+        local frame = unitFrame(unit)
+        local region = frame and frame.name
+        if frame and region and not nativeNameObserverInstalled[frame]
+            and type(region.SetText) == "function" then
+            local hooked = pcall(hooksecurefunc, region, "SetText", function()
+                nativeNameWriteObserved[frame] = true
+            end)
+            if hooked then
+                nativeNameObserverInstalled[frame] = true
+                nativeNameWriteObserved[frame] = false
+            end
+        end
+    end
+end
+
+local function repairSkippedTargetName(frame, unit)
+    if not nativeNameObserverInstalled[frame] then return end
+    local wroteName = nativeNameWriteObserved[frame]
+    nativeNameWriteObserved[frame] = false
+    if wroteName ~= false or readableUnitToken(frame.unit) ~= unit
+        or readableBool(UnitExists, unit) ~= true or not UnitName then return end
+
+    -- Fetch directly from the CURRENT unit token. Never reuse the previous
+    -- FontString or infer identity from old health/portrait/target values.
+    -- Avoid parsing protected strings and leave unfamiliar states native.
+    local ok, current = pcall(UnitName, unit)
+    if not ok or isSecret(current) or type(current) ~= "string"
+        or current == "" or not frame.name or not frame.name.SetText then return end
+    pcall(frame.name.SetText, frame.name, current)
+    nativeNameWriteObserved[frame] = false
 end
 
 local function applyPrimaryName(unit)
-    applyPrimaryNameToFrame(unitFrame(unit), unit)
+    local frame = unitFrame(unit)
+    if not frame or readableUnitToken(frame.unit) ~= unit then return end
+    -- Keep the current actor's name on derived frames even when its primary
+    -- component cannot be established. A protected full name stays whole.
+    applyPrimaryNameToFrame(frame, unit, unit == "targettarget" or unit == "focustarget")
+    -- Our presentation write is not evidence that Blizzard performed its own
+    -- name refresh; do not let it mask a skipped native write next time.
+    if nativeNameWriteObserved[frame] ~= nil then nativeNameWriteObserved[frame] = false end
 end
 
 local function applyCompactPrimaryName(frame)
@@ -955,6 +1076,75 @@ local function senderNameFilter(event, decorated, text, sender, language, channe
     if not primary or primary == sender then return decorated end
     local replaced, count = decorated:gsub(escapePattern(sender), primary, 1)
     return count > 0 and replaced or decorated
+end
+
+local function shortenPingVisibleRun(text, fullName)
+    if isSecret(text) or isSecret(fullName) or type(text) ~= "string"
+        or type(fullName) ~= "string" then return text end
+    local primary = primaryDisplayName(fullName)
+    if not primary or primary == fullName then return text end
+
+    local parts, index, replaced = {}, 1, false
+    while index <= #text do
+        local pipe = text:find("|", index, true)
+        local finish = pipe and pipe - 1 or #text
+        local visible = text:sub(index, finish)
+        if not replaced then
+            local first, last = visible:find(fullName, 1, true)
+            if first then
+                local before, after = visible:sub(first - 1, first - 1), visible:sub(last + 1, last + 1)
+                -- Match the complete readable name, not part of a larger word.
+                if (first == 1 or not before:match("[%w_\128-\255]"))
+                    and (after == "" or not after:match("[%w_\128-\255]")) then
+                    visible = visible:sub(1, first - 1) .. primary .. visible:sub(last + 1)
+                    replaced = true
+                end
+            end
+        end
+        parts[#parts + 1] = visible
+        if not pipe then break end
+
+        -- Preserve color and role-icon markup. Unknown or malformed markup
+        -- leaves the original label intact, including any earlier match.
+        local kind = text:sub(pipe + 1, pipe + 1)
+        local last
+        if kind == "A" or kind == "T" then
+            local closing = text:find(kind == "A" and "|a" or "|t", pipe + 2, true)
+            if closing then last = closing + 1 end
+        elseif kind == "c" and text:sub(pipe + 2, pipe + 9):match("^%x%x%x%x%x%x%x%x$") then
+            last = pipe + 9
+        elseif kind == "r" or kind == "|" then
+            last = pipe + 1
+        end
+        if not last then return text end
+        parts[#parts + 1] = text:sub(pipe, last)
+        index = last + 1
+    end
+    return table.concat(parts)
+end
+
+local function pingSenderNameFilter(_, event, text, sender, ...)
+    if event ~= "CHAT_MSG_PING" or isSecret(text) or isSecret(sender)
+        or type(sender) ~= "string" then return false end
+
+    -- PING bypasses the decorated-sender filter and uses this preformatted
+    -- label directly. Change its visible name, preserving the player link.
+    local shortened = sender:gsub("(|Hplayer:([^:|]+)[^|]*|h)(.-)(|h)",
+        function(open, fullName, visible, close)
+            return open .. shortenPingVisibleRun(visible, fullName) .. close
+        end, 1)
+    if shortened ~= sender then return false, text, shortened, ... end
+
+    -- Plain labels need an exact readable name witness. Native role-only
+    -- labels and unavailable names remain unchanged.
+    local guid = select(10, ...)
+    if isSecret(guid) or not senderIsPlayer(event, guid)
+        or type(GetPlayerInfoByGUID) ~= "function" then return false end
+    local ok, _, _, _, _, _, fullName = pcall(GetPlayerInfoByGUID, guid)
+    if not ok or isSecret(fullName) or type(fullName) ~= "string" then return false end
+    shortened = shortenPingVisibleRun(sender, fullName)
+    if shortened ~= sender then return false, text, shortened, ... end
+    return false
 end
 
 local communitiesNameHookInstalled = false
@@ -1036,7 +1226,28 @@ local function applyCommunityMemberPrimaryName(entry, memberInfo)
             primary = decorated
         end
     end
-    pcall(entry.NameFrame.Name.SetText, entry.NameFrame.Name, primary)
+    local nameFrame = entry.NameFrame
+    local nameRegion = nameFrame.Name
+    if not pcall(nameRegion.SetText, nameRegion, primary) then return end
+
+    -- Native SetMember lays out the rank icon before this name post-hook runs.
+    -- Re-anchor only that icon using the current readable text geometry.
+    pcall(function()
+        local rank = nameFrame.RankIcon
+        if not rank or readableBool(rank.IsShown, rank) ~= true then return end
+        local truncated = readableBool(nameRegion.IsTruncated, nameRegion)
+        if truncated == nil then return end
+        local width = truncated and nameRegion:GetWidth() or nameRegion:GetStringWidth()
+        local presence = nameFrame.PresenceIcon
+        local presenceShown = presence and readableBool(presence.IsShown, presence)
+        if presenceShown == nil then return end
+        local offset = presenceShown and presence:GetWidth() or 0
+        if isSecret(width) or isSecret(offset)
+            or type(width) ~= "number" or type(offset) ~= "number"
+            or width < 0 or offset < 0 or width ~= width or offset ~= offset
+            or width == math.huge or offset == math.huge then return end
+        rank:SetPoint("LEFT", nameFrame, "LEFT", width + offset, 0)
+    end)
 end
 
 local function applyVisibleCommunityMemberNames()
@@ -1236,7 +1447,107 @@ local function normalizeDamageMeterEntryName(frame)
     if state then state.guard = false end
 end
 
-local function installDamageMeterEntryNameHook(frame)
+local function applyDamageMeterUnitPrimaryName(frame, combatSource)
+    if not frame or type(combatSource) ~= "table" or not UnitTokenFromGUID
+        or not isSecret(frame.sourceName)
+    then
+        return
+    end
+
+    -- Use only the current native Init record. Never retain its GUID or a unit
+    -- mapping on this recycled row, and preserve the independent local path.
+    local creature, localPlayer = frame.isCreature, frame.isLocalPlayer
+    if isSecret(creature) or creature ~= false
+        or isSecret(localPlayer) or localPlayer ~= false then return end
+    local creatureID = combatSource.sourceCreatureID
+    if not isSecret(creatureID) and creatureID ~= nil then return end
+
+    -- This API explicitly permits opaque GUID arguments. A readable result may
+    -- be classified; an opaque result may only reach an accepting native consumer.
+    local sourceGUID = combatSource.sourceGUID
+    if not isSecret(sourceGUID) and type(sourceGUID) ~= "string" then return end
+    local okUnit, mappedUnit = pcall(UnitTokenFromGUID, sourceGUID)
+    if not okUnit then return end
+
+    local primary, canDisplay
+    if isSecret(mappedUnit) then
+        -- UnitName explicitly accepts an opaque token. Outside regional mode
+        -- its first component is already the native primary display value;
+        -- transport it whole, including any multiword NPC component. Never
+        -- classify this token, inspect either name result, or cache a mapping.
+        -- A readable source GUID still requires the readable round trip below.
+        if not isSecret(sourceGUID) or readableBool(RegionalUniqueNamesEnabled) ~= false
+            or type(UnitName) ~= "function" then return end
+        local okName, name = pcall(UnitName, mappedUnit)
+        if not okName or (not isSecret(name) and type(name) ~= "string") then return end
+        primary, canDisplay = name, true
+    else
+        local unit = readableUnitToken(mappedUnit)
+        if not unit or not isPlayerUnit(unit) then return end
+
+        -- A readable mismatch vetoes a stale unit mapping. An opaque source GUID
+        -- is only forwarded to the native mapper, never compared or inspected.
+        if not isSecret(sourceGUID) then
+            local currentGUID = readableUnitGUID(unit)
+            if not currentGUID or currentGUID ~= sourceGUID then return end
+        end
+
+        primary, canDisplay = primaryName(unit)
+    end
+    if not canDisplay then return end
+
+    local deathRecapID = frame.deathRecapID
+    if isSecret(deathRecapID) or type(deathRecapID) ~= "number" then return end
+    local isDeath = deathRecapID ~= 0
+    local index, displayName = frame.index, primary
+    if not isDeath then
+        if isSecret(index) or type(index) ~= "number"
+            or isSecret(DAMAGE_METER_SOURCE_NAME)
+            or type(DAMAGE_METER_SOURCE_NAME) ~= "string" then return end
+
+        -- Preserve the native classification/faction prefix. If the native
+        -- decision is unavailable to addon code, leave the full label native.
+        if type(frame.GetClassificationAtlasElement) ~= "function"
+            or type(frame.GetSourceTypeAtlasElement) ~= "function" then return end
+        local okAtlas, atlas = pcall(frame.GetClassificationAtlasElement, frame)
+        if not okAtlas or isSecret(atlas) then return end
+        if atlas == nil then
+            okAtlas, atlas = pcall(frame.GetSourceTypeAtlasElement, frame)
+            if not okAtlas or isSecret(atlas) then return end
+        end
+        if atlas ~= nil then
+            if type(atlas) ~= "string" or type(CreateAtlasMarkup) ~= "function"
+                or not C_StringUtil or type(C_StringUtil.WrapString) ~= "function"
+            then
+                return
+            end
+            local okMarkup, markup = pcall(CreateAtlasMarkup, atlas)
+            if not okMarkup or isSecret(markup) or type(markup) ~= "string" then return end
+            local okWrap, wrapped = pcall(C_StringUtil.WrapString, primary, markup .. " ", "")
+            if not okWrap then return end
+            displayName = wrapped
+        end
+    end
+
+    local okRegion, nameRegion = pcall(frame.GetName, frame)
+    if not okRegion or not nameRegion then return end
+    if isDeath and type(nameRegion.SetText) ~= "function" then return end
+    if not isDeath and type(nameRegion.SetFormattedText) ~= "function" then return end
+    local state = damageMeterNameRegionHooks[frame]
+    if not state or state.guard then return end
+
+    -- Both native text sinks accept protected arguments. The primary component
+    -- and formatted replacement are never parsed, compared, logged, or cached.
+    state.guard = true
+    if isDeath then
+        pcall(nameRegion.SetText, nameRegion, primary)
+    else
+        pcall(nameRegion.SetFormattedText, nameRegion, DAMAGE_METER_SOURCE_NAME, index, displayName)
+    end
+    state.guard = false
+end
+
+local function installDamageMeterEntryNameHook(frame, combatSource)
     if not frame or not hooksecurefunc then return end
 
     if not damageMeterNameRegionHooks[frame] then
@@ -1264,6 +1575,7 @@ local function installDamageMeterEntryNameHook(frame)
     end
 
     normalizeDamageMeterEntryName(frame)
+    applyDamageMeterUnitPrimaryName(frame, combatSource)
 end
 
 local function hookDamageMeterWindow(sessionWindow)
@@ -1273,8 +1585,8 @@ local function hookDamageMeterWindow(sessionWindow)
         return
     end
 
-    hooksecurefunc(sessionWindow, "InitEntry", function(_self, frame, _elementData)
-        installDamageMeterEntryNameHook(frame)
+    hooksecurefunc(sessionWindow, "InitEntry", function(_self, frame, elementData)
+        installDamageMeterEntryNameHook(frame, elementData)
     end)
     damageMeterWindowHooks[sessionWindow] = true
 
@@ -1282,8 +1594,8 @@ local function hookDamageMeterWindow(sessionWindow)
     if type(sessionWindow.GetScrollBox) == "function" then
         local ok, scrollBox = pcall(sessionWindow.GetScrollBox, sessionWindow)
         if ok and scrollBox and type(scrollBox.ForEachFrame) == "function" then
-            pcall(scrollBox.ForEachFrame, scrollBox, function(frame)
-                installDamageMeterEntryNameHook(frame)
+            pcall(scrollBox.ForEachFrame, scrollBox, function(frame, elementData)
+                installDamageMeterEntryNameHook(frame, elementData)
             end)
         end
     end
@@ -1306,8 +1618,8 @@ local function installDamageMeterPrimaryNames()
         and _G.DamageMeterSourceEntryMixin
         and type(_G.DamageMeterSourceEntryMixin.Init) == "function"
     then
-        hooksecurefunc(_G.DamageMeterSourceEntryMixin, "Init", function(frame)
-            installDamageMeterEntryNameHook(frame)
+        hooksecurefunc(_G.DamageMeterSourceEntryMixin, "Init", function(frame, combatSource)
+            installDamageMeterEntryNameHook(frame, combatSource)
         end)
         damageMeterSourceInitHookInstalled = true
     end
@@ -1389,10 +1701,14 @@ local function installLevelVisibilityHook(textRegion)
     end
 
     levelVisibilityHooks[textRegion] = true
-    hooksecurefunc(textRegion, "Show", function(self)
+    local function enforceHidden(self)
         if levelNumbersEnabled() then return end
         pcall(self.Hide, self)
-    end)
+    end
+    hooksecurefunc(textRegion, "Show", enforceHidden)
+    if type(textRegion.SetShown) == "function" then
+        hooksecurefunc(textRegion, "SetShown", enforceHidden)
+    end
 end
 
 local function applyLevelNumberVisibility()
@@ -1404,13 +1720,17 @@ local function applyLevelNumberVisibility()
             if not levelNumbersEnabled() then
                 pcall(textRegion.Hide, textRegion)
             elseif unit == "player" then
-                if type(PlayerFrame_UpdateLevel) == "function" then
-                    pcall(PlayerFrame_UpdateLevel)
+                local frame = _G.PlayerFrame
+                if frame and readableUnitToken(frame.unit) == "player" then
+                    if type(PlayerFrame_UpdateLevel) == "function" then
+                        pcall(PlayerFrame_UpdateLevel)
+                    end
+                    pcall(textRegion.Show, textRegion)
                 end
-                pcall(textRegion.Show, textRegion)
             else
                 local frame = unit == "target" and _G.TargetFrame or _G.FocusFrame
-                if frame and type(frame.CheckLevel) == "function" then
+                if frame and readableUnitToken(frame.unit) == unit
+                    and type(frame.CheckLevel) == "function" then
                     -- Blizzard owns the valid visibility state for target/focus
                     -- (corpse, battle pet, unknown/high level, etc.).
                     pcall(frame.CheckLevel, frame)
@@ -1603,13 +1923,13 @@ local function installHooks()
 
     if hooksecurefunc and type(UnitFrameHealthBar_Update) == "function" then
         hooksecurefunc("UnitFrameHealthBar_Update", function(bar, unit)
-            unit = readableUnitToken(unit)
-                or (bar and readableUnitToken(bar.unit))
-            -- Only touch the actual Blizzard unit-frame health bar. PlayerFrame
-            -- also owns an AnimatedLossBar which is intentionally red on damage;
-            -- styling that auxiliary bar makes the whole health display flash red.
+            -- The event can name another alias of this actor (for example
+            -- target while updating focus). Route by the bar's bound unit.
+            unit = bar and readableUnitToken(bar.unit)
+            -- Only touch the actual unit-frame health bar, excluding auxiliary
+            -- damage/absorb bars that can carry the same unit token.
             if unit and bar == healthBar(unit) then
-                applyAtlas(bar)
+                applyUnitBarTexture(bar)
                 applyHealthColor(bar, unit)
             end
         end)
@@ -1618,21 +1938,46 @@ local function installHooks()
         hooksecurefunc("UnitFrameManaBar_UpdateType", function(bar)
             local unit = bar and readableUnitToken(bar.unit)
             if unit and bar == powerBar(unit) then
-                applyAtlas(bar)
+                applyUnitBarTexture(bar)
                 applyPowerColor(bar, unit)
             end
         end)
     end
 
+    installTargetNameWriteObservers()
     if hooksecurefunc and type(UnitFrame_Update) == "function" then
         hooksecurefunc("UnitFrame_Update", function(frame)
             local unit = trackedFrame(frame)
             if unit then
+                -- Blizzard occasionally leaves the previous target name even
+                -- though other target-frame fields refresh. Repair only when
+                -- native SetText was skipped, before our primary-name styling.
+                if unit == "target" or unit == "focus" then
+                    repairSkippedTargetName(frame, unit)
+                end
                 -- TargetOfTargetMixin:Update() calls UnitFrame_Update before its
                 -- dead/portrait checks. Reapply after the unit rebind here; the
                 -- two derived bars also guard subsequent native tint writes.
                 applyUnit(unit)
                 applyPrimaryName(unit)
+            end
+        end)
+    end
+    -- Owned bars can refresh before the nameplate's deferred health update.
+    -- Re-sample matching plates after their native color selection finishes.
+    if hooksecurefunc and type(CompactUnitFrame_UpdateHealthColor) == "function" then
+        hooksecurefunc("CompactUnitFrame_UpdateHealthColor", function(frame)
+            local ok, plateUnit = pcall(function()
+                if isSecret(frame) or not frame
+                    or (frame.IsForbidden and readableBool(frame.IsForbidden, frame) ~= false)
+                then return nil end
+                return readableUnitToken(frame.unit)
+            end)
+            if not ok or not plateUnit or not plateUnit:match("^nameplate%d+$") then return end
+            for _, unit in ipairs({ "target", "focus", "targettarget", "focustarget" }) do
+                if sameUnit(unit, plateUnit) then
+                    applyHealthColor(healthBar(unit), unit)
+                end
             end
         end)
     end
@@ -1645,53 +1990,549 @@ local function installHooks()
     if ChatFrameUtil and ChatFrameUtil.AddSenderNameFilter then
         ChatFrameUtil.AddSenderNameFilter(senderNameFilter)
     end
+    if ChatFrameUtil and ChatFrameUtil.AddMessageEventFilter then
+        ChatFrameUtil.AddMessageEventFilter("CHAT_MSG_PING", pingSenderNameFilter)
+    end
     installCommunitiesPrimaryNames()
     installDamageMeterPrimaryNames()
 
     installThreatScaling()
 end
 
-local derivedDebuffRefreshHookInstalled = false
-local derivedDebuffRefreshGuard = false
+local derivedFrameAlignment = setmetatable({}, { __mode = "k" })
 
-local function installDerivedDebuffRefresh()
-    if derivedDebuffRefreshHookInstalled or not hooksecurefunc
-        or type(AuraUtil) ~= "table" or type(AuraUtil.RefreshAuras) ~= "function"
+local function readableGeometryNumber(value)
+    return not isSecret(value) and type(value) == "number"
+        and value == value and value > -math.huge and value < math.huge
+end
+
+local function alignDerivedFrame(frame)
+    local state = derivedFrameAlignment[frame]
+    if not state or state.updating or readableBool(InCombatLockdown) ~= false then return end
+
+    local parent = state.parent
+    if not frame.GetNumPoints or not frame.GetPoint or not frame.SetPoint
+        or not frame.GetEffectiveScale or not parent.GetEffectiveScale
     then
         return
     end
 
-    hooksecurefunc(AuraUtil, "RefreshAuras", function(frame, unit, numAuras, suffix, checkCVar, showBuffs)
-        if derivedDebuffRefreshGuard or checkCVar ~= true or showBuffs ~= false then return end
-        if frame ~= smallFrame("targettarget") and frame ~= smallFrame("focustarget") then return end
+    local counted, count = pcall(frame.GetNumPoints, frame)
+    if not counted or isSecret(count) or count ~= 1 then return end
 
-        -- Blizzard's ToT/FoT refresh obeys showDispelDebuffs. When that option is
-        -- enabled on a friendly derived unit, the native HARMFUL|RAID filter can
-        -- make ordinary debuffs disappear entirely. Keep the global setting for
-        -- other frames, but restore the full harmful list on ToT/FoT.
-        local filterActive = false
-        if CVarCallbackRegistry and CVarCallbackRegistry.GetCVarValueBool then
-            local ok, value = pcall(
-                CVarCallbackRegistry.GetCVarValueBool,
-                CVarCallbackRegistry,
-                "showDispelDebuffs"
-            )
-            filterActive = ok and value == true
-        elseif GetCVarBool then
-            local ok, value = pcall(GetCVarBool, "showDispelDebuffs")
-            filterActive = ok and value == true
+    local anchored, point, relativeTo, relativePoint, x, y = pcall(frame.GetPoint, frame, 1)
+    if not anchored or isSecret(point) or isSecret(relativeTo) or isSecret(relativePoint)
+        or point ~= "TOPRIGHT" or relativeTo ~= parent or relativePoint ~= "BOTTOMRIGHT"
+        or not readableGeometryNumber(x) or not readableGeometryNumber(y)
+    then
+        return
+    end
+
+    local parentReadable, parentScale = pcall(parent.GetEffectiveScale, parent)
+    local frameReadable, frameScale = pcall(frame.GetEffectiveScale, frame)
+    if not parentReadable or not frameReadable
+        or not readableGeometryNumber(parentScale) or not readableGeometryNumber(frameScale)
+        or parentScale <= 0 or frameScale <= 0
+    then
+        return
+    end
+
+    -- Native TargetFrame.xml places the parent portrait center 55 units left
+    -- of its right edge and the derived portrait center 96.5 units left of its
+    -- right edge. SetPoint offsets use the derived frame's scale. Change only
+    -- X, retaining the current native Y (including small Focus's distinct Y).
+    -- The visible small-circle aperture needs one unit left of logical center.
+    local alignedX = 95.5 - 55 * (parentScale / frameScale)
+    if not readableGeometryNumber(alignedX) or math.abs(x - alignedX) < 0.000001 then return end
+
+    -- Replacing this same single point is atomic: a rejected write leaves the
+    -- native anchor intact. Never read positions/visibility or re-anchor in
+    -- combat; PLAYER_REGEN_ENABLED retries from the current native relation.
+    state.updating = true
+    pcall(frame.SetPoint, frame, point, parent, relativePoint, alignedX, y)
+    state.updating = false
+end
+
+local function installDerivedFrameAlignment()
+    for _, unit in ipairs({ "targettarget", "focustarget" }) do
+        local parent = unit == "targettarget" and _G.TargetFrame or _G.FocusFrame
+        local frame = smallFrame(unit)
+        if parent and frame then
+            local state = derivedFrameAlignment[frame] or {}
+            derivedFrameAlignment[frame] = state
+            state.parent = parent
+
+            if hooksecurefunc then
+                if not state.pointHook and type(frame.SetPoint) == "function" then
+                    state.pointHook = pcall(hooksecurefunc, frame, "SetPoint", alignDerivedFrame)
+                end
+                if not state.scaleHook and type(frame.SetScale) == "function" then
+                    state.scaleHook = pcall(hooksecurefunc, frame, "SetScale", alignDerivedFrame)
+                end
+            end
+            alignDerivedFrame(frame)
         end
-        if not filterActive then return end
+    end
+end
 
-        local assistable = readableBool(UnitCanAssist, "player", unit)
-        if assistable ~= true then return end
+-- Compact ToT/ToF frames are separate from their HealthBar children.
+-- Unlike the abandoned .124 anchor experiment, do NOT move either compact
+-- frame: that carries the portrait, name, health, and mana together.
+-- The native health bar is BOTTOMRIGHT anchored, 10 units tall. Adjusting
+-- only its height changes its top fill edge while leaving the bottom edge
+-- (and the ManaBar anchored to it) at the native position.
+local COMPACT_HP_TOP_EDGE_ADJUST = {
+    -- ToT remains the native 10-unit reference. In .129, stretching ToF to
+    -- 10.5 improved upper coverage but softened its lower silver separator.
+    -- Reduce only that stretch to preserve more of the native edge gradient.
+    focustarget = 0.25, -- ToF 10.25, bottom edge and mana anchor unchanged
+}
 
-        derivedDebuffRefreshGuard = true
-        pcall(AuraUtil.RefreshAuras, frame, unit, numAuras, suffix, false, false)
-        derivedDebuffRefreshGuard = false
+local function alignCompactHealthFill(unit)
+    local delta = COMPACT_HP_TOP_EDGE_ADJUST[unit]
+    if not delta or readableBool(InCombatLockdown) ~= false then return end
+
+    local frame = smallFrame(unit)
+    local bar = frame and frame.HealthBar
+    if not bar or not bar.GetParent or not bar.GetNumPoints or not bar.GetPoint
+        or not bar.GetHeight or not bar.SetHeight then return end
+
+    local parentOK, parent = pcall(bar.GetParent, bar)
+    if not parentOK or parent ~= frame then return end
+
+    local countOK, count = pcall(bar.GetNumPoints, bar)
+    if not countOK or isSecret(count) or count ~= 1 then return end
+    local ok, point, relativeTo, relativePoint, x, y = pcall(bar.GetPoint, bar, 1)
+    if not ok or isSecret(point) or isSecret(relativeTo) or isSecret(relativePoint)
+        or point ~= "BOTTOMRIGHT" or relativeTo ~= frame or relativePoint ~= "RIGHT"
+        or not readableGeometryNumber(x) or not readableGeometryNumber(y) then return end
+
+    local heightOK, height = pcall(bar.GetHeight, bar)
+    if not heightOK or not readableGeometryNumber(height) then return end
+    local wanted = 10 + delta
+    -- The game returns approximate floats, e.g. 10.000018 or 9.999895;
+    -- 0.000001 incorrectly skipped the adjustment entirely on both frames.
+    -- Tolerate native floating-point noise, but decline unusual layouts.
+    if math.abs(height - wanted) < 0.005 then return end
+    if math.abs(height - 10) > 0.005 then return end
+    pcall(bar.SetHeight, bar, wanted)
+end
+
+-- The in-game ToF test confirmed a cleaner health/resource separator
+-- when the compact ManaBar is anchored directly to the health bar (Y=0).
+-- Apply the identical spacing to ToT as well; do not touch either HealthBar,
+-- its height, the portrait, the outer frame or native border artwork.
+-- No ClearAllPoints: replace the same single anchor only, outside combat.
+local function alignCompactMana(unit)
+    if unit ~= "targettarget" and unit ~= "focustarget" then return end
+    if readableBool(InCombatLockdown) ~= false then return end
+    local frame = smallFrame(unit)
+    local health = frame and frame.HealthBar
+    local mana = frame and frame.ManaBar
+    if not health or not mana or not mana.GetNumPoints or not mana.GetPoint
+        or not mana.SetPoint then return end
+
+    local countOK, count = pcall(mana.GetNumPoints, mana)
+    if not countOK or isSecret(count) or count ~= 1 then return end
+    local ok, point, relativeTo, relativePoint, x, y = pcall(mana.GetPoint, mana, 1)
+    if not ok or isSecret(point) or isSecret(relativeTo) or isSecret(relativePoint)
+        or point ~= "TOPLEFT" or relativeTo ~= health or relativePoint ~= "BOTTOMLEFT"
+        or not readableGeometryNumber(x) or not readableGeometryNumber(y)
+        or math.abs(x + 4) > 0.005 then return end
+    -- Accept only Blizzard's native offset (-1) or our tested offset (0).
+    -- Do not overwrite an unfamiliar layout, including another addon's.
+    if math.abs(y) <= 0.005 then return end
+    if math.abs(y + 1) > 0.005 then return end
+    pcall(mana.SetPoint, mana, "TOPLEFT", health, "BOTTOMLEFT", -4, 0)
+end
+
+-- The ToF in-game experiment established a narrower, better mechanism than
+-- SetDrawLayer on the parent FrameTexture: a separate border-artwork frame,
+-- directly above the two StatusBar child frames. Clip the overlay below
+-- the name on both ToT and ToF: the higher-level border copy otherwise
+-- draws over the native name FontString. Preserve fill and text ownership.
+-- This creates at most one overlay per compact frame; no OnUpdate/polling.
+local compactChromeOverlays = setmetatable({}, { __mode = "k" })
+
+local function alignCompactChrome(unit)
+    if unit ~= "targettarget" and unit ~= "focustarget" then return end
+    if readableBool(InCombatLockdown) ~= false then return end
+
+    local frame = smallFrame(unit)
+    local mana = frame and frame.ManaBar
+    local original = frame and frame.FrameTexture
+    if not frame or not mana or not original or not CreateFrame
+        or not mana.GetFrameLevel or not original.GetAtlas then return end
+
+    local atlasOK, atlas = pcall(original.GetAtlas, original)
+    local levelOK, barLevel = pcall(mana.GetFrameLevel, mana)
+    if not atlasOK or not levelOK or isSecret(atlas) or isSecret(barLevel)
+        or type(atlas) ~= "string" or atlas == ""
+        or not readableGeometryNumber(barLevel) then return end
+
+    local wantedLevel = barLevel + 1
+    local state = compactChromeOverlays[frame]
+    if state then
+        -- Blizzard can relevel the compact StatusBars on layout changes.
+        -- Keep the existing overlay above them without duplicating textures.
+        if not state.shell or not state.shell.GetFrameLevel or not state.shell.SetFrameLevel then return end
+        local currentOK, currentLevel = pcall(state.shell.GetFrameLevel, state.shell)
+        if currentOK and readableGeometryNumber(currentLevel)
+            and math.abs(currentLevel - wantedLevel) > 0.001 then
+            pcall(state.shell.SetFrameLevel, state.shell, wantedLevel)
+        end
+        if state.atlas ~= atlas and state.texture and state.texture.SetAtlas then
+            if pcall(state.texture.SetAtlas, state.texture, atlas, true) then
+                state.atlas = atlas
+            end
+        end
+        return
+    end
+
+    -- The compact frame's native Name is a FontString owned by the parent:
+    -- its rectangle begins at y=-5 (relative to Portrait) and is 10 units
+    -- high, whereas HealthBar starts around y=-17. A full-sized higher-level
+    -- border copy also redraws the opaque nameplate ABOVE that FontString,
+    -- clipping/dimming longer names (reported in .141). We only need the
+    -- chrome over the two bar fills, not over the name or portrait crown.
+    --
+    -- Clip the copy to the lower region of this same native frame. Keep the
+    -- copied atlas centered on the *original* frame so the lower frame border
+    -- and health/power separator retain exactly their native alignment.
+    -- If clipping is unavailable, fail closed rather than hiding the names.
+    if not CreateFrame or not frame.SetClipsChildren then return end
+    local made, shell = pcall(CreateFrame, "Frame", nil, frame)
+    if not made or not shell then return end
+    if shell.EnableMouse then pcall(shell.EnableMouse, shell, false) end
+    if not shell.SetClipsChildren then
+        if shell.Hide then pcall(shell.Hide, shell) end
+        compactChromeOverlays[frame] = {disabled = true}
+        return
+    end
+    local clipped = pcall(shell.SetClipsChildren, shell, true)
+    local topOK = pcall(shell.SetPoint, shell, "TOPLEFT", frame, "TOPLEFT", 0, -16)
+    local bottomOK = pcall(shell.SetPoint, shell, "BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
+    local levelSetOK = pcall(shell.SetFrameLevel, shell, wantedLevel)
+    if not clipped or not topOK or not bottomOK or not levelSetOK then
+        if shell.Hide then pcall(shell.Hide, shell) end
+        compactChromeOverlays[frame] = {disabled = true}
+        return
+    end
+
+    local textureMade, texture = pcall(shell.CreateTexture, shell, nil, "OVERLAY")
+    if not textureMade or not texture then
+        if shell.Hide then pcall(shell.Hide, shell) end
+        compactChromeOverlays[frame] = {disabled = true}
+        return
+    end
+    if not pcall(texture.SetAtlas, texture, atlas, true)
+        or not pcall(texture.SetPoint, texture, "CENTER", frame) then
+        if shell.Hide then pcall(shell.Hide, shell) end
+        compactChromeOverlays[frame] = {disabled = true}
+        return
+    end
+
+    compactChromeOverlays[frame] = {shell = shell, texture = texture, atlas = atlas}
+end
+
+-- Preserve the .114 health fill (top=-40.5, height=20.5) and its
+-- independently aligned health text. Keep the .115 resource bar and text at
+-- y=-62. Do not stretch the health fill merely to meet the resource bar:
+-- that extra lower pixel made the HP fill appear too low and obscured the seam.
+-- The one-unit separation is left to the existing Blizzard border artwork;
+-- never move the outer frame or the status-text anchors here.
+local function alignPlayerHealthContent()
+    if readableBool(InCombatLockdown) ~= false then return end
+
+    local frame = _G.PlayerFrame
+    local main = frame and frame.PlayerFrameContent
+        and frame.PlayerFrameContent.PlayerFrameContentMain
+    local container = main and main.HealthBarsContainer
+    local manaArea = main and main.ManaBarArea
+    local health = container and container.HealthBar
+    local mana = manaArea and manaArea.ManaBar
+    if not health or not mana or not container.GetPoint
+        or not container.GetNumPoints or not health.GetPoint
+        or not health.GetNumPoints or not mana.GetPoint
+        or not mana.GetNumPoints or not health.GetHeight
+        or not mana.GetHeight or not health.SetPoint or not mana.SetPoint
+        or not health.SetHeight or not mana.SetHeight then return end
+
+    -- Protect vehicle, health-only, and unknown layouts from player-art edits.
+    local stateOK, state = pcall(function() return frame.state end)
+    if not stateOK or isSecret(state) or (state ~= nil and state ~= "player") then return end
+
+    local function singleAnchor(object)
+        local countOK, count = pcall(object.GetNumPoints, object)
+        if not countOK or isSecret(count) or count ~= 1 then return end
+        local ok, point, relativeTo, relativePoint, x, y =
+            pcall(object.GetPoint, object, 1)
+        if not ok or isSecret(point) or isSecret(relativeTo)
+            or isSecret(relativePoint) or not readableGeometryNumber(x)
+            or not readableGeometryNumber(y) then return end
+        return point, relativeTo, relativePoint, x, y
+    end
+
+    local cp, cr, crp, cx, cy = singleAnchor(container)
+    local hp, hr, hrp, hx, hy = singleAnchor(health)
+    local mp, mr, mrp, mx, my = singleAnchor(mana)
+    if cp ~= "TOPLEFT" or cr ~= main or crp ~= "TOPLEFT"
+        or math.abs(cx - 85) > 0.001 or math.abs(cy + 41) > 0.001
+        or hp ~= "TOPLEFT" or hr ~= container or hrp ~= "TOPLEFT"
+        or math.abs(hx) > 0.001
+        or (math.abs(hy) > 0.001 and math.abs(hy - 0.5) > 0.001
+            and math.abs(hy - 1) > 0.001)
+        or mp ~= "TOPLEFT" or mr ~= manaArea or mrp ~= "TOPLEFT"
+        or math.abs(mx - 85) > 0.001
+        or (math.abs(my + 61) > 0.001 and math.abs(my + 62) > 0.001
+            and math.abs(my + 60.5) > 0.001 and math.abs(my + 60) > 0.001)
+    then return end
+
+    local healthOK, healthHeight = pcall(health.GetHeight, health)
+    local manaOK, manaHeight = pcall(mana.GetHeight, mana)
+    if not healthOK or not manaOK or not readableGeometryNumber(healthHeight)
+        or not readableGeometryNumber(manaHeight)
+        or (math.abs(healthHeight - 19) > 0.001
+            and math.abs(healthHeight - 20) > 0.001
+            and math.abs(healthHeight - 20.5) > 0.001
+            and math.abs(healthHeight - 21.5) > 0.001)
+        or (math.abs(manaHeight - 10) > 0.001
+            and math.abs(manaHeight - 10.5) > 0.001
+            and math.abs(manaHeight - 11) > 0.001)
+    then return end
+
+    -- Resource bar and labels remain at the successful .115 y=-62.
+    -- Restore .114's health fill lower edge by returning to height 20.5
+    -- (top=-40.5; bottom=-61), without moving the health text or container.
+    -- Accept .115's 21.5 input for seamless migration at /reload.
+    if math.abs(my + 62) > 0.001 then
+        if not pcall(mana.SetPoint, mana, "TOPLEFT", manaArea, "TOPLEFT", 85, -62) then return end
+    end
+    if math.abs(manaHeight - 10) > 0.001 then
+        if not pcall(mana.SetHeight, mana, 10) then return end
+    end
+    if math.abs(healthHeight - 20.5) > 0.001 then
+        if not pcall(health.SetHeight, health, 20.5) then return end
+    end
+    if math.abs(hy - 0.5) > 0.001 then
+        if not pcall(health.SetPoint, health, "TOPLEFT", container, "TOPLEFT", 0, 0.5) then return end
+    end
+
+    -- Preserve .114's independent player health text alignment. The resource
+    -- labels stay anchored natively inside their own shifted mana status bar.
+    local function alignHealthText(font, point, x)
+        if not font or not font.GetNumPoints or not font.GetPoint or not font.SetPoint then return end
+        local p, relative, rp, tx, ty = singleAnchor(font)
+        if p ~= point or relative ~= container or rp ~= point
+            or math.abs(tx - x) > 0.001
+            or (math.abs(ty) > 0.001 and math.abs(ty - 1) > 0.001)
+        then return end
+        if math.abs(ty - 1) > 0.001 then
+            pcall(font.SetPoint, font, point, container, point, x, 1)
+        end
+    end
+    alignHealthText(container.HealthBarText, "CENTER", 0)
+    alignHealthText(container.LeftText, "LEFT", 2)
+    alignHealthText(container.RightText, "RIGHT", -2)
+end
+
+-- The PRD-style neutral statusbar fill can be cropped by Blizzard's native
+-- player-specific ManaBarMask: the upper colored row is absent on the player
+-- while visible on Target. Do not change the ManaBar frame, height, width,
+-- values, text, or native silver border. Trial correction: move only the
+-- already-attached player Mana fill mask upward by ONE UI unit (native +2 -> +3).
+-- This retains Blizzard's mask shape and clamps this experiment to its known
+-- portrait-on atlas. The alternate/class-resource mask and unfamiliar anchors
+-- are deliberately left native. An in-game screenshot is still needed.
+local function alignPlayerManaMask(mana)
+    local mask = mana and mana.ManaBarMask
+    if not mask or isSecret(mask) or not mask.GetAtlas or not mask.GetNumPoints
+        or not mask.GetPoint or not mask.SetPoint then return end
+
+    local atlasOK, atlas = pcall(mask.GetAtlas, mask)
+    if not atlasOK or isSecret(atlas)
+        or atlas ~= "UI-HUD-UnitFrame-Player-PortraitOn-Bar-Mana-Mask" then return end
+    local countOK, count = pcall(mask.GetNumPoints, mask)
+    if not countOK or isSecret(count) or count ~= 1 then return end
+
+    local ok, p, relative, relativePoint, x, y = pcall(mask.GetPoint, mask, 1)
+    if not ok or isSecret(p) or isSecret(relative) or isSecret(relativePoint)
+        or p ~= "TOPLEFT" or relative ~= mana or relativePoint ~= "TOPLEFT"
+        or not readableGeometryNumber(x) or not readableGeometryNumber(y)
+        or math.abs(x + 2) > 0.01 then return end
+
+    if math.abs(y - 3) <= 0.01 then return end
+    if math.abs(y - 2) > 0.01 then return end
+    -- Reuse the existing single TOPLEFT anchor; no ClearAllPoints or new frame.
+    pcall(mask.SetPoint, mask, "TOPLEFT", mana, "TOPLEFT", -2, 3)
+end
+
+-- Blizzard and bjarkiUI can update the player Mana status labels at different
+-- points of the frame lifecycle. In-game observation: Mana percentage sometimes
+-- aligns naturally after /reload, without a code change. Do not impose a
+-- fixed Y offset on LeftText: that made an already-correct state regress.
+-- Leave the percentage's native anchor alone; preserve the previously tested
+-- center/right presentation until independently validated or removed.
+local playerManaTextOffsets = setmetatable({}, { __mode = "k" })
+local playerManaTextArtHookInstalled = false
+
+local function alignPlayerManaText()
+    if readableBool(InCombatLockdown) ~= false then return end
+    local frame = _G.PlayerFrame
+    local main = frame and frame.PlayerFrameContent
+        and frame.PlayerFrameContent.PlayerFrameContentMain
+    local area = main and main.ManaBarArea
+    local mana = area and area.ManaBar
+    if not mana or not mana.GetEffectiveScale then return end
+    local stateOK, state = pcall(function() return frame.state end)
+    if not stateOK or isSecret(state) or (state ~= nil and state ~= "player") then return end
+    if readableUnitToken(mana.unit) ~= "player" then return end
+    -- Existing native player-art post-hook provides this mask's lifecycle;
+    -- execute before text checks without introducing another hook or loop.
+    alignPlayerManaMask(mana)
+
+    local scaleOK, scale = pcall(mana.GetEffectiveScale, mana)
+    if not scaleOK or not readableGeometryNumber(scale)
+        or scale <= 0 then return end
+    -- Translate one physical pixel to UI units at the current effective scale.
+    local targetY = 1 / scale
+    if not readableGeometryNumber(targetY) or targetY < 0.5 or targetY > 3 then return end
+
+    local anchors = {
+        {mana.ManaBarText, "CENTER", 0},
+        {mana.RightText, "RIGHT", -2},
+    }
+    for _, entry in ipairs(anchors) do
+        local font, point, expectedX = unpack(entry)
+        if font and not isSecret(font) and font.GetNumPoints and font.GetPoint
+            and font.SetPoint then
+            local countOK, count = pcall(font.GetNumPoints, font)
+            if countOK and not isSecret(count) and count == 1 then
+                local ok, p, relative, rp, x, y = pcall(font.GetPoint, font, 1)
+                if ok and not isSecret(p) and not isSecret(relative)
+                    and not isSecret(rp) and readableGeometryNumber(x)
+                    and readableGeometryNumber(y) and p == point and relative == mana
+                    and rp == point and math.abs(x - expectedX) < 0.005 then
+                    local previous = playerManaTextOffsets[font]
+                    local native = math.abs(y) < 0.005
+                    local unchanged = math.abs(y - targetY) < 0.005
+                    local ours = previous and math.abs(y - previous) < 0.005
+                    if native or unchanged or ours then
+                        if not unchanged then
+                            if not pcall(font.SetPoint, font, point, mana,
+                                point, expectedX, targetY) then
+                                -- A rejected protected write leaves native geometry.
+                                return
+                            end
+                        end
+                        playerManaTextOffsets[font] = targetY
+                    end
+                end
+            end
+        end
+    end
+
+
+end
+
+local function installPlayerManaTextAlignment()
+    if hooksecurefunc and not playerManaTextArtHookInstalled
+        and type(PlayerFrame_UpdateArt) == "function" then
+        playerManaTextArtHookInstalled = pcall(hooksecurefunc,
+            "PlayerFrame_UpdateArt", alignPlayerManaText)
+    end
+    alignPlayerManaText()
+end
+
+-- Live 0.2.155 screenshots: PRD Health and Energy text rows are accepted
+-- with native anchors lifted +1 UI unit. Both primary Mana (caster) and
+-- alternate Mana (forms) are slightly too high at +1. Use +0.5 for Mana
+-- instead, and leave the accepted Health/Energy positions unchanged.
+--
+-- The native PRD text fields have fixed Blizzard XML anchors, but their
+-- GetPoint() coordinates can be SECRET, even out of combat. Do not inspect
+-- them: write only to known LeftText/RightText/TextString anchors, using
+-- UnitPowerType to select primary-Mana treatment when that token is readable.
+-- Unknown primary power stays on the previously accepted +1 offset.
+-- Never change bar frames, values, palettes, masks, or the Edit Mode layout.
+local PRD_TEXT_Y_LIFT = 1
+local PRD_MANA_TEXT_Y_LIFT = 0.5
+local prdTextSetupHookInstalled = false
+local prdTextVisibilityHookInstalled = false
+local prdTextPowerUpdateHookInstalled = false
+
+local function alignPRDTextRows()
+    if readableBool(InCombatLockdown) ~= false then return end
+    local prd = _G.PersonalResourceDisplayFrame
+    if not prd or isSecret(prd) then return end
+    local ok, ready, health, primary, alternate = pcall(function()
+        local container = prd.HealthBarsContainer
+        return prd.hasBeenSetup, container and container.healthBar,
+            prd.PowerBar, prd.AlternatePowerBar
     end)
+    if not ok or isSecret(ready) or ready ~= true then return end
 
-    derivedDebuffRefreshHookInstalled = true
+    local function alignBar(bar, y)
+        if not bar or isSecret(bar) then return end
+        -- Only native PRD text members. Avoid GetPoint(): Forever may mark
+        -- those coordinates secret. SetPoint replaces the same known anchor.
+        for _, spec in ipairs({
+            {"LeftText", "LEFT", 5},
+            {"RightText", "RIGHT", -5},
+            {"TextString", "RIGHT", -5},
+        }) do
+            local found, font, setter = pcall(function()
+                local region = bar[spec[1]]
+                return region, region and region.SetPoint
+            end)
+            if found and font and not isSecret(font) and type(setter) == "function" then
+                pcall(setter, font, spec[2], bar, spec[2], spec[3], y)
+            end
+        end
+    end
+
+    local primaryLift = PRD_TEXT_Y_LIFT
+    if UnitPowerType then
+        local typeOK, _, token = pcall(UnitPowerType, "player")
+        if typeOK and not isSecret(token) and type(token) == "string"
+            and token == "MANA" then
+            primaryLift = PRD_MANA_TEXT_Y_LIFT
+        end
+    end
+
+    local alternateLift = PRD_TEXT_Y_LIFT
+    if alternate and not isSecret(alternate) then
+        local nameOK, name = pcall(function() return alternate.powerName end)
+        if nameOK and not isSecret(name) and name == "MANA" then
+            alternateLift = PRD_MANA_TEXT_Y_LIFT
+        end
+    end
+
+    alignBar(health, PRD_TEXT_Y_LIFT)
+    alignBar(primary, primaryLift)
+    alignBar(alternate, alternateLift)
+end
+
+local function installPRDTextRows()
+    local prd = _G.PersonalResourceDisplayFrame
+    if not prd or isSecret(prd) then return end
+    if hooksecurefunc then
+        if not prdTextSetupHookInstalled and type(prd.Setup) == "function" then
+            prdTextSetupHookInstalled = pcall(hooksecurefunc, prd,
+                "Setup", alignPRDTextRows)
+        end
+        if not prdTextVisibilityHookInstalled and type(prd.SetShowBarText) == "function" then
+            prdTextVisibilityHookInstalled = pcall(hooksecurefunc, prd,
+                "SetShowBarText", alignPRDTextRows)
+        end
+        -- Forms change the primary power token; recheck after Blizzard
+        -- repaints that bar so Energy retains +1 and Mana uses +0.5.
+        if not prdTextPowerUpdateHookInstalled and type(prd.UpdatePowerBar) == "function" then
+            prdTextPowerUpdateHookInstalled = pcall(hooksecurefunc, prd,
+                "UpdatePowerBar", alignPRDTextRows)
+        end
+    end
+    alignPRDTextRows()
 end
 
 local compactDebuffBorderHookInstalled = false
@@ -1711,40 +2552,60 @@ local function isCompactPartyRaidFrame(frame)
     local current = frame
     for _ = 1, 8 do
         if not current then return false end
+        if isSecret(current) then return nil end
 
-        if current.GetName then
-            local okName, name = pcall(current.GetName, current)
-            if okName and compactFrameNameMatches(name) then
+        local ok, forbidden, getName, getParent = pcall(function()
+            return current.IsForbidden, current.GetName, current.GetParent
+        end)
+        if not ok or (forbidden and readableBool(forbidden, current) ~= false) then
+            return nil
+        end
+        if getName then
+            local okName, name = pcall(getName, current)
+            if not okName or isSecret(name) then return nil end
+            if compactFrameNameMatches(name) then
                 return true
             end
         end
 
-        if not current.GetParent then return false end
-        local okParent, parent = pcall(current.GetParent, current)
-        if not okParent then return false end
+        if not getParent then return false end
+        local okParent, parent = pcall(getParent, current)
+        if not okParent or isSecret(parent) then return nil end
         current = parent
     end
-    return false
+    -- An unreadable or deeper ancestry cannot authorize a hide or restoration.
+    return nil
 end
 
-local function neutralizeCompactDebuffBorder(debuffFrame)
-    if not debuffFrame then return end
+local function neutralizeCompactBorder(border)
+    if not border or isSecret(border) then return end
+    local ok, setAlpha = pcall(function()
+        if border.IsForbidden and readableBool(border.IsForbidden, border) ~= false then return nil end
+        return border.SetAlpha
+    end)
+    if not ok or type(setAlpha) ~= "function" then return end
 
-    local border = debuffFrame.border
-    if not border or not border.SetAlpha then return end
-
-    if isCompactPartyRaidFrame(debuffFrame) then
+    local compact = isCompactPartyRaidFrame(border)
+    if compact then
         -- The border is already the final native presentation object here.
         -- Alpha-zero hides only the dispel-colored border; icon, cooldown,
         -- stacks, and the debuff frame itself remain untouched.
-        pcall(border.SetAlpha, border, 0)
-        compactHiddenDebuffBorders[border] = true
-    elseif compactHiddenDebuffBorders[border] then
+        if pcall(setAlpha, border, 0) then
+            compactHiddenDebuffBorders[border] = true
+        end
+    elseif compact == false and compactHiddenDebuffBorders[border] then
         -- Compact aura textures are pooled. Restore native presentation if a
         -- previously hidden border is later reused outside compact frames.
-        pcall(border.SetAlpha, border, 1)
-        compactHiddenDebuffBorders[border] = nil
+        if pcall(setAlpha, border, 1) then
+            compactHiddenDebuffBorders[border] = nil
+        end
     end
+end
+
+local function neutralizeCompactDebuffBorder(debuffFrame)
+    if not debuffFrame or isSecret(debuffFrame) then return end
+    local ok, border = pcall(function() return debuffFrame.border end)
+    if ok then neutralizeCompactBorder(border) end
 end
 
 local function neutralizeCompactDebuffFrames(frame)
@@ -1758,12 +2619,34 @@ local function neutralizeCompactDebuffFrames(frame)
     end
 end
 
+local function disableCompactDispelOverlay()
+    local api = C_CVar
+    if type(api) ~= "table" or type(api.GetCVar) ~= "function"
+        or type(api.SetCVar) ~= "function"
+    then
+        return
+    end
+
+    local ok, value = pcall(api.GetCVar, "raidFramesDispelIndicatorOverlay")
+    if not ok or isSecret(value)
+        or (type(value) ~= "string" and type(value) ~= "number")
+    then
+        return
+    end
+    value = tonumber(value)
+    if value ~= 1 and value ~= 2 then return end
+
+    -- Native overlay visibility owns the frame-wide border, gradient, and
+    -- background together. Separate dispel icons and aura borders are untouched.
+    pcall(api.SetCVar, "raidFramesDispelIndicatorOverlay", "0")
+end
+
 local function installCompactDebuffBorderNeutralization()
+    disableCompactDispelOverlay()
     if not hooksecurefunc then return end
 
-    -- CompactUnitFrame_UtilSetDebuff is the native type-color writer on the
-    -- Classic/Forever path. Install it when the function actually exists;
-    -- Blizzard compact-frame modules can load after bjarkiUI.
+    -- Older public compact renderers color borders through this helper.
+    -- Install when it exists; compact modules can load after bjarkiUI.
     if not compactDebuffBorderHookInstalled
         and type(CompactUnitFrame_UtilSetDebuff) == "function"
     then
@@ -1773,8 +2656,8 @@ local function installCompactDebuffBorderNeutralization()
         compactDebuffBorderHookInstalled = true
     end
 
-    -- A post-hook on the complete debuff refresh is the final safety boundary.
-    -- This catches clients/branches where another native aura writer updates
+    -- A post-hook on the complete public debuff refresh is the final boundary.
+    -- This catches implementations where another public aura writer updates
     -- the border after the per-aura helper returns.
     if not compactDebuffUpdateHookInstalled
         and type(CompactUnitFrame_UpdateDebuffs) == "function"
@@ -1785,7 +2668,7 @@ local function installCompactDebuffBorderNeutralization()
         compactDebuffUpdateHookInstalled = true
     end
 
-    -- Some Forever builds route aura refreshes through UpdateAuras instead of
+    -- Some public renderers route aura refreshes through UpdateAuras instead of
     -- calling UpdateDebuffs directly. The same narrow final sweep handles that
     -- path without reading aura data or changing selection.
     if not compactDebuffAuraUpdateHookInstalled
@@ -1797,29 +2680,14 @@ local function installCompactDebuffBorderNeutralization()
         compactDebuffAuraUpdateHookInstalled = true
     end
 
-    -- Compatibility for clients whose compact border is written through AuraUtil.
+    -- Public AuraUtil renderers only. Blizzard_PrivateAurasUI has a separate
+    -- secure environment and does not call this copy of AuraUtil.
     if not compactAuraBorderHookInstalled
         and type(AuraUtil) == "table"
         and type(AuraUtil.SetAuraBorderAtlas) == "function"
     then
         hooksecurefunc(AuraUtil, "SetAuraBorderAtlas", function(borderRegion)
-            if not borderRegion or not borderRegion.SetAlpha then return end
-            local current = borderRegion
-            for _ = 1, 8 do
-                if not current then return end
-                if current.GetName then
-                    local okName, name = pcall(current.GetName, current)
-                    if okName and compactFrameNameMatches(name) then
-                        pcall(borderRegion.SetAlpha, borderRegion, 0)
-                        compactHiddenDebuffBorders[borderRegion] = true
-                        return
-                    end
-                end
-                if not current.GetParent then return end
-                local okParent, parent = pcall(current.GetParent, current)
-                if not okParent then return end
-                current = parent
-            end
+            neutralizeCompactBorder(borderRegion)
         end)
         compactAuraBorderHookInstalled = true
     end
@@ -1949,6 +2817,11 @@ end
 local function applyAll()
     for _, unit in ipairs({"player", "target", "focus", "targettarget", "focustarget", "pet"}) do
         applyUnit(unit)
+        if unit == "targettarget" or unit == "focustarget" then
+            alignCompactHealthFill(unit)
+            alignCompactMana(unit)
+            alignCompactChrome(unit)
+        end
         if unit ~= "pet" then applyPrimaryName(unit) end
     end
 end
@@ -1956,12 +2829,18 @@ end
 local events = CreateFrame("Frame")
 for _, event in ipairs({
     "PLAYER_LOGIN", "PLAYER_ENTERING_WORLD", "PLAYER_TARGET_CHANGED", "PLAYER_FOCUS_CHANGED",
-    "EDIT_MODE_LAYOUTS_UPDATED", "ADDON_LOADED",
+    "EDIT_MODE_LAYOUTS_UPDATED", "ADDON_LOADED", "PLAYER_REGEN_ENABLED",
 }) do events:RegisterEvent(event) end
 
 events:SetScript("OnEvent", function(_, event, unit)
     if event == "ADDON_LOADED" then
-        if unit == "Blizzard_Communities" then
+        if unit == "Blizzard_UnitFrame" then
+            installDerivedFrameAlignment()
+            installTargetNameWriteObservers()
+        elseif unit == "Blizzard_PersonalResourceDisplay" then
+            installPRDAlternateManaColor()
+            installPRDTextRows()
+            elseif unit == "Blizzard_Communities" then
             installCommunitiesPrimaryNames()
         elseif unit == "Blizzard_DamageMeter" then
             installDamageMeterPrimaryNames()
@@ -1986,7 +2865,12 @@ events:SetScript("OnEvent", function(_, event, unit)
         anchorUIErrorsFrame()
         installLossOfControlPresentation()
         installHooks()
-        installDerivedDebuffRefresh()
+        installDerivedFrameAlignment()
+        alignPlayerHealthContent()
+        installPlayerManaTextAlignment()
+        installPlayerAlternateManaColor()
+        installPRDAlternateManaColor()
+        installPRDTextRows()
         installCompactDebuffBorderNeutralization()
         installMicroMenuChildOffset()
         installGuildNotificationPipSuppression()
@@ -1998,7 +2882,12 @@ events:SetScript("OnEvent", function(_, event, unit)
         applyWorldTextPosition()
         anchorUIErrorsFrame()
         installLossOfControlPresentation()
-        installDerivedDebuffRefresh()
+        installDerivedFrameAlignment()
+        alignPlayerHealthContent()
+        installPlayerManaTextAlignment()
+        installPlayerAlternateManaColor()
+        installPRDAlternateManaColor()
+        installPRDTextRows()
         installCompactDebuffBorderNeutralization()
         installMicroMenuChildOffset()
         installGuildNotificationPipSuppression()
@@ -2006,14 +2895,39 @@ events:SetScript("OnEvent", function(_, event, unit)
         anchorCombatText()
         applyAll()
     elseif event == "EDIT_MODE_LAYOUTS_UPDATED" then
+        installDerivedFrameAlignment()
+        alignPlayerHealthContent()
+        installPlayerManaTextAlignment()
+        installPlayerAlternateManaColor()
+        installPRDAlternateManaColor()
+        installPRDTextRows()
         installMicroMenuChildOffset()
         anchorCombatText()
         applyAll()
+    elseif event == "PLAYER_REGEN_ENABLED" then
+        installDerivedFrameAlignment()
+        alignPlayerHealthContent()
+        installPlayerManaTextAlignment()
+        installPlayerAlternateManaColor()
+        installPRDAlternateManaColor()
+        installPRDTextRows()
+        alignCompactHealthFill("targettarget")
+        alignCompactHealthFill("focustarget")
+        alignCompactMana("targettarget")
+        alignCompactMana("focustarget")
+        alignCompactChrome("targettarget")
+        alignCompactChrome("focustarget")
     elseif event == "PLAYER_TARGET_CHANGED" then
         applyUnit("target"); applyUnit("targettarget")
+        alignCompactHealthFill("targettarget")
+        alignCompactMana("targettarget")
+        alignCompactChrome("targettarget")
         applyPrimaryName("target"); applyPrimaryName("targettarget")
     elseif event == "PLAYER_FOCUS_CHANGED" then
         applyUnit("focus"); applyUnit("focustarget")
+        alignCompactHealthFill("focustarget")
+        alignCompactMana("focustarget")
+        alignCompactChrome("focustarget")
         applyPrimaryName("focus"); applyPrimaryName("focustarget")
     end
 end)
@@ -2024,9 +2938,15 @@ local unitTargetEvents = CreateFrame("Frame")
 unitTargetEvents:RegisterUnitEvent("UNIT_TARGET", "target", "focus")
 unitTargetEvents:SetScript("OnEvent", function(_, _, unit)
     if unit == "target" then
-        applyUnit("targettarget"); applyPrimaryName("targettarget")
+        applyUnit("targettarget"); alignCompactHealthFill("targettarget")
+        alignCompactMana("targettarget")
+        alignCompactChrome("targettarget")
+        applyPrimaryName("targettarget")
     elseif unit == "focus" then
-        applyUnit("focustarget"); applyPrimaryName("focustarget")
+        applyUnit("focustarget"); alignCompactHealthFill("focustarget")
+        alignCompactMana("focustarget")
+        alignCompactChrome("focustarget")
+        applyPrimaryName("focustarget")
     end
 end)
 
@@ -2096,6 +3016,118 @@ petStateEvents:SetScript("OnEvent", function()
 end)
 
 -- Read-only diagnostics. This intentionally reports state without repairing it.
+local function printDamageMeterNameAudit()
+    local count = { rows = 0, hooked = 0, sourceSecret = 0, textSecret = 0, guidSecret = 0,
+        tokenSecret = 0, tokenMissing = 0, playerUnknown = 0, prefixSecret = 0, unavailable = 0 }
+    local seen = {}
+    local function valueState(value)
+        if isSecret(value) then return "secret" end
+        if type(canaccessvalue) == "function" and readableBool(canaccessvalue, value) ~= true then
+            return "unavailable"
+        end
+        return "readable"
+    end
+    local function accessibleTable(value)
+        return valueState(value) == "readable" and type(value) == "table"
+            and (type(canaccesstable) ~= "function" or readableBool(canaccesstable, value) == true)
+    end
+    local function visible(frame)
+        if not accessibleTable(frame) then count.unavailable = count.unavailable + 1; return false end
+        if readableBool(frame.IsForbidden, frame) == true then
+            count.unavailable = count.unavailable + 1; return false
+        end
+        local shown = readableBool(frame.IsShown, frame)
+        if shown == nil then count.unavailable = count.unavailable + 1 end
+        return shown == true
+    end
+    local function inspect(frame, source)
+        if not visible(frame) or seen[frame] then return end
+        seen[frame] = true
+        count.rows = count.rows + 1
+        if damageMeterNameRegionHooks[frame] then count.hooked = count.hooked + 1 end
+        local sourceState = valueState(frame.sourceName)
+        if sourceState == "secret" then count.sourceSecret = count.sourceSecret + 1
+        elseif sourceState == "unavailable" then count.unavailable = count.unavailable + 1 end
+        local okRegion, region = pcall(frame.GetName, frame)
+        local okText, text
+        if okRegion and accessibleTable(region) then okText, text = pcall(region.GetText, region) end
+        if not okText then count.unavailable = count.unavailable + 1
+        elseif valueState(text) == "secret" then count.textSecret = count.textSecret + 1
+        elseif valueState(text) == "unavailable" then count.unavailable = count.unavailable + 1 end
+
+        -- Only inspect the current protected nonlocal-source route. Names are
+        -- never parsed or printed, and no lookup result survives this command.
+        if sourceState ~= "secret" then return end
+        local creature, localPlayer = frame.isCreature, frame.isLocalPlayer
+        if valueState(creature) ~= "readable" or type(creature) ~= "boolean"
+            or valueState(localPlayer) ~= "readable" or type(localPlayer) ~= "boolean" then
+            count.unavailable = count.unavailable + 1; return
+        end
+        if creature or localPlayer then return end
+        if not accessibleTable(source) then count.unavailable = count.unavailable + 1; return end
+        local creatureID = source.sourceCreatureID
+        if valueState(creatureID) == "unavailable" then count.unavailable = count.unavailable + 1; return end
+        if valueState(creatureID) == "readable" and creatureID ~= nil then return end
+
+        local prefixSecret = readableBool(frame.ShouldShowClassification, frame) == true
+            and isSecret(frame.classification)
+        local colored = frame.isClassColorDesired
+        if isSecret(colored) then prefixSecret = true
+        elseif valueState(colored) == "readable" and colored == true then
+            local displayType = frame.sourceDisplayType
+            if isSecret(displayType) then prefixSecret = true
+            elseif valueState(displayType) == "readable"
+                and displayType == Enum.DamageMeterSourceDisplayType.Enemy then
+                prefixSecret = prefixSecret or isSecret(frame.factionGroup)
+            end
+        end
+        if prefixSecret then count.prefixSecret = count.prefixSecret + 1 end
+
+        local guid = source.sourceGUID
+        local guidState = valueState(guid)
+        if guidState == "secret" then count.guidSecret = count.guidSecret + 1 end
+        if guidState == "unavailable" then count.unavailable = count.unavailable + 1; return end
+        if not UnitTokenFromGUID or (guidState == "readable" and type(guid) ~= "string") then
+            count.tokenMissing = count.tokenMissing + 1; return
+        end
+        local okToken, token = pcall(UnitTokenFromGUID, guid)
+        if not okToken then count.tokenMissing = count.tokenMissing + 1; return end
+        local tokenState = valueState(token)
+        if tokenState == "secret" then count.tokenSecret = count.tokenSecret + 1; return end
+        if tokenState == "unavailable" then count.unavailable = count.unavailable + 1; return end
+        if type(token) ~= "string" or token == "" then count.tokenMissing = count.tokenMissing + 1; return end
+        local okPlayer, player = pcall(UnitIsPlayer, token)
+        if not okPlayer or valueState(player) ~= "readable" or type(player) ~= "boolean" then
+            count.playerUnknown = count.playerUnknown + 1
+        end
+    end
+    local function inspectWindow(window)
+        if not visible(window) then return end
+        local ok, scrollBox = pcall(window.GetScrollBox, window)
+        if not ok or not accessibleTable(scrollBox)
+            or not pcall(scrollBox.ForEachFrame, scrollBox, inspect) then
+            count.unavailable = count.unavailable + 1
+        end
+        local okLocal, localEntry = pcall(window.GetLocalPlayerEntry, window)
+        if okLocal and valueState(localEntry) == "readable" and localEntry ~= nil then inspect(localEntry) end
+    end
+    local meter = _G.DamageMeter
+    if not accessibleTable(meter) or not pcall(meter.ForEachSessionWindow, meter, inspectWindow) then
+        count.unavailable = count.unavailable + 1
+    end
+    local function out(message)
+        if DEFAULT_CHAT_FRAME then DEFAULT_CHAT_FRAME:AddMessage("|cff74c7ecbjarkiUI|r: " .. message) end
+    end
+    out("names version=" .. BJARKI_UI_VERSION .. " rows=" .. count.rows .. " hooked=" .. count.hooked
+        .. " sourceSecret=" .. count.sourceSecret .. " textSecret=" .. count.textSecret
+        .. " unavailable=" .. count.unavailable)
+    local regional = readableBool(RegionalUniqueNamesEnabled)
+    out("names guidSecret=" .. count.guidSecret .. " tokenSecret=" .. count.tokenSecret .. " tokenMissing=" .. count.tokenMissing
+        .. " playerUnknown=" .. count.playerUnknown .. " prefixSecret=" .. count.prefixSecret
+        .. " regional=" .. (regional == nil and "unknown" or tostring(regional))
+        .. " UnitName=" .. tostring(type(UnitName) == "function"))
+end
+
 local function printUIAudit()
     local function out(message)
         if DEFAULT_CHAT_FRAME then
@@ -2106,12 +3138,27 @@ local function printUIAudit()
     out("audit version=" .. BJARKI_UI_VERSION)
     out("hooks locSetup=" .. tostring(lossOfControlSetUpHookInstalled)
         .. " locTime=" .. tostring(lossOfControlSetTimeHookInstalled)
-        .. " derivedDebuffs=" .. tostring(derivedDebuffRefreshHookInstalled)
-        .. " compactBorder=" .. tostring(compactDebuffBorderHookInstalled)
+        .. " compactLegacy=" .. tostring(compactDebuffBorderHookInstalled)
+        .. " compactDebuffRefresh=" .. tostring(compactDebuffUpdateHookInstalled)
+        .. " compactAuraRefresh=" .. tostring(compactDebuffAuraUpdateHookInstalled)
+        .. " compactAuraUtil=" .. tostring(compactAuraBorderHookInstalled)
         .. " communitiesRoster=" .. tostring(communitiesNameHookInstalled)
         .. " communitiesChat=" .. tostring(communitiesChatNameHookInstalled)
         .. " damageMeter=" .. tostring(damageMeterNameHookInstalled)
         .. " damageMeterInit=" .. tostring(damageMeterSourceInitHookInstalled))
+
+    local privateContainer = readableBool(function()
+        local mixin = _G.ContainerPrivateAuraBehaviorMixin
+        if isSecret(mixin) then return nil end
+        if type(mixin) ~= "table" then return false end
+        local setter = mixin.SetPrivateAuraAnchorSettings
+        if isSecret(setter) then return nil end
+        return type(setter) == "function"
+    end)
+    -- Private aura icons are rendered in Blizzard's separate secure environment;
+    -- public legacy hook installation does not prove their borders were hidden.
+    out("compactPrivateAuraContainer=" .. (privateContainer == nil and "unknown" or tostring(privateContainer))
+        .. " privateBorderVisibility=client-owned")
 
     for _, unit in ipairs({ "targettarget", "focustarget" }) do
         local frame = smallFrame(unit)
@@ -2151,6 +3198,16 @@ local function healthColorText(bar)
     return string.format("%.2f,%.2f,%.2f", r, g, b)
 end
 
+local function selectionColorText(unit)
+    if type(UnitSelectionColor) ~= "function" then return "unknown" end
+    local ok, r, g, b = pcall(UnitSelectionColor, unit)
+    if not ok or isSecret(r) or isSecret(g) or isSecret(b)
+        or type(r) ~= "number" or type(g) ~= "number" or type(b) ~= "number" then
+        return "unknown"
+    end
+    return string.format("%.2f,%.2f,%.2f", r, g, b)
+end
+
 local function printHealthColorAudit()
     local function out(message)
         if DEFAULT_CHAT_FRAME then
@@ -2161,6 +3218,9 @@ local function printHealthColorAudit()
     out("colors version=" .. BJARKI_UI_VERSION)
     for _, unit in ipairs({ "target", "focus", "targettarget", "focustarget" }) do
         local exists = readableBool(UnitExists, unit)
+        local connected = readableBool(UnitIsConnected, unit)
+        local dead = readableBool(UnitIsDead, unit)
+        local tapDenied = readableBool(UnitIsTapDenied, unit)
         local player, playerReadable = playerUnitState(unit)
         local pet, petReadable = petUnitState(unit)
         local token = classToken(unit)
@@ -2171,6 +3231,10 @@ local function printHealthColorAudit()
         local plateColor = plateR and string.format("%.2f,%.2f,%.2f", plateR, plateG, plateB) or "none"
         out(unit
             .. " exists=" .. (exists == nil and "unknown" or tostring(exists))
+            .. " connected=" .. (connected == nil and "unknown" or tostring(connected))
+            .. " dead=" .. (dead == nil and "unknown" or tostring(dead))
+            .. " tapDenied=" .. (tapDenied == nil and "unknown" or tostring(tapDenied))
+            .. " selection=" .. selectionColorText(unit)
             .. " player=" .. (playerReadable and tostring(player) or "unknown")
             .. " class=" .. tostring(token or "unknown")
             .. " pet=" .. (petReadable and tostring(pet) or "unknown")
@@ -2188,11 +3252,14 @@ SlashCmdList.BJARKIUI = function(message)
     if command == "audit" then
         printUIAudit()
         return
+    elseif command == "names" then
+        printDamageMeterNameAudit()
+        return
     elseif command == "colors" then
         printHealthColorAudit()
         return
     elseif command == "" or command == "help" then
-        print("bjarkiUI: /bui levels [on|off] | audit | colors")
+        print("bjarkiUI: /bui levels [on|off] | audit | colors | names")
         return
     end
     if previousBJarkiUISlash then
