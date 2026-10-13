@@ -2,8 +2,11 @@
 ## Title: bjarkiUI
 ## Notes: Ultralight unit-frame presentation for WoW: Forever
 ## Author: Bjarki / OpenAI
-## Version: 0.2.156-local
+## Version: 0.2.197-local
 ## SavedVariablesPerCharacter: bjarkiUISettings
 
 bjarkiUI.lua
 PartyOrder.lua
+SoftDark.lua
+TrackedBuffSeconds.lua
+NameplateTimers.lua

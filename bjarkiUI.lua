@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.156-local"
+local BJARKI_UI_VERSION = "0.2.197-local"
 local PRD_ATLAS = "UI-HUD-CoolDownManager-Bar"
 -- The PRD's native Mana palette, used for all MANA fills. This does not
 -- replace Blizzard's textures or its handling of Energy/Rage/Fury/etc.
@@ -19,11 +19,85 @@ if bjarkiUISettings.showLevelNumbers == nil then
     bjarkiUISettings.showLevelNumbers = true
 end
 
-local EDIT_MODE_LAYOUT_STRING = [=[5 0 59 0 0 1 8 6 MicroMenuContainer -4.5 -4.0 -1 ##$$%/&('%)#+$,$ 0 1 1 7 7 UIParent 0.0 0.0 -1 ##$$%/&('%(#,# 0 2 1 7 7 UIParent 0.0 0.0 -1 ##$$%/&('%(#,# 0 3 1 5 5 UIParent -5.0 -77.0 -1 #$$$%/&('%(#,# 0 4 1 5 5 UIParent -5.0 -77.0 -1 #$$$%/&('%(#,# 0 5 0 6 0 MultiBarBottomRight 0.0 4.0 -1 ##$$%/&('%(#,# 0 6 0 6 0 MultiBar5 0.0 4.0 -1 ##$$%/&('%(#,# 0 7 0 0 0 UIParent 915.2 -744.0 -1 ##$$%/&('%(#,# 0 10 1 7 7 UIParent 0.0 -4.0 -1 ##$$&('% 0 11 1 7 7 UIParent 0.0 -4.0 -1 ##$$&('%,# 0 12 1 7 7 UIParent 0.0 -4.0 -1 ##$$&('% 1 -1 0 4 4 UIParent 0.0 -276.0 -1 #%$#%$ 2 -1 1 2 2 UIParent 0.0 0.0 -1 ##$#%(&( 3 0 0 0 0 UIParent 278.0 -157.0 -1 $#3% 3 1 0 1 1 UIParent -294.0 -158.0 -1 %#3% 3 2 0 4 4 UIParent 358.0 -163.0 -1 %#&$3% 3 3 0 0 0 UIParent 512.0 -420.0 -1 '$(#)#-k.5/#1$3#5#6,7-7$8(9, 3 4 0 0 0 UIParent 21.4 -0.0 -1 ,#-=.+/#0#1#2(3#5#6(7-7$8(9( 3 5 1 5 5 UIParent 0.0 0.0 -1 &$*$3# 3 6 1 5 5 UIParent 0.0 0.0 -1 -=.+/#4$5#6(7-7$8(9( 3 7 0 1 7 PlayerFrame 34.0 25.0 -1 3% 4 -1 1 7 7 UIParent 0.0 -4.0 -1 # 5 -1 1 7 7 UIParent 0.0 -4.0 -1 # 6 0 0 1 1 UIParent 238.3 -100.0 -1 ##$#%#&.())( 6 1 0 2 8 BuffFrame -16.0 -4.0 -1 ##$#%#'+())(-# 6 2 1 1 1 UIParent 0.0 -25.0 -1 ##$#%$&.(()(+#,-,$ 7 -1 1 7 7 UIParent 0.0 -4.0 -1 # 8 -1 0 3 3 UIParent 34.0 -220.0 -1 #'$d%$&i 9 -1 1 7 7 UIParent 0.0 -4.0 -1 # 10 -1 1 0 0 UIParent 16.0 -116.0 -1 # 11 -1 1 8 8 UIParent -9.0 85.0 -1 # 12 -1 1 2 2 UIParent -110.0 -275.0 -1 #K$#%# 13 -1 1 7 7 UIParent 116.5 6.0 -1 ##$#%) 14 -1 1 6 8 MicroMenuContainer 7.0 -4.0 -1 ##$#%( 15 0 1 7 7 UIParent 0.0 0.0 -1 &- 15 1 1 1 1 UIParent 0.0 17.0 -1 &- 16 -1 1 5 5 UIParent 0.0 0.0 -1 #( 17 -1 1 1 1 UIParent 0.0 -100.0 -1 ## 18 -1 1 5 5 UIParent 0.0 0.0 -1 #- 19 -1 1 7 7 UIParent 0.0 0.0 -1 ## 20 0 0 0 6 BuffIconCooldownViewer 0.0 -4.0 -1 ##$/%$&('%(-($)#+$,$-# 20 1 0 0 6 EssentialCooldownViewer 0.0 -4.0 -1 ##$*%$&('%(-($)#+$,$-# 20 2 0 1 1 UIParent -867.7 -2.0 -1 ##$$%$&('((-($)#+$,$-$ 20 3 0 2 8 DebuffFrame 0.0 -4.0 -1 #$$$%#&('#(U)#*#+$,$-#.U 21 -1 0 4 4 UIParent 0.0 -175.0 -1 ##%#&$'$($)#*U+#,&-#.#/&0$1# 22 0 1 8 7 UIParent -457.0 336.0 -1 #$$$%#&('((#)U*$+%,$-#.#/U0% 22 1 1 1 1 UIParent 0.0 -40.0 -1 &('()U*#+% 22 2 1 1 1 UIParent 0.0 -90.0 -1 &('()U*#+% 22 3 1 1 1 UIParent 0.0 -130.0 -1 &('()U*#+% 23 -1 0 8 6 MultiBarLeft -4.0 0.0 -1 ##$#%$&i'B'$(#)U+$,$-,.'/# 24 -1 1 1 1 UIParent 0.0 -182.0 -1 # 25 -1 0 0 0 UIParent 663.2 -865.0 -1 # 26 0 1 5 3 MainActionBar 30.0 5.0 -1 #$ 26 1 1 3 5 BagsBar -30.0 5.0 -1 #$ 27 -1 1 4 4 Minimap -68.0 -68.0 -1 #+ 28 -1 1 4 4 UIParent 0.0 0.0 -1 #& 29 0 1 7 7 UIParent 0.0 450.0 -1 #($U%$&K'#(#)# 29 1 1 7 7 UIParent 0.0 425.0 -1 #($U%$&K'#(#)# 29 2 1 7 7 UIParent 0.0 400.0 -1 #($U%$&K'#(#)#]=]
+local EDIT_MODE_LAYOUT_STRING = [=[5 0 59 0 0 1 8 6 MicroMenuContainer -4.5 -4.0 -1 ##$$%/&('%)#+$,$ 0 1 1 7 7 UIParent 0.0 0.0 -1 ##$$%/&('%(#,# 0 2 1 7 7 UIParent 0.0 0.0 -1 ##$$%/&('%(#,# 0 3 1 5 5 UIParent -5.0 -77.0 -1 #$$$%/&('%(#,# 0 4 1 5 5 UIParent -5.0 -77.0 -1 #$$$%/&('%(#,# 0 5 1 1 4 UIParent 0.0 0.0 -1 ##$$%/&('%(#,# 0 6 1 1 4 UIParent 0.0 -50.0 -1 ##$$%/&('%(#,# 0 7 1 1 4 UIParent 0.0 -100.0 -1 ##$$%/&('%(#,# 0 10 1 7 7 UIParent 0.0 -4.0 -1 ##$$&('% 0 11 1 7 7 UIParent 0.0 -4.0 -1 ##$$&('%,# 0 12 1 7 7 UIParent 0.0 -4.0 -1 ##$$&('% 1 -1 0 4 4 UIParent 0.0 -276.0 -1 #%$#%$ 2 -1 1 2 2 UIParent 0.0 0.0 -1 ##$#%(&( 3 0 0 0 0 UIParent 278.0 -159.0 -1 $#3% 3 1 0 1 1 UIParent -294.0 -160.0 -1 %#3% 3 2 0 4 4 UIParent 358.0 -163.0 -1 %#&$3% 3 3 0 0 0 UIParent 512.0 -420.0 -1 '$(#)#-k.5/#1$3#5#6,7-7$8(9, 3 4 0 0 0 UIParent 21.4 -0.0 -1 ,$-=.+/#0#1#2(3#5#6(7-7$8(9( 3 5 1 5 5 UIParent 0.0 0.0 -1 &$*$3# 3 6 1 5 5 UIParent 0.0 0.0 -1 -=.+/#4$5#6(7-7$8(9( 3 7 0 1 7 PlayerFrame 34.0 25.0 -1 3% 4 -1 1 7 7 UIParent 0.0 -4.0 -1 # 5 -1 1 7 7 UIParent 0.0 -4.0 -1 # 6 0 0 1 1 UIParent 238.3 -100.0 -1 ##$#%#&.())( 6 1 0 2 8 BuffFrame -16.0 -4.0 -1 ##$#%#'+())(-# 6 2 1 1 1 UIParent 0.0 -25.0 -1 ##$#%$&.(()(+#,-,$ 7 -1 1 7 7 UIParent 0.0 -4.0 -1 # 8 -1 0 3 3 UIParent 34.0 -220.0 -1 #'$d%$&i 9 -1 1 7 7 UIParent 0.0 -4.0 -1 # 10 -1 1 0 0 UIParent 16.0 -116.0 -1 # 11 -1 1 8 8 UIParent -9.0 85.0 -1 # 12 -1 1 2 2 UIParent -110.0 -275.0 -1 #K$#%# 13 -1 1 7 7 UIParent 116.5 6.0 -1 ##$#%) 14 -1 1 6 8 MicroMenuContainer 7.0 -4.0 -1 ##$#%( 15 0 1 7 7 UIParent 0.0 0.0 -1 &- 15 1 1 1 1 UIParent 0.0 17.0 -1 &- 16 -1 1 5 5 UIParent 0.0 0.0 -1 #( 17 -1 1 1 1 UIParent 0.0 -100.0 -1 ## 18 -1 1 5 5 UIParent 0.0 0.0 -1 #- 19 -1 1 7 7 UIParent 0.0 0.0 -1 ## 20 0 0 1 1 UIParent -859.2 -2.0 -1 ##$/%$&('%(-($)#+$,$-# 20 1 0 0 6 EssentialCooldownViewer 0.0 -4.0 -1 ##$*%$&('%(-($)#+$,$-# 20 2 0 4 4 UIParent 152.0 0.0 -1 #$$$%$&''((-($)#+$,$-$ 20 3 0 2 8 DebuffFrame 0.0 -4.0 -1 #$$$%#&('#(U)#*#+$,$-#.U 21 -1 0 4 4 UIParent 0.0 -175.0 -1 ##%#&$'$($)#*U+#,&-#.$/&0$1# 22 0 1 8 7 UIParent -457.0 336.0 -1 #$$$%#&('((#)U*$+%,$-#.#/U0% 22 1 1 1 1 UIParent 0.0 -40.0 -1 &('()U*#+% 22 2 1 1 1 UIParent 0.0 -90.0 -1 &('()U*#+% 22 3 1 1 1 UIParent 0.0 -130.0 -1 &('()U*#+% 23 -1 0 8 6 MultiBarLeft -4.0 0.0 -1 ##$#%$&i'B'$(#)U+$,$-,.'/# 24 -1 1 1 1 UIParent 0.0 -182.0 -1 # 25 -1 0 0 0 UIParent 663.2 -865.0 -1 # 26 0 1 5 3 MainActionBar 30.0 5.0 -1 #$ 26 1 1 3 5 BagsBar -30.0 5.0 -1 #$ 27 -1 1 4 4 Minimap -68.0 -68.0 -1 #+ 28 -1 1 4 4 UIParent 0.0 0.0 -1 #& 29 0 1 7 7 UIParent 0.0 450.0 -1 #($U%$&K'#(#)# 29 1 1 7 7 UIParent 0.0 425.0 -1 #($U%$&K'#(#)# 29 2 1 7 7 UIParent 0.0 400.0 -1 #($U%$&K'#(#)#]=]
+-- Tracked Buffs is serialized slot "20 2", NOT "20 0" (Essential).
+-- Use the requested rounded 152.0, including previous 145.0 and 151.9 builds.
+-- Migrate known positions only, preserving unrelated Edit Mode adjustments.
+local EDIT_MODE_PRESET_REVISION = "bjarkiUI-layout-0.2.181"
+local EDIT_MODE_ANCHOR_MIGRATIONS = {
+    { system = 3, systemIndex = 0, x = 278.0, oldY = -157.0, newY = -158.0 },
+    { system = 3, systemIndex = 0, x = 278.0, oldY = -158.0, newY = -159.0 },
+    { system = 3, systemIndex = 1, x = -294.0, oldY = -158.0, newY = -159.0 },
+    { system = 3, systemIndex = 1, x = -294.0, oldY = -159.0, newY = -160.0 },
+}
 local editModeLayoutChecked = false
+
+local function nearlyEqual(a, b)
+    return type(a) == "number" and math.abs(a - b) <= 0.11
+end
+
+local function migrateExistingEditModeLayout(layout)
+    local systems = layout and layout.systems
+    if type(systems) ~= "table" then return false end
+    local changed = false
+    for _, move in ipairs(EDIT_MODE_ANCHOR_MIGRATIONS) do
+        for _, entry in ipairs(systems) do
+            if type(entry) == "table" and entry.system == move.system
+                and entry.systemIndex == move.systemIndex
+                and type(entry.anchorInfo) == "table" then
+                local anchor = entry.anchorInfo
+                -- Only move recognized prior coordinates. If the player
+                -- independently moved a frame, that change takes precedence.
+                if move.newX then
+                    if nearlyEqual(anchor.offsetX, move.x)
+                        and nearlyEqual(anchor.offsetY, move.y) then
+                        anchor.offsetX = move.newX
+                        changed = true
+                    end
+                elseif nearlyEqual(anchor.offsetX, move.x)
+                    and nearlyEqual(anchor.offsetY, move.oldY) then
+                    anchor.offsetY = move.newY
+                    changed = true
+                end
+                break
+            end
+        end
+    end
+
+    -- The share-code systemIndex is not the same reliable identity check as
+    -- the live frame's enum index on every client. Recognize these TWO
+    -- exact exported anchors instead of guessing the index again.
+    for _, entry in ipairs(systems) do
+        if type(entry) == "table" and entry.system == 20
+            and type(entry.anchorInfo) == "table" then
+            local anchor = entry.anchorInfo
+            if anchor.relativeTo == "UIParent" and nearlyEqual(anchor.offsetY, 0.0)
+                and type(anchor.offsetX) == "number"
+                and (math.abs(anchor.offsetX - 144.9) < 0.05
+                    or math.abs(anchor.offsetX - 145.0) < 0.05
+                    or math.abs(anchor.offsetX - 151.9) < 0.05) then
+                -- BuffIconCooldownViewer: clean rounded target 152.0.
+                anchor.offsetX = 152.0
+                changed = true
+            elseif anchor.relativeTo == "UIParent" and nearlyEqual(anchor.offsetY, -2.0)
+                and (nearlyEqual(anchor.offsetX, -852.2)
+                    or nearlyEqual(anchor.offsetX, -849.2)
+                    or nearlyEqual(anchor.offsetX, -850.0)) then
+                -- EssentialCooldownViewer: undo earlier misdirected nudges.
+                anchor.offsetX = -859.2
+                changed = true
+            end
+        end
+    end
+    return changed
+end
 
 local function installEditModeLayout()
     if editModeLayoutChecked then return end
+    if type(InCombatLockdown) == "function" then
+        local okCombat, combat = pcall(InCombatLockdown)
+        if not okCombat or combat then return end
+    end
     if not C_EditMode or not C_EditMode.GetLayouts or not C_EditMode.ConvertStringToLayoutInfo
         or not C_EditMode.SaveLayouts or not Enum or not Enum.EditModeLayoutType
     then
@@ -33,10 +107,34 @@ local function installEditModeLayout()
     local ok, layouts = pcall(C_EditMode.GetLayouts)
     if not ok or type(layouts) ~= "table" or type(layouts.layouts) ~= "table" then return end
 
-    for _, saved in ipairs(layouts.layouts) do
-        if type(saved) == "table" and saved.layoutName == EDIT_MODE_LAYOUT_NAME then
-            -- Presence is the one-time-install marker. Once created, the layout
-            -- belongs to the player and normal Edit Mode changes are respected.
+    for _, existing in ipairs(layouts.layouts) do
+        if type(existing) == "table" and existing.layoutName == EDIT_MODE_LAYOUT_NAME then
+            if bjarkiUISettings.editModePresetRevision ~= EDIT_MODE_PRESET_REVISION then
+                -- Copy-on-write: a failed SaveLayouts must not leave the data
+                -- returned by GetLayouts partially modified.
+                local originals = {}
+                if type(existing.systems) == "table" then
+                    for _, entry in ipairs(existing.systems) do
+                        if type(entry) == "table" and type(entry.anchorInfo) == "table" then
+                            originals[entry] = { entry.anchorInfo.offsetX, entry.anchorInfo.offsetY }
+                        end
+                    end
+                end
+                local changed = migrateExistingEditModeLayout(existing)
+                if changed then
+                    local okSave, result = pcall(C_EditMode.SaveLayouts, layouts)
+                    if not okSave or result == false then
+                        for entry, coords in pairs(originals) do
+                            entry.anchorInfo.offsetX = coords[1]
+                            entry.anchorInfo.offsetY = coords[2]
+                        end
+                        return
+                    end
+                end
+                bjarkiUISettings.editModePresetRevision = EDIT_MODE_PRESET_REVISION
+            end
+            -- Do not keep reapplying: normal future Edit Mode adjustments
+            -- should remain under the player's control.
             editModeLayoutChecked = true
             return
         end
@@ -58,19 +156,19 @@ local function installEditModeLayout()
     table.insert(layouts.layouts, layoutInfo)
     local newIndex = #layouts.layouts
 
-    local saved = pcall(C_EditMode.SaveLayouts, layouts)
-    if not saved then
+    local saved, result = pcall(C_EditMode.SaveLayouts, layouts)
+    if not saved or result == false then
         table.remove(layouts.layouts, newIndex)
         return
     end
 
-    -- Match Blizzard's own import lifecycle: save the new layout, then announce
-    -- it as an imported layout and activate it.
+    -- Existing behavior for first-time installations only.
     if C_EditMode.OnLayoutAdded then
         pcall(C_EditMode.OnLayoutAdded, newIndex, true, true)
     elseif C_EditMode.SetActiveLayout then
         pcall(C_EditMode.SetActiveLayout, newIndex)
     end
+    bjarkiUISettings.editModePresetRevision = EDIT_MODE_PRESET_REVISION
     editModeLayoutChecked = true
 end
 
@@ -2153,6 +2251,10 @@ end
 -- draws over the native name FontString. Preserve fill and text ownership.
 -- This creates at most one overlay per compact frame; no OnUpdate/polling.
 local compactChromeOverlays = setmetatable({}, { __mode = "k" })
+-- Diagnostic only: the native Blizzard frame texture always remains visible.
+-- Toggle just bjarkiUI's extra clipped copy for a same-target seam A/B test.
+-- Intentionally session-local, so /reload restores the accepted default.
+local compactChromeOverlayVisible = true
 
 local function alignCompactChrome(unit)
     if unit ~= "targettarget" and unit ~= "focustarget" then return end
@@ -2173,6 +2275,10 @@ local function alignCompactChrome(unit)
     local wantedLevel = barLevel + 1
     local state = compactChromeOverlays[frame]
     if state then
+        -- Preserve the temporary diagnostic choice on frame relayouts.
+        if state.shell and state.shell.SetShown then
+            pcall(state.shell.SetShown, state.shell, compactChromeOverlayVisible)
+        end
         -- Blizzard can relevel the compact StatusBars on layout changes.
         -- Keep the existing overlay above them without duplicating textures.
         if not state.shell or not state.shell.GetFrameLevel or not state.shell.SetFrameLevel then return end
@@ -2232,7 +2338,13 @@ local function alignCompactChrome(unit)
         return
     end
 
+    -- The shell is ours, not Blizzard's. Expose only its owned art to Soft
+    -- Dark so that the ToT/ToF border copy can receive exactly the same tint
+    -- as the original without scanning unit-frame children/icons.
+    shell._bjarkiUIChromeTexture = texture
     compactChromeOverlays[frame] = {shell = shell, texture = texture, atlas = atlas}
+    -- New overlays must respect a diagnostic toggle made while frames were absent.
+    if shell.SetShown then pcall(shell.SetShown, shell, compactChromeOverlayVisible) end
 end
 
 -- Preserve the .114 health fill (top=-40.5, height=20.5) and its
@@ -2367,81 +2479,38 @@ local function alignPlayerManaMask(mana)
     pcall(mask.SetPoint, mask, "TOPLEFT", mana, "TOPLEFT", -2, 3)
 end
 
--- Blizzard and bjarkiUI can update the player Mana status labels at different
--- points of the frame lifecycle. In-game observation: Mana percentage sometimes
--- aligns naturally after /reload, without a code change. Do not impose a
--- fixed Y offset on LeftText: that made an already-correct state regress.
--- Leave the percentage's native anchor alone; preserve the previously tested
--- center/right presentation until independently validated or removed.
-local playerManaTextOffsets = setmetatable({}, { __mode = "k" })
-local playerManaTextArtHookInstalled = false
+-- Blizzard's TextStatusBar owns the Player Mana/energy/rage status text.
+-- The old 0.2.143-0.2.156 player-only text correction conditionally moved
+-- ManaBarText and RightText upward after inspecting GetPoint(). On Forever the
+-- existing anchor can be secret, so the write sometimes executed and sometimes
+-- skipped. Live screenshots show a two-pixel high RightText when it executed.
+-- Stop touching all three player resource FontStrings. TextStatusBar also
+-- intentionally hides the left percentage for non-MANA power tokens.
+-- Retain the independently validated upper Mana MASK adjustment from 0.2.148:
+-- the mask lifecycle needs PlayerFrame_UpdateArt, but not text manipulation.
+local playerManaMaskArtHookInstalled = false
 
-local function alignPlayerManaText()
+local function syncPlayerManaMask()
     if readableBool(InCombatLockdown) ~= false then return end
     local frame = _G.PlayerFrame
-    local main = frame and frame.PlayerFrameContent
+    if not frame or isSecret(frame) then return end
+    local main = frame.PlayerFrameContent
         and frame.PlayerFrameContent.PlayerFrameContentMain
-    local area = main and main.ManaBarArea
-    local mana = area and area.ManaBar
-    if not mana or not mana.GetEffectiveScale then return end
+    local mana = main and main.ManaBarArea and main.ManaBarArea.ManaBar
+    if not mana or isSecret(mana) then return end
     local stateOK, state = pcall(function() return frame.state end)
     if not stateOK or isSecret(state) or (state ~= nil and state ~= "player") then return end
     if readableUnitToken(mana.unit) ~= "player" then return end
-    -- Existing native player-art post-hook provides this mask's lifecycle;
-    -- execute before text checks without introducing another hook or loop.
     alignPlayerManaMask(mana)
-
-    local scaleOK, scale = pcall(mana.GetEffectiveScale, mana)
-    if not scaleOK or not readableGeometryNumber(scale)
-        or scale <= 0 then return end
-    -- Translate one physical pixel to UI units at the current effective scale.
-    local targetY = 1 / scale
-    if not readableGeometryNumber(targetY) or targetY < 0.5 or targetY > 3 then return end
-
-    local anchors = {
-        {mana.ManaBarText, "CENTER", 0},
-        {mana.RightText, "RIGHT", -2},
-    }
-    for _, entry in ipairs(anchors) do
-        local font, point, expectedX = unpack(entry)
-        if font and not isSecret(font) and font.GetNumPoints and font.GetPoint
-            and font.SetPoint then
-            local countOK, count = pcall(font.GetNumPoints, font)
-            if countOK and not isSecret(count) and count == 1 then
-                local ok, p, relative, rp, x, y = pcall(font.GetPoint, font, 1)
-                if ok and not isSecret(p) and not isSecret(relative)
-                    and not isSecret(rp) and readableGeometryNumber(x)
-                    and readableGeometryNumber(y) and p == point and relative == mana
-                    and rp == point and math.abs(x - expectedX) < 0.005 then
-                    local previous = playerManaTextOffsets[font]
-                    local native = math.abs(y) < 0.005
-                    local unchanged = math.abs(y - targetY) < 0.005
-                    local ours = previous and math.abs(y - previous) < 0.005
-                    if native or unchanged or ours then
-                        if not unchanged then
-                            if not pcall(font.SetPoint, font, point, mana,
-                                point, expectedX, targetY) then
-                                -- A rejected protected write leaves native geometry.
-                                return
-                            end
-                        end
-                        playerManaTextOffsets[font] = targetY
-                    end
-                end
-            end
-        end
-    end
-
-
 end
 
-local function installPlayerManaTextAlignment()
-    if hooksecurefunc and not playerManaTextArtHookInstalled
+local function installPlayerManaMaskCorrection()
+    if hooksecurefunc and not playerManaMaskArtHookInstalled
         and type(PlayerFrame_UpdateArt) == "function" then
-        playerManaTextArtHookInstalled = pcall(hooksecurefunc,
-            "PlayerFrame_UpdateArt", alignPlayerManaText)
+        playerManaMaskArtHookInstalled = pcall(hooksecurefunc,
+            "PlayerFrame_UpdateArt", syncPlayerManaMask)
     end
-    alignPlayerManaText()
+    syncPlayerManaMask()
 end
 
 -- Live 0.2.155 screenshots: PRD Health and Energy text rows are accepted
@@ -2533,6 +2602,198 @@ local function installPRDTextRows()
         end
     end
     alignPRDTextRows()
+end
+
+-- Optional fourth PRD-style row: movement speed in percent. The row is a
+-- presentation-only child of Blizzard's PRD; no native frame geometry or Edit
+-- Mode data is changed. It behaves like a compact speedometer: the row always
+-- stays present, shows 0% while idle or rooted, and fills according to live
+-- movement speed while moving. Anchoring to PRD BOTTOM keeps it beneath the
+-- stack as alternate/class bars appear.
+local SPEED_BASE = (type(BASE_MOVEMENT_SPEED) == "number" and BASE_MOVEMENT_SPEED > 0)
+    and BASE_MOVEMENT_SPEED or 7
+local SPEEDOMETER_MAX_PERCENT = 200
+local SPEEDOMETER_UPDATE_INTERVAL = 0.03
+-- Formatter accepts a secret speed directly. A tiny divisor correction avoids
+-- the integer truncation which previously displayed 129% for a 130% run speed
+-- when using BASE_MOVEMENT_SPEED/100 exactly (also used by MoveSpeed).
+-- Non-secret speeds continue using normal nearest-integer rounding.
+local SPEEDOMETER_SECRET_FORMAT = {
+    breakpointData = {{
+        breakpoint = 0,
+        abbreviation = "%",
+        significandDivisor = (SPEED_BASE / 100) * (699 / 700),
+        fractionDivisor = 1,
+        abbreviationIsGlobal = false,
+    }},
+}
+local movementSpeedRow
+
+local function playerIsRooted()
+    local api = _G.C_LossOfControl
+    if not api then return false end
+    local useUnit = type(api.GetActiveLossOfControlDataCountByUnit) == "function"
+        and type(api.GetActiveLossOfControlDataByUnit) == "function"
+    local countFunc = useUnit and api.GetActiveLossOfControlDataCountByUnit
+        or api.GetActiveLossOfControlDataCount
+    local dataFunc = useUnit and api.GetActiveLossOfControlDataByUnit
+        or api.GetActiveLossOfControlData
+    if type(countFunc) ~= "function" or type(dataFunc) ~= "function" then return false end
+    local ok, count
+    if useUnit then
+        ok, count = pcall(countFunc, "player")
+    else
+        ok, count = pcall(countFunc)
+    end
+    if not ok or isSecret(count) or type(count) ~= "number"
+        or count < 0 or count > 64 then return false end
+    for i = 1, math.min(count, 32) do
+        local dataOK, data
+        if useUnit then
+            dataOK, data = pcall(dataFunc, "player", i)
+        else
+            dataOK, data = pcall(dataFunc, i)
+        end
+        -- Inspect secrecy before even testing data's truthiness: combat
+        -- responses themselves may be opaque values.
+        if dataOK and not isSecret(data) and data then
+            local typeOK, locType = pcall(function() return data.locType end)
+            if typeOK and not isSecret(locType) and locType == "ROOT" then return true end
+        end
+    end
+    return false
+end
+
+-- Return the display text, raw speed for the native StatusBar, and whether
+-- the display text can itself be a secret. Never branch, compare, do math on,
+-- or concatenate a secret speed or secret-derived string in addon Lua.
+local function movementSpeedInfo()
+    if playerIsRooted() then
+        return "0%", 0, false
+    end
+    if not GetUnitSpeed then return "--%", 0, false end
+    local ok, current = pcall(GetUnitSpeed, "player")
+    if not ok then return "--%", 0, false end
+
+    if isSecret(current) then
+        -- Blizzard's formatter accepts secret numbers without addon arithmetic.
+        -- Do not inspect or compare its result: pass it straight to SetText.
+        if AbbreviateNumbers then
+            local formattedOK, formatted = pcall(AbbreviateNumbers,
+                current, SPEEDOMETER_SECRET_FORMAT)
+            if formattedOK then
+                return formatted, current, true
+            end
+        end
+        return "--%", current, false
+    end
+    if type(current) ~= "number" then return "--%", 0, false end
+
+    local percent = current / SPEED_BASE * 100
+    if current <= 0.01 or percent <= 0.01 then
+        return "0%", 0, false
+    end
+    if percent < 0 then percent = 0 end
+    return string.format("%d%%", math.floor(percent + 0.5)), current, false
+end
+
+local function refreshMovementSpeedRow(frame)
+    if not frame or not frame.label or not frame.fillBar then return end
+    local content, rawSpeed, textMayBeSecret = movementSpeedInfo()
+
+    -- Native status bars accept secret numeric values, unlike our old
+    -- Texture:SetWidth(percent * width) implementation. The bar is configured
+    -- once with 0..200% of base run speed, matching the old fill scale.
+    frame.fillBar:SetValue(rawSpeed)
+
+    -- A secret-derived string can propagate secrecy even through formatters;
+    -- don't compare or cache it in Lua. SetText accepts it natively.
+    if textMayBeSecret then
+        frame.label:SetText(content)
+        frame.lastText = nil
+    elseif content ~= frame.lastText then
+        frame.label:SetText(content)
+        frame.lastText = content
+    end
+end
+
+local function nativePRDBarSize(prd)
+    local width, height = 174, 12
+    local power = prd and prd.PowerBar
+    if power and not isSecret(power) then
+        local ok, w, h = pcall(function() return power:GetWidth(), power:GetHeight() end)
+        if ok then
+            if not isSecret(w) and type(w) == "number" and w >= 100 and w <= 400 then width = w end
+            if not isSecret(h) and type(h) == "number" and h >= 5 and h <= 28 then height = h end
+        end
+    end
+    -- One screen-pixel increment from the visually thinner .162 row; keep
+    -- the .162 fill insets and atlas extents unchanged to avoid overexpansion.
+    return width, height + 2
+end
+
+local function installMovementSpeedRow()
+    if readableBool(InCombatLockdown) ~= false then return end
+    local prd = _G.PersonalResourceDisplayFrame
+    if not prd or isSecret(prd) or not CreateFrame then return end
+    local width, height = nativePRDBarSize(prd)
+    if movementSpeedRow then
+        -- Edit Mode can resize the PRD; keep this extra row the same width.
+        local row = movementSpeedRow
+        if math.abs(row:GetWidth() - width) > 0.01
+            or math.abs(row:GetHeight() - height) > 0.01 then
+            row:SetSize(width, height)
+            refreshMovementSpeedRow(row)
+        end
+        return
+    end
+    local made, row = pcall(CreateFrame, "Frame", nil, prd)
+    if not made or not row then return end
+    row:EnableMouse(false)
+    row:SetSize(width, height)
+    row:SetPoint("TOP", prd, "BOTTOM", 0, -2.5)
+    -- Rendering-only native StatusBar accepts combat-secret movement speed.
+    -- The original row remains an ordinary child of the PRD: its geometry,
+    -- Edit Mode relationship, and 30 ms refresh cadence are unchanged.
+    local fillBar = CreateFrame("StatusBar", nil, row)
+    fillBar:EnableMouse(false)
+    fillBar:SetPoint("TOPLEFT", row, "TOPLEFT", 1, -1)
+    fillBar:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -1, 1)
+    fillBar:SetMinMaxValues(0, SPEED_BASE * SPEEDOMETER_MAX_PERCENT / 100)
+    local fill = fillBar:CreateTexture(nil, "BACKGROUND", nil, 1)
+    fill:SetAtlas("UI-HUD-CoolDownManager-Bar", false)
+    fillBar:SetStatusBarTexture(fill)
+    fillBar:SetStatusBarColor(0.18, 0.68, 0.24, 1)
+    row.fillBar = fillBar
+    -- Blizzard's PersonalResourceStatusBar draws this BG atlas on BACKGROUND,
+    -- behind the StatusBarTexture. Drawing it above the fill (ARTWORK 7)
+    -- caused a dark internal overlay that the native PRD rows do not have.
+    -- Keep all calibrated anchor positions and the border extents unchanged.
+    local backdrop = fillBar:CreateTexture(nil, "BACKGROUND", nil, 0)
+    backdrop:SetAtlas("UI-HUD-CoolDownManager-Bar-BG", false)
+    backdrop:SetPoint("TOPLEFT", row, "TOPLEFT", -2, 2)
+    backdrop:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 6, -6)
+    row.backdrop = backdrop
+    local label = fillBar:CreateFontString(nil, "OVERLAY", "TextStatusBarText")
+    label:SetPoint("LEFT", row, "LEFT", 5, -0.5)
+    label:SetJustifyH("LEFT")
+    label:SetText("")
+    row.label = label
+    row.lastText = nil
+    row.elapsed = 0
+    row:SetScript("OnUpdate", function(self, elapsed)
+        self.elapsed = self.elapsed + elapsed
+        -- 30 ms polling: preserve the tuned tap-step responsiveness without
+        -- changing any native PRD bar or protected frame behavior.
+        if self.elapsed < SPEEDOMETER_UPDATE_INTERVAL then return end
+        self.elapsed = 0
+        -- Native PRD changes height as forms/extra bars change. The row's
+        -- BOTTOM-relative anchor follows automatically, even inside combat.
+        refreshMovementSpeedRow(self)
+    end)
+    row:SetScript("OnShow", refreshMovementSpeedRow)
+    movementSpeedRow = row
+    refreshMovementSpeedRow(row)
 end
 
 local compactDebuffBorderHookInstalled = false
@@ -2840,6 +3101,7 @@ events:SetScript("OnEvent", function(_, event, unit)
         elseif unit == "Blizzard_PersonalResourceDisplay" then
             installPRDAlternateManaColor()
             installPRDTextRows()
+            installMovementSpeedRow()
             elseif unit == "Blizzard_Communities" then
             installCommunitiesPrimaryNames()
         elseif unit == "Blizzard_DamageMeter" then
@@ -2867,10 +3129,11 @@ events:SetScript("OnEvent", function(_, event, unit)
         installHooks()
         installDerivedFrameAlignment()
         alignPlayerHealthContent()
-        installPlayerManaTextAlignment()
+        installPlayerManaMaskCorrection()
         installPlayerAlternateManaColor()
         installPRDAlternateManaColor()
         installPRDTextRows()
+        installMovementSpeedRow()
         installCompactDebuffBorderNeutralization()
         installMicroMenuChildOffset()
         installGuildNotificationPipSuppression()
@@ -2884,10 +3147,11 @@ events:SetScript("OnEvent", function(_, event, unit)
         installLossOfControlPresentation()
         installDerivedFrameAlignment()
         alignPlayerHealthContent()
-        installPlayerManaTextAlignment()
+        installPlayerManaMaskCorrection()
         installPlayerAlternateManaColor()
         installPRDAlternateManaColor()
         installPRDTextRows()
+        installMovementSpeedRow()
         installCompactDebuffBorderNeutralization()
         installMicroMenuChildOffset()
         installGuildNotificationPipSuppression()
@@ -2897,20 +3161,23 @@ events:SetScript("OnEvent", function(_, event, unit)
     elseif event == "EDIT_MODE_LAYOUTS_UPDATED" then
         installDerivedFrameAlignment()
         alignPlayerHealthContent()
-        installPlayerManaTextAlignment()
+        installPlayerManaMaskCorrection()
         installPlayerAlternateManaColor()
         installPRDAlternateManaColor()
         installPRDTextRows()
+        installMovementSpeedRow()
         installMicroMenuChildOffset()
         anchorCombatText()
         applyAll()
     elseif event == "PLAYER_REGEN_ENABLED" then
+        installEditModeLayout()
         installDerivedFrameAlignment()
         alignPlayerHealthContent()
-        installPlayerManaTextAlignment()
+        installPlayerManaMaskCorrection()
         installPlayerAlternateManaColor()
         installPRDAlternateManaColor()
         installPRDTextRows()
+        installMovementSpeedRow()
         alignCompactHealthFill("targettarget")
         alignCompactHealthFill("focustarget")
         alignCompactMana("targettarget")
@@ -3246,10 +3513,167 @@ local function printHealthColorAudit()
     end
 end
 
+-- Read-only inspection: verify the actual saved Tracked Buffs anchor and
+-- whether bjarkiUI is the current active Edit Mode layout. Nothing is moved
+-- or unanchored by this diagnostic.
+local function printTrackedBuffLayoutAudit()
+    local function out(s)
+        if DEFAULT_CHAT_FRAME then
+            DEFAULT_CHAT_FRAME:AddMessage("|cff74c7ecbjarkiUI|r: " .. tostring(s))
+        elseif type(print) == "function" then
+            print("bjarkiUI: " .. tostring(s))
+        end
+    end
+    local viewer = _G.BuffIconCooldownViewer
+    local liveIndex = viewer and not isSecret(viewer) and viewer.systemIndex or nil
+    if isSecret(liveIndex) then liveIndex = nil end
+    local active = _G.EditModeManagerFrame
+    local activeName = "unknown"
+    if active and not isSecret(active) and type(active.GetActiveLayoutInfo) == "function" then
+        local ok, info = pcall(active.GetActiveLayoutInfo, active)
+        if ok and info and not isSecret(info) then
+            local okName, name = pcall(function() return info.layoutName end)
+            if okName and not isSecret(name) and type(name) == "string" then
+                activeName = name
+            end
+        end
+    end
+    local savedX, savedIndex = "not found", "?"
+    if C_EditMode and type(C_EditMode.GetLayouts) == "function" then
+        local ok, layouts = pcall(C_EditMode.GetLayouts)
+        if ok and type(layouts) == "table" and type(layouts.layouts) == "table" then
+            for _, layout in ipairs(layouts.layouts) do
+                if type(layout) == "table" and layout.layoutName == EDIT_MODE_LAYOUT_NAME
+                    and type(layout.systems) == "table" then
+                    for _, entry in ipairs(layout.systems) do
+                        if type(entry) == "table" and entry.system == 20
+                            and type(entry.anchorInfo) == "table" then
+                            local anchor = entry.anchorInfo
+                            -- Locate the expected Tracked Buffs anchor, but do
+                            -- not assume the export and runtime indexes match.
+                            if anchor.relativeTo == "UIParent" and nearlyEqual(anchor.offsetY, 0.0)
+                                and (nearlyEqual(anchor.offsetX, 144.9)
+                                    or nearlyEqual(anchor.offsetX, 145.0)
+                                    or nearlyEqual(anchor.offsetX, 151.9)
+                                    or nearlyEqual(anchor.offsetX, 152.0)) then
+                                savedX = tostring(anchor.offsetX)
+                                savedIndex = tostring(entry.systemIndex)
+                                break
+                            end
+                        end
+                    end
+                    break
+                end
+            end
+        end
+    end
+    local liveX, liveY = "?", "?"
+    if viewer and not isSecret(viewer) and type(viewer.GetPoint) == "function" then
+        local ok, _, _, _, x, y = pcall(viewer.GetPoint, viewer, 1)
+        if ok and not isSecret(x) and not isSecret(y) then
+            if type(x) == "number" then liveX = tostring(x) end
+            if type(y) == "number" then liveY = tostring(y) end
+        end
+    end
+    out("tracked buffs: activeLayout=" .. activeName
+        .. ", savedX=" .. savedX
+        .. ", savedIndex=" .. savedIndex
+        .. ", liveBuffIconIndex=" .. tostring(liveIndex or "unknown")
+        .. ", liveOffset=" .. liveX .. "," .. liveY
+        .. ", revision=" .. tostring(bjarkiUISettings.editModePresetRevision or "none"))
+    if activeName ~= "unknown" and activeName ~= EDIT_MODE_LAYOUT_NAME then
+        out("tracked buffs: the bjarkiUI preset is not active; use that preset in Edit Mode to see its saved placement")
+    end
+end
+
+-- Read-only geometry inspection for the compact ToT/ToF seam. Moving a
+-- parent in Edit Mode should not change the child bar anchor, but fractional
+-- UI scaling and our older compact-bar corrections can affect rendered pixels.
+-- This command never calls SetPoint, SetSize, or any protected geometry writer.
+local function printCompactGeometryAudit()
+    local function out(message)
+        if DEFAULT_CHAT_FRAME then
+            DEFAULT_CHAT_FRAME:AddMessage("|cff74c7ecbjarkiUI|r: " .. tostring(message))
+        elseif type(print) == "function" then print("bjarkiUI: " .. tostring(message)) end
+    end
+    local function number(value)
+        if isSecret(value) or type(value) ~= "number" then return "?" end
+        return string.format("%.3f", value)
+    end
+    local function query(frame, method)
+        if not frame or isSecret(frame) or type(frame[method]) ~= "function" then return nil end
+        local ok, result = pcall(frame[method], frame)
+        return ok and not isSecret(result) and result or nil
+    end
+    for _, unit in ipairs({"targettarget", "focustarget"}) do
+        local frame = smallFrame(unit)
+        if not frame or isSecret(frame) then
+            out(unit .. " frame=missing")
+        else
+            local hp, mana = frame.HealthBar, frame.ManaBar
+            local seam
+            local bottom, top = query(hp, "GetBottom"), query(mana, "GetTop")
+            if type(bottom) == "number" and type(top) == "number" then
+                seam = bottom - top
+            end
+            local anchor = "?"
+            if mana and type(mana.GetPoint) == "function" then
+                local ok, point, rel, relPoint, x, y = pcall(mana.GetPoint, mana, 1)
+                if ok and not isSecret(point) and not isSecret(rel)
+                    and not isSecret(relPoint) and not isSecret(x) and not isSecret(y) then
+                    anchor = tostring(point) .. ":" .. tostring(relPoint)
+                        .. "@" .. number(x) .. "," .. number(y)
+                        .. (rel == hp and " (to health)" or " (other parent)")
+                end
+            end
+            out(unit .. " hpH=" .. number(query(hp, "GetHeight"))
+                .. " manaH=" .. number(query(mana, "GetHeight"))
+                .. " gapUI=" .. number(seam)
+                .. " manaAnchor=" .. anchor
+                .. " scale=" .. number(query(frame, "GetEffectiveScale")))
+        end
+    end
+end
+
+-- A/B experiment for the silver line between compact health and mana bars.
+-- Only our owned, clipped chrome-copy shells are toggled: no protected bar,
+-- native artwork, offsets, scales, font, or Soft Dark setting is changed.
+local function setCompactChromeDiagnostic(enabled)
+    if readableBool(InCombatLockdown) ~= false then
+        print("bjarkiUI: compact chrome test requires being out of combat")
+        return
+    end
+    compactChromeOverlayVisible = enabled
+    local changed = 0
+    for _, unit in ipairs({ "targettarget", "focustarget" }) do
+        alignCompactChrome(unit)
+        local frame = smallFrame(unit)
+        local state = frame and compactChromeOverlays[frame]
+        if state and state.shell and state.shell.SetShown then
+            local ok = pcall(state.shell.SetShown, state.shell, enabled)
+            if ok then changed = changed + 1 end
+        end
+    end
+    print("bjarkiUI: extra ToT/ToF chrome " .. (enabled and "ON" or "OFF")
+        .. " (" .. changed .. " overlays; diagnostic, reset on /reload)")
+end
+
 local previousBJarkiUISlash = SlashCmdList.BJARKIUI
 SlashCmdList.BJARKIUI = function(message)
-    local command = tostring(message or ""):lower():match("^%s*(%S*)")
-    if command == "audit" then
+    local command, arg1, arg2 = tostring(message or ""):lower():match("^%s*(%S*)%s*(%S*)%s*(%S*)")
+    if command == "compact" then
+        if arg1 == "chrome" and (arg2 == "on" or arg2 == "off") then
+            setCompactChromeDiagnostic(arg2 == "on")
+        elseif arg1 == "chrome" then
+            print("bjarkiUI: /bui compact chrome [on|off]")
+        else
+            printCompactGeometryAudit()
+        end
+        return
+    elseif command == "tracked" then
+        printTrackedBuffLayoutAudit()
+        return
+    elseif command == "audit" then
         printUIAudit()
         return
     elseif command == "names" then
@@ -3259,7 +3683,7 @@ SlashCmdList.BJARKIUI = function(message)
         printHealthColorAudit()
         return
     elseif command == "" or command == "help" then
-        print("bjarkiUI: /bui levels [on|off] | audit | colors | names")
+        print("bjarkiUI: /bui levels [on|off] | audit | colors | names | tracked | compact [chrome on|off]")
         return
     end
     if previousBJarkiUISlash then

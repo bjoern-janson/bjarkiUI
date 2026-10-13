@@ -1,5 +1,7 @@
 # bjarkiUI architecture
 
+> **Current repository baseline (2026-10-14):** `0.2.197-local` source-synchronized from the exact local release ZIP. Sections 1–25 preserve the historical design and experiments; section 25 specifically describes the **former `0.2.156` baseline**, not the current implementation. Section 26 is authoritative for the latest source.
+
 This document now tracks **bjarkiUI 0.2.156-local**, the current source version. Sections 1–23 preserve earlier implementation notes (mostly 0.2.90-era); section 24 is a historical 0.2.134-local field study. **Section 25 supersedes earlier descriptions where behavior changed.** This is a maintenance reference, not a guarantee about undocumented WoW: Forever client behavior or taint safety.
 
 The addon is deliberately small. The runtime consists of:
@@ -519,7 +521,7 @@ Targeted **mock execution**, not WoW client execution, passed for:
 7. **Audit implementation separately from screenshots**: compile/syntax, mocks, idempotence, combat gates, secret-value reads, lifecycle, and behavior under unsupported layouts. Claim “tested in mock” rather than “taint-free.”
 8. **Keep local/repository version provenance explicit.** Updating this document alone must not be described as merging `0.2.134-local` into `main`.
 
-## 25. Current committed source: 0.2.156-local (2026-10-12)
+## 25. Historical committed source: 0.2.156-local (2026-10-12)
 
 **Provenance:** The implementation in `bjarkiUI.lua`, `PartyOrder.lua`, and both matching manifests is taken from the accepted `bjarkiUI-0.2.156-local.zip` (ZIP SHA-256 `2bdc6f25d581a6340d54c21811573efc11ddc6a993db2e440f9fa1ce8e592ed7`). The prior 0.2.134 field study remains useful history, but is not a description of the current code. `KNOWN_ISSUES.md` continues to record unresolved Battleground/client observations, not confirmed fixes.
 
@@ -550,3 +552,78 @@ Targeted **mock execution**, not WoW client execution, passed for:
 - Small UI corrections should be event/post-write based, fail closed on secret numbers or unfamiliar geometry, and never grow cumulative offsets. Diagnostic macros that read secret `GetPoint()` values are not safe evidence in Forever.
 - The transient Player Mana seam-stripe, bronze-border, widened StatusBar, and masked-duplicate-artwork experiments from 0.2.136–0.147 were **rejected** and are not part of the 0.2.156 source. The successful native mask correction was retained. The portrait timer `/bp timery` experiment belongs only to the separate portraits addon and has been removed there.
 - **Verified for this source sync:** ZIP integrity, both Lua sources parsing, manifest contents, and Git object blob checks. In-game screenshots supported the accepted visual appearance in several tested scenarios, but **do not establish universal combat-taint safety**, every UI scale, Battleground class evidence, or behavior after all client transitions.
+
+## 26. Current synchronized source: 0.2.197-local (2026-10-14)
+
+### 26.1 Provenance and atomic source boundary
+
+This chapter describes the source in the **exact** `bjarkiUI-0.2.197-local.zip` supplied during the 2026-10-13 Forever UI work. ZIP SHA-256:
+`c3074d15fc74ebf5c84cd5ff5ee7cd0a406b5d1eeb743e50da72460fd03c774c`.
+The prior `main` head was `5138ac6cb36b1d1cfb1d6ed0afc617a4c1af99d7` at `0.2.156-local`. The intervening `0.2.157–0.2.196` artifacts were iterative **local** builds, not a claim of GitHub history. The synchronization imports their cumulative *accepted candidate* as-is, not a reconstruction from chat descriptions.
+
+Module load order in both TOCs (Interface `16001`):
+1. `bjarkiUI.lua` — primary unit-frame and PRD presentation;
+2. `PartyOrder.lua` — visual compact-party ordering;
+3. `SoftDark.lua` — fixed decorative-theme layer;
+4. `TrackedBuffSeconds.lua` — tracked buff cooldown-number presentation;
+5. `NameplateTimers.lua` — native nameplate aura countdown font.
+
+`PartyOrder.lua` is byte-identical to the prior repository blob (`6f51134ffdbdaaf77ef8b6a833fcff7018d377a8`). Added repository source files are `SoftDark.lua`, `TrackedBuffSeconds.lua`, `NameplateTimers.lua`, and the bundled `EditMode-0.2.181.txt`. That layout file name records the original preset revision; its **contents** exactly match the `0.2.197` embedded layout and are not proof the code reverted to `.181`.
+
+### 26.2 Ownership and non-implication boundaries
+
+The addon owns **presentation**, not combat state, player identity, aura state, protected unit assignments, or Blizzard's rendering lifecycle. Successful access to a value does not by itself authorize assigning class identity, editing protected geometry, or altering an unrelated system. The modules obey different ownership contracts:
+
+| Module | Owned outputs | Native/engine-owned inputs | Gate / fallback |
+| --- | --- | --- | --- |
+| Core `bjarkiUI.lua` | bounded color, text, atlas and known-frame presentation; one extra speed row | unit identities, resource values, frame geometry, protected values | guarded readability, recognized native layout, out-of-combat layout work |
+| `PartyOrder.lua` | visual anchor order for compact PARTY frames | unit assignments, secure refresh and roster membership | next-tick scheduling, readable unit tokens, out-of-combat intent |
+| `SoftDark.lua` | decorative texture vertex colors and partial desaturation | icon imagery, cooldowns, class-colored fills, button geometry | fixed 60% preset, saved original appearance, deferred combat work |
+| `TrackedBuffSeconds.lua` | native cooldown style threshold | spell/aura durations and icon recycling | `Cooldown:SetCountdownMillisecondsThreshold(0)` on BuffIcon viewer only |
+| `NameplateTimers.lua` | nameplate-aura countdown font | aura time, stacks, portraits, unit-frame data | native countdown font object with guarded FontString fallback |
+
+Unknown or secret evidence must not silently be treated as permission. A `pcall` success is an API result, not proof of combat-taint freedom or correct visible pixels. Retain the existing `KNOWN_ISSUES.md` as open evidence for opposing-faction class colors and ToT/ToF identity unless fresh in-game tests close those observations.
+
+### 26.3 Core frame and color behavior
+
+Six handled units are `player`, `target`, `focus`, `targettarget`, `focustarget`, and `pet`. Owned unit-frame bar fills use the neutral `UI-HUD-CoolDownManager-Bar` texture; Blizzard keeps the native status values, masks and unit assignment. The addon resolves positively readable player/class/pet/reaction/tap-denied information before choosing its fallback color; inaccessible identity must not be replaced with a guess. Player class colors use native `RAID_CLASS_COLORS` or guarded `C_ClassColor`; combat pets use familiar pure green; Mana is PRD-like blue `(0.10,0.25,1.00)`.
+
+ToT/ToF preserve the known compact layout: ToT health height 10, ToF health height 10.25, both Mana bars attached at `Y=0` to their corresponding health bars. A clipped, mouse-transparent copy of their native `FrameTexture` is layered above the fills but below the name area. This duplicate chrome is a **visual intervention**, not an independent native feature; do not confuse it with a second health/resource bar. Live diagnostic `/bui compact` reported `gapUI=0.000` on both at scale 0.825. Hiding the added copy did not remove the visible hairline separator, so further whole-frame or Mana Y-offset hunts remain unjustified without new evidence. Temporary `/bui compact chrome on|off` is a session-only diagnostic; the default is ON.
+
+### 26.4 PRD speedometer: secret-compatible native bar
+
+The added fourth PRD-style row is an ordinary, mouse-transparent child of `PersonalResourceDisplayFrame`, anchored below Blizzard's native bar stack. Its text and green fill show instantaneous speed relative to `BASE_MOVEMENT_SPEED`: idle/rooted `0%`, normal movement `100%`, speed-boosting effects above `100%`. The bar is scaled to **200% maximum** (higher text may continue while fill is capped). The row uses a native `StatusBar:SetValue` rather than addon arithmetic on combat-secret numbers; when `GetUnitSpeed` yields a secret, a guarded `AbbreviateNumbers` path formats the label for native `SetText`.
+
+The row refreshes at `0.03` seconds (30 ms) only while the row updates. The display uses `UI-HUD-CoolDownManager-Bar` with green `(0.18,0.68,0.24)`; its background atlas is drawn at `BACKGROUND` layer below, not above, the fill. This fixed an observed nonnative dark inner overlay. Keep calibrated bar and text anchors independent of the native PRD frame's protected geometry. The implementation was visually iterated in play, but not certified for all forms, buffs, API secrecy policies or UI scales.
+
+### 26.5 Soft Dark: fixed presentation preset and verified bag hierarchy
+
+Soft Dark is **one automatic preset**: `SOFT_DARK_BRIGHTNESS=0.60`. Old per-character brightness, bag tint and atlas comparison settings are cleared on the fixed-preset revision. Ordinary use requires no chat commands. Only emergency ON/OFF and read-only audits remain for troubleshooting. If the full `DarkMode` addon is loaded, this theme refuses concurrent recoloring. Combat-delayed work retries at supported lifecycle boundaries; there is no theme-specific per-frame poll.
+
+Original vertex colors are stored in a weak-keyed map, and original bag-texture desaturation is stored separately. Repeated repaints derive their output from these originals rather than repeatedly multiplying an already-dark texture. Soft Dark OFF restores both channels. Tinting stays on identified decorative textures, not spell/item icons, portrait pictures, name text, native bar fill values or cooldown sweeps.
+
+The bag experiment is an unusually well-scoped client observation. Hiding regular `CharacterBag0Slot`–`3Slot` buttons did **not** remove the gold triangular seams; hiding `BagsBar` did. Hiding only the non-button sibling frames of `BagsBar`, while retaining `BagSlotCluster` and clickable buttons, **did** remove them. The live hierarchy exposed **seven unnamed sibling frames**; `0.2.195` proved that 27 textures across seven frames were reachable. `0.2.197` retains these frames, uses partial desaturation (`0.55`) plus a fixed warm-charcoal tint, and leaves bag slots significantly less dark than the rejected `0.32` multiplier builds. The seven-frame equality guard intentionally fails closed when the native client structure changes. **Exact visual parity after `.197` is not yet verified.**
+
+Other Soft Dark targets include action-bar chrome, individually reachable normal/slot art, 33 pooled action-bar dividers observed in diagnostics, named window chrome, PRD background/border atlases, and both native and clipped ToT/ToF chrome textures. Counts are diagnostic observations, not universal frame coverage guarantees. Unrecognized textures are skipped rather than automatically darkening arbitrary frame descendants.
+
+### 26.6 Timers and selected Edit Mode layout
+
+`TrackedBuffSeconds.lua` affects only `BuffIconCooldownViewer` cooldown style: `SetCountdownMillisecondsThreshold(0)` requests integer seconds. It does not change the Blizzard cast-bar timer, essential/utility cooldowns, buff stacks or aura time data.
+
+`NameplateTimers.lua` only modifies Blizzard nameplate aura **countdown FontStrings**, not aura stacks or bjarkiPortraits portrait timers. It caches native font objects and guards its post-`SetAura`/post-`RefreshList` pooled refresh paths. Code default is 11 pt; the user selected **13 pt** in persistent per-character settings. `/bui nameplates` is optional adjustment/diagnostic, not a required configuration step. The actual FontString is rechecked after applying the font rather than assuming a successful API call implies visible success.
+
+The embedded Edit Mode preset is installed only if absent. Existing `bjarkiUI` layouts receive **one-time migrations of recognized old coordinates**, with saved-layout rollback after a failed write and unrelated player changes preserved. Current intended coordinates include Player Y=`-159.0`, Target Y=`-160.0`, and Tracked Buffs X=`152.0`. Tracked Buffs is serialized as `20 2`; earlier adjustments to `20 0` mistakenly targeted Essential Cooldowns and were reversed. Do not silently overwrite an existing player's custom layout or use an inferred cooldown viewer index without checking the exported entry.
+
+### 26.7 Party ordering, observed risk, and release discipline
+
+`PartyOrder.lua` rearranges only the **visual** compact PARTY frame anchors (party1 through party4, player last), deferring reanchors after native `RefreshMembers`/layout callbacks. It avoids `SetFlowSortFunction` because that path previously re-entered Blizzard's native protected refresh from addon-tainted code. Unit tokens are read live; on unknown tokens the reorder returns without guessing.
+
+**Open P1 hardening finding (not silently patched in the `.197` source sync):** `PartyOrder.lua` currently defines `inCombat()` as `safeBool(InCombatLockdown) == true`. When the query fails, is secret, or has an unsupported type, `safeBool` returns `nil` and the condition evaluates **false**, permitting a visual reanchor attempt under *unknown* combat authorization. A future individually tested patch should require `safeBool(InCombatLockdown) == false` before doing protected anchor work, preserving the otherwise accepted player-last ordering. This is a code-level entitlement gap, not proof that an error has already occurred in live play.
+
+### 26.8 Verification record and what remains open
+
+**Checked at source sync:** `0.2.197` archive integrity; complete file extraction; byte equality between extracted files and the release ZIP; both manifest load orders; embedded versus bundled Edit Mode layout equality; syntax compilation of all five Lua modules through liblua **5.4**; matching GitHub blobs for every synchronized source file. No package-source modernization, UI re-layout, icon changes, or behavior-changing hardening was introduced during repository reconciliation.
+
+**Not established:** zero taint in all combat transitions; compatibility with every future Forever build; class colors under all hostile BG secrets; dynamic ToT/ToF frame scale changes; every nameplate pool/cooldown mode; visual identity between bag chrome and Action Bar 1 following the final warm-charcoal `.197` preset. The local screenshots and in-game commands in prior work are **scope-limited evidence**, not universal proof.
+
+**Maintenance protocol:** Keep behavioral patches separate from release-source syncing, test the *specific native owner and draw layer*, use reversible out-of-combat probes, compare pixels at the same UI scale, preserve a known-good ZIP, and check both the written API result and actual visible rendering. Prefer narrow post-write hooks and snapshot-based restoration to broad frame scans or cumulative tint/geometry adjustments.
