@@ -10,10 +10,51 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Stage addon
+      - name: Validate manifests and stage addon
         run: |
-          mkdir -p dist/bjarkiUI
-          cp bjarkiUI.lua PartyOrder.lua bjarkiUI.toc bjarkiUI_Camelot.toc dist/bjarkiUI/
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import shutil
+
+          root = Path(".")
+          manifests = [root / "bjarkiUI.toc", root / "bjarkiUI_Camelot.toc"]
+
+          def modules(manifest):
+              return [
+                  line.strip()
+                  for line in manifest.read_text(encoding="utf-8").splitlines()
+                  if line.strip() and not line.lstrip().startswith("#")
+              ]
+
+          source_modules = modules(manifests[0])
+          assert source_modules, "Main manifest does not declare Lua modules"
+          assert source_modules == modules(manifests[1]), "The two TOC module lists disagree"
+          assert len(source_modules) == len(set(source_modules)), "Duplicate Lua module in TOC"
+
+          package = Path("dist/bjarkiUI")
+          package.mkdir(parents=True, exist_ok=True)
+          inputs = manifests + [root / path for path in source_modules]
+          layout = root / "EditMode-0.2.181.txt"
+          if layout.is_file():
+              inputs.append(layout)
+
+          for item in inputs:
+              if not item.is_file():
+                  raise FileNotFoundError(f"TOC references missing module: {item}")
+              if item.suffix == ".lua" and (item.is_absolute() or ".." in item.parts):
+                  raise ValueError(f"Unsafe module path: {item}")
+              shutil.copy2(item, package / item.name)
+
+          if sorted(p.name for p in package.glob("*.lua")) != sorted(Path(x).name for x in source_modules):
+              raise RuntimeError("Package source differs from the manifest")
+          sums = [
+              hashlib.sha256((package / item.name).read_bytes()).hexdigest() + "  " + item.name
+              for item in inputs
+          ]
+          (package / "SHA256SUMS.txt").write_text("\n".join(sums) + "\n", encoding="utf-8")
+          print("Staged:", ", ".join(item.name for item in inputs))
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: bjarkiUI

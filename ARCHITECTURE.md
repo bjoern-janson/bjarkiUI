@@ -627,3 +627,9 @@ The embedded Edit Mode preset is installed only if absent. Existing `bjarkiUI` l
 **Not established:** zero taint in all combat transitions; compatibility with every future Forever build; class colors under all hostile BG secrets; dynamic ToT/ToF frame scale changes; every nameplate pool/cooldown mode; visual identity between bag chrome and Action Bar 1 following the final warm-charcoal `.197` preset. The local screenshots and in-game commands in prior work are **scope-limited evidence**, not universal proof.
 
 **Maintenance protocol:** Keep behavioral patches separate from release-source syncing, test the *specific native owner and draw layer*, use reversible out-of-combat probes, compare pixels at the same UI scale, preserve a known-good ZIP, and check both the written API result and actual visible rendering. Prefer narrow post-write hooks and snapshot-based restoration to broad frame scans or cumulative tint/geometry adjustments.
+
+### 26.9 CI packaging is part of the runtime contract
+
+The previous `.github/workflows/package-addon.yml` was still hard-coded to copy only `bjarkiUI.lua`, `PartyOrder.lua`, and the two TOCs. A green GitHub Actions result therefore produced an **incomplete** post-`0.2.156` addon: `SoftDark.lua`, `TrackedBuffSeconds.lua`, and `NameplateTimers.lua` were missing from its packaged artifact.
+
+The packaging workflow now parses both TOCs, requires identical nonempty module lists, verifies that each referenced file exists, stages exactly those modules plus the manifests (and the optional edit-layout reference file), then emits SHA-256 checksums. Its success means the artifact is *complete relative to the TOCs*; it does **not** independently prove WoW compatibility, zero taint, or visual quality. New modules must be added to both TOCs; no future release should rely on an obsolete manual `cp` list.
