@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.197-local"
+local BJARKI_UI_VERSION = "0.2.203-local"
 local PRD_ATLAS = "UI-HUD-CoolDownManager-Bar"
 -- The PRD's native Mana palette, used for all MANA fills. This does not
 -- replace Blizzard's textures or its handling of Energy/Rage/Fury/etc.
@@ -366,6 +366,48 @@ local function powerBar(unit)
     elseif unit == "pet" then
         return _G.PetFrameManaBar or (_G.PetFrame and _G.PetFrame.manabar)
     end
+end
+
+-- User-requested contrast: a small, semi-transparent black backing *inside*
+-- native statusbar tracks. This increases separation from bright terrain while
+-- keeping Blizzard's shaped chrome, colored fills, text and portraits intact.
+-- Do not create a full rectangular unit-frame backdrop (especially on ToT/ToF:
+-- that previously introduced obvious edges and a false resource-bar seam).
+-- One fixed appearance for the six requested displays; no settings or polling.
+local BAR_TRACK_DARKEN_ALPHA = 0.25
+local barTrackBackings = setmetatable({}, { __mode = "k" })
+
+local function installBarTrackBacking(bar)
+    if not bar or isSecret(bar) or barTrackBackings[bar] then return end
+    if readableBool(InCombatLockdown) ~= false then return end
+    if type(bar.CreateTexture) ~= "function" or type(bar.GetObjectType) ~= "function" then return end
+    local okType, kind = pcall(bar.GetObjectType, bar)
+    if not okType or isSecret(kind) or kind ~= "StatusBar" then return end
+
+    -- BACKGROUND sublevel -7 stays below the native backdrop and the fill.
+    -- The 1-unit inset avoids placing black artwork on the chrome's edges;
+    -- these anchors also resize automatically with the original StatusBar.
+    local okCreate, texture = pcall(bar.CreateTexture, bar, nil, "BACKGROUND", nil, -7)
+    if not okCreate or not texture or isSecret(texture) then return end
+    local okPaint = pcall(function()
+        texture:SetPoint("TOPLEFT", bar, "TOPLEFT", 1, -1)
+        texture:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", -1, 1)
+        texture:SetColorTexture(0, 0, 0, BAR_TRACK_DARKEN_ALPHA)
+    end)
+    if not okPaint then
+        if texture.Hide then pcall(texture.Hide, texture) end
+        return
+    end
+    barTrackBackings[bar] = texture
+end
+
+local function installPRDTrackBackings()
+    local prd = _G.PersonalResourceDisplayFrame
+    if not prd or isSecret(prd) then return end
+    local container = prd.HealthBarsContainer
+    installBarTrackBacking(container and container.healthBar)
+    installBarTrackBacking(prd.PowerBar)
+    installBarTrackBacking(prd.AlternatePowerBar)
 end
 
 local function applyBarAtlas(bar, atlas)
@@ -950,6 +992,13 @@ end
 
 local function applyUnit(unit)
     local health, power = healthBar(unit), powerBar(unit)
+    if unit ~= "pet" then
+        installBarTrackBacking(health)
+        installBarTrackBacking(power)
+        if unit == "player" and _G.PlayerFrame then
+            installBarTrackBacking(_G.PlayerFrame.activeAlternatePowerBar)
+        end
+    end
     -- Native player/pet frames can swap bindings. Keep unsupported or unknown
     -- bindings native until these surfaces return to their tracked units.
     if (health and readableUnitToken(health.unit) ~= unit)
@@ -2736,6 +2785,7 @@ local function installMovementSpeedRow()
     if readableBool(InCombatLockdown) ~= false then return end
     local prd = _G.PersonalResourceDisplayFrame
     if not prd or isSecret(prd) or not CreateFrame then return end
+    installPRDTrackBackings()
     local width, height = nativePRDBarSize(prd)
     if movementSpeedRow then
         -- Edit Mode can resize the PRD; keep this extra row the same width.
@@ -2758,12 +2808,13 @@ local function installMovementSpeedRow()
     local fillBar = CreateFrame("StatusBar", nil, row)
     fillBar:EnableMouse(false)
     fillBar:SetPoint("TOPLEFT", row, "TOPLEFT", 1, -1)
-    fillBar:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -1, 1)
+    fillBar:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 0, 1)
     fillBar:SetMinMaxValues(0, SPEED_BASE * SPEEDOMETER_MAX_PERCENT / 100)
     local fill = fillBar:CreateTexture(nil, "BACKGROUND", nil, 1)
     fill:SetAtlas("UI-HUD-CoolDownManager-Bar", false)
     fillBar:SetStatusBarTexture(fill)
     fillBar:SetStatusBarColor(0.18, 0.68, 0.24, 1)
+    installBarTrackBacking(fillBar)
     row.fillBar = fillBar
     -- Blizzard's PersonalResourceStatusBar draws this BG atlas on BACKGROUND,
     -- behind the StatusBarTexture. Drawing it above the fill (ARTWORK 7)

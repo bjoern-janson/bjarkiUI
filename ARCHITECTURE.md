@@ -633,3 +633,33 @@ The embedded Edit Mode preset is installed only if absent. Existing `bjarkiUI` l
 The previous `.github/workflows/package-addon.yml` was still hard-coded to copy only `bjarkiUI.lua`, `PartyOrder.lua`, and the two TOCs. A green GitHub Actions result therefore produced an **incomplete** post-`0.2.156` addon: `SoftDark.lua`, `TrackedBuffSeconds.lua`, and `NameplateTimers.lua` were missing from its packaged artifact.
 
 The packaging workflow now parses both TOCs, requires identical nonempty module lists, verifies that each referenced file exists, stages exactly those modules plus the manifests (and the optional edit-layout reference file), then emits SHA-256 checksums. Its success means the artifact is *complete relative to the TOCs*; it does **not** independently prove WoW compatibility, zero taint, or visual quality. New modules must be added to both TOCs; no future release should rely on an obsolete manual `cp` list.
+
+## 27. Current synchronized source: 0.2.203-local (2026-10-15)
+
+### 27.1 Provenance and source synchronization
+
+- Source: the user-tested `bjarkiUI-0.2.203-local.zip`; archive SHA-256 `1e6076ab2efb175f6a74c2cbcc91603c8a7b347d9d6fdd057570f111ae4eea18`.
+- Both manifests declare the same five runtime modules (`bjarkiUI.lua`, `PartyOrder.lua`, `SoftDark.lua`, `TrackedBuffSeconds.lua`, `NameplateTimers.lua`). The named `EditMode-0.2.181.txt` preset remains a separately bundled asset; its version in the filename is historical, not the addon version.
+- Changes relative to the prior synchronized `0.2.197` snapshot are limited to `bjarkiUI.lua`, `SoftDark.lua`, and the two manifests. `PartyOrder.lua`, `NameplateTimers.lua`, `TrackedBuffSeconds.lua`, and the Edit Mode asset were verified byte-identical; no broad rewrite.
+- This synchronization deliberately retains the `0.2.201` event-driven PRD geometry path rather than the transient `0.2.202` 150 ms geometry polling experiment. `0.2.203` adds only bounded presentation backing to the later `0.2.201` baseline.
+
+### 27.2 Soft Dark: correctly owned Forever artwork
+
+- The user-verified circular faction/PvP badge treatment targets **the backdrop only**: `PlayerFrame.PlayerFrameContent.PlayerFrameContentMain.PvpBackgroundCircle`, `TargetFrame.TargetFrameContent.TargetFrameContentContextual.PvpBackgroundCircle`, and the equivalent FocusFrame path. The separate `PvpBackgroundIcon` faction symbol is left unchanged. The prior retail `PVPIcon` / prestige paths and old global `PlayerPVPIcon` names did not correspond to the visible Forever badges.
+- The native minimap day/night orb has a separate cycle-rim atlas. Soft Dark tints the bounded rim texture, not the sun/moon disc; this and the faction circle were positively evaluated in the client after the earlier failed paths.
+- The preset is fixed at 60% brightness with no routine per-bag, per-element, or brightness configuration. Bounded bag-chrome discovery includes seven identified non-button sibling frames; darkening is restored on Soft Dark OFF and must remain safe through Edit Mode and combat deferral. These stages are **presentation** operations, not permission to change secure unit state.
+
+### 27.3 PRD speedometer and native presentation
+
+- The fourth row is an addon-owned `StatusBar` child of Blizzard's PRD. It inherits frame position, scale, and visibility; width/height are synchronized on recognized layout/lifecycle events rather than via the discarded constant geometry polling. No claimed support for arbitrary unsignaled third-party resizing.
+- Speed is sampled every 30 ms for the text/bar readout; the native status-bar API and a formatter are used when current speed may be secret. The 200% fill cap means values above 200%, including observed 433–434% Gryphon speed, saturate the fill while the displayed percentage keeps increasing. The right-hand fill extent was adjusted in `0.2.201` and visually accepted against native PRD bars.
+- `0.2.203` adds a one-time 25%-alpha black `BACKGROUND` sublevel -7 track backing inset one UI unit, for player, target, focus, ToT, ToF, and PRD (including the speed row). This does **not** add full-frame black panels, resize native bars, or add a poller. The player's health and partially empty mana presentation received positive visual feedback; comprehensive target/focus/ToT/ToF/PRD testing remains open.
+- Native bar artwork can mask a backing drawn below it: an installed texture is not, by itself, proof of an observable effect under all client background/alpha combinations. Preserve the demonstrated player-frame rendering; do not automatically increase alpha.
+
+### 27.4 Verification boundaries and open work
+
+- Source blob and ZIP integrity checks establish exact source provenance, not zero runtime taint. The Forever client's protected values and secure update paths still determine what may be inspected or modified.
+- The unresolved older `PartyOrder.lua` fail-open combat-guard concern persists, because the synced `0.2.203` release intentionally preserves that module unchanged. Keep the risk explicit rather than silently patching unrelated runtime behavior.
+- The ToT/ToF apparent health-resource separator was measured at `gapUI=0` and did not disappear when the optional extra chrome was toggled. Do not change bar geometry without new evidence.
+- The repeated bag-divider experiments establish texture ownership only for the tested Forever hierarchy. Future client changes should fail closed, not trigger broad UI-tree recoloring.
+- Positive screenshots for the faction circles, minimap cycle rim, PRD full-speed fill, and player low-mana track must not be overgeneralized to every client state, combat transition, or UI scale.
