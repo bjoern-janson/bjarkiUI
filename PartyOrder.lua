@@ -40,8 +40,11 @@ local function readableUnitToken(value)
     return value
 end
 
-local function inCombat()
-    return safeBool(InCombatLockdown) == true
+-- Reanchoring protected native frames requires positive proof of both
+-- permissions. UNKNOWN is not out-of-combat and is not outside a raid.
+local function mayReanchor()
+    return safeBool(InCombatLockdown) == false
+        and safeBool(IsInRaid) == false
 end
 
 local function shown(frame)
@@ -138,22 +141,17 @@ local function applyVisualOrder(frame)
     frame = frame or _G.CompactPartyFrame
     if not frame then return end
 
-    -- This feature is only for raid-style PARTY frames.
-    if safeBool(IsInRaid) == true then
-        return
-    end
-
-    if inCombat() then
-        return
-    end
+    -- Never modify Blizzard anchors without readable out-of-combat and
+    -- non-raid authorization. In particular, nil/secret API results deny work.
+    if not mayReanchor() then return end
 
     local ordered = visualMembers(frame)
     if not ordered or #ordered == 0 then return end
 
     local edit = _G.EditModeManagerFrame
-    local horizontal = edit
-        and safeBool(edit.ShouldRaidFrameUseHorizontalRaidGroups, edit, frame.groupType) == true
-        or false
+    local horizontal = edit and safeBool(edit.ShouldRaidFrameUseHorizontalRaidGroups, edit, frame.groupType)
+    -- An unreadable orientation must not silently be interpreted as vertical.
+    if horizontal == nil then return end
 
     local titleHeight = safeNumberMethod(frame.title, frame.title and frame.title.GetHeight) or 0
 
@@ -203,10 +201,12 @@ local function queueVisualOrder(frame)
     -- Native compact-frame writers can consume protected values. Never perform
     -- our anchor writes inside their call stack; coalesce all repair onto the
     -- next tick and re-evaluate the live frame state there.
-    if C_Timer and C_Timer.After then
+    if C_Timer and type(C_Timer.After) == "function" then
         C_Timer.After(0, run)
     else
-        run()
+        -- Running immediately here would re-enter Blizzard's protected
+        -- compact-frame update; skip instead and retry at a later event.
+        queuedFrames[frame] = nil
     end
 end
 

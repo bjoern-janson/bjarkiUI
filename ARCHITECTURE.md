@@ -1,8 +1,8 @@
 # bjarkiUI architecture
 
-> **Current repository baseline (2026-10-14):** `0.2.197-local` source-synchronized from the exact local release ZIP. Sections 1–25 preserve the historical design and experiments; section 25 specifically describes the **former `0.2.156` baseline**, not the current implementation. Section 26 is authoritative for the latest source.
+> **Current repository baseline (2026-10-15):** `0.2.204-local`. Sections 1–27 preserve historical implementation and release notes; section 28 records this focused Edit Mode and PartyOrder update. No prior live-client test of `0.2.203` automatically validates these new edits.
 
-This document now tracks **bjarkiUI 0.2.156-local**, the current source version. Sections 1–23 preserve earlier implementation notes (mostly 0.2.90-era); section 24 is a historical 0.2.134-local field study. **Section 25 supersedes earlier descriptions where behavior changed.** This is a maintenance reference, not a guarantee about undocumented WoW: Forever client behavior or taint safety.
+This document now tracks **bjarkiUI 0.2.204-local**. Sections 1–27 retain historical implementation notes and field studies; **section 28 supersedes older statements where behavior changed**. This is a maintenance reference, not a guarantee about undocumented WoW: Forever client behavior or taint safety.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -663,3 +663,22 @@ The packaging workflow now parses both TOCs, requires identical nonempty module 
 - The ToT/ToF apparent health-resource separator was measured at `gapUI=0` and did not disappear when the optional extra chrome was toggled. Do not change bar geometry without new evidence.
 - The repeated bag-divider experiments establish texture ownership only for the tested Forever hierarchy. Future client changes should fail closed, not trigger broad UI-tree recoloring.
 - Positive screenshots for the faction circles, minimap cycle rim, PRD full-speed fill, and player low-mana track must not be overgeneralized to every client state, combat transition, or UI scale.
+
+
+## 28. Edit Mode preset and party-order safety update: 0.2.204-local (2026-10-15)
+
+### 28.1 Exact user-exported Edit Mode reference
+
+The live Edit Mode share string supplied on 2026-10-15 is now copied byte-for-byte (apart from the final newline) into the bundled `EditMode-0.2.181.txt` reference and the embedded `EDIT_MODE_LAYOUT_STRING` in `bjarkiUI.lua`. The reference filename and `EDIT_MODE_PRESET_REVISION` retain the historical `.181` labels because neither the loader identity nor the migration contract changed. This update changes exactly five serialized tokens relative to `.203`: three opaque action/microbar metadata tokens, the `3 4` Y offset from `-0.0` to `-253.4`, and one opaque `21 -1` status entry. Their semantics are not inferred from the opaque flags.
+
+The existing `bjarkiUI` Edit Mode layout is still installed **only when absent**. This does **not** forcibly replace a user's existing custom layout, nor does it perform a migration for the new `3 4` or opaque-field changes. The user's supplied share string already expresses the desired live layout; first-time installations receive it from the embedded preset. Future migrations require an explicitly scoped decision rather than a silent global rewrite.
+
+### 28.2 Visual party sorting authorization
+
+`PartyOrder.lua` now requires **readable out-of-combat (`InCombatLockdown == false`) and non-raid (`IsInRaid == false`) evidence** before it changes any compact-party member, pet, or border anchors. A missing, secret, failing, or otherwise unrecognized result denies reanchoring. The Edit Mode horizontal/vertical orientation must also be a readable boolean; UNKNOWN no longer becomes vertical by default. The callback remains next-tick coalesced; without the timer API it skips reanchoring rather than synchronously entering a native compact-frame hook.
+
+The familiar party1–party4, then player visual order is unchanged when those conditions are readable. Unit assignments, secure native sorting, and unrelated party/raid settings remain Blizzard-owned.
+
+### 28.3 Validation boundary
+
+Source-side verification should include the five-token share-string diff, matching embedded/reference layouts, both `.toc` module lists, syntax compilation of all five Lua modules, and mocked combat/raid/orientation/queue paths. Real client behavior, especially Edit Mode, party grouping, and combat transitions, must be retested before claiming runtime safety. This is a focused edit: no health/power colors, typography, Soft Dark materials, PRD geometry, or portrait-aura logic were modified.
