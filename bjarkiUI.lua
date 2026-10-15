@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.204-local"
+local BJARKI_UI_VERSION = "0.2.206-local"
 local PRD_ATLAS = "UI-HUD-CoolDownManager-Bar"
 -- The PRD's native Mana palette, used for all MANA fills. This does not
 -- replace Blizzard's textures or its handling of Energy/Rage/Fury/etc.
@@ -3007,8 +3007,8 @@ end
 
 local legacyNotificationSuppressed = setmetatable({}, { __mode = "k" })
 
-local function isLegacyMicroButton(button)
-    if not button then return false end
+local function microButtonIdentity(button)
+    if not button then return nil, nil end
 
     local name
     if button.GetName then
@@ -3017,70 +3017,79 @@ local function isLegacyMicroButton(button)
     end
 
     local command = button.commandName
-    if type(name) == "string"
-        and name:lower():find("legacy", 1, true)
-    then
-        return true
-    end
-    if type(command) == "string"
-        and command:lower():find("legacy", 1, true)
-    then
-        return true
-    end
-
-    return false
+    return name, type(command) == "string" and command or nil
 end
 
-local function suppressLegacyNotificationPip()
+local function shouldSuppressMicroButtonNotification(button)
+    local name, command = microButtonIdentity(button)
+    local loweredName = type(name) == "string" and name:lower() or nil
+    local loweredCommand = type(command) == "string" and command:lower() or nil
+
+    if loweredName and loweredName:find("legacy", 1, true) then return true end
+    if loweredCommand and loweredCommand:find("legacy", 1, true) then return true end
+
+    -- The guild and help / game-menu buttons can show blue notification pips
+    -- that clash with the cleaned micro menu look. Keep the buttons functional
+    -- and suppress only the overlay. Match both likely global names and the
+    -- button command because Forever mixes old and new naming across clients.
+    local names = {
+        guildmicrobutton = true,
+        helpmicrobutton = true,
+        mainmenumicrobutton = true,
+        gamemenumicrobutton = true,
+    }
+    local commands = {
+        guild = true,
+        help = true,
+        mainmenu = true,
+        gamemenu = true,
+    }
+    return (loweredName and names[loweredName] == true)
+        or (loweredCommand and commands[loweredCommand] == true)
+        or false
+end
+
+local function hideMicroButtonNotificationPip(button)
+    if not button then return end
+    local overlay = button.NotificationOverlay
+    if overlay and not legacyNotificationSuppressed[overlay] then
+        -- Preserve the button and its click behavior; suppress only the pip.
+        if overlay.SetAlpha then
+            pcall(overlay.SetAlpha, overlay, 0)
+        end
+        if overlay.Hide then
+            pcall(overlay.Hide, overlay)
+        end
+        legacyNotificationSuppressed[overlay] = true
+    end
+end
+
+local microButtonNotificationHookInstalled = setmetatable({}, { __mode = "k" })
+
+local function suppressMicroMenuNotificationPips()
     local menu = _G.MicroMenu
     if not menu or not menu.GetChildren then return end
 
     for _, button in ipairs({ menu:GetChildren() }) do
-        if isLegacyMicroButton(button) then
-            local overlay = button.NotificationOverlay
-            if overlay and not legacyNotificationSuppressed[overlay] then
-                -- Keep the feature button functional; suppress only its pip.
-                if overlay.SetAlpha then
-                    pcall(overlay.SetAlpha, overlay, 0)
-                end
-                if overlay.Hide then
-                    pcall(overlay.Hide, overlay)
-                end
-                legacyNotificationSuppressed[overlay] = true
+        if shouldSuppressMicroButtonNotification(button) then
+            hideMicroButtonNotificationPip(button)
+            if not microButtonNotificationHookInstalled[button] and hooksecurefunc
+                and type(button.UpdateNotificationIcon) == "function"
+            then
+                hooksecurefunc(button, "UpdateNotificationIcon", function(self)
+                    hideMicroButtonNotificationPip(self)
+                end)
+                microButtonNotificationHookInstalled[button] = true
             end
         end
     end
-end
-
-local guildNotificationHookInstalled = false
-
-local function hideGuildNotificationPip()
-    local button = _G.GuildMicroButton
-    local overlay = button and button.NotificationOverlay
-    if overlay and overlay.Hide then
-        pcall(overlay.Hide, overlay)
-    end
-end
-
-local function installGuildNotificationPipSuppression()
-    local button = _G.GuildMicroButton
-    if not button then return end
-
-    if not guildNotificationHookInstalled and hooksecurefunc
-        and type(button.UpdateNotificationIcon) == "function"
-    then
-        hooksecurefunc(button, "UpdateNotificationIcon", hideGuildNotificationPip)
-        guildNotificationHookInstalled = true
-    end
-
-    hideGuildNotificationPip()
 end
 
 local microMenuChildOffsetHookInstalled = false
 local MICRO_MENU_CHILD_Y_OFFSET = -1
 
 local function applyMicroMenuChildOffset()
-    suppressLegacyNotificationPip()
+    suppressMicroMenuNotificationPips()
 
     local menu = _G.MicroMenu
     local container = _G.MicroMenuContainer
@@ -3112,7 +3121,7 @@ local function installMicroMenuChildOffset()
     local menu = _G.MicroMenu
     if not menu then return end
 
-    suppressLegacyNotificationPip()
+    suppressMicroMenuNotificationPips()
 
     if not microMenuChildOffsetHookInstalled and hooksecurefunc
         and type(menu.AnchorToMenuContainer) == "function"
@@ -3158,8 +3167,7 @@ events:SetScript("OnEvent", function(_, event, unit)
         elseif unit == "Blizzard_DamageMeter" then
             installDamageMeterPrimaryNames()
         elseif unit == "Blizzard_MicroMenu" then
-            installGuildNotificationPipSuppression()
-            suppressLegacyNotificationPip()
+                suppressMicroMenuNotificationPips()
         elseif unit == "Blizzard_PrivateAurasUI"
             or unit == "Blizzard_CompactRaidFrames"
             or unit == "Blizzard_CompactUnitFrame"
@@ -3187,7 +3195,6 @@ events:SetScript("OnEvent", function(_, event, unit)
         installMovementSpeedRow()
         installCompactDebuffBorderNeutralization()
         installMicroMenuChildOffset()
-        installGuildNotificationPipSuppression()
         applyStaticFonts()
         anchorCombatText()
         applyAll()
@@ -3205,7 +3212,6 @@ events:SetScript("OnEvent", function(_, event, unit)
         installMovementSpeedRow()
         installCompactDebuffBorderNeutralization()
         installMicroMenuChildOffset()
-        installGuildNotificationPipSuppression()
         applyStaticFonts()
         anchorCombatText()
         applyAll()

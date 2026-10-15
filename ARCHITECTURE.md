@@ -1,8 +1,8 @@
 # bjarkiUI architecture
 
-> **Current repository baseline (2026-10-15):** `0.2.204-local`. Sections 1–27 preserve historical implementation and release notes; section 28 records this focused Edit Mode and PartyOrder update. No prior live-client test of `0.2.203` automatically validates these new edits.
+> **Current repository baseline (2026-10-15):** `0.2.206-local`. Sections 1–28 are historical implementation and release notes; section 29 documents the current four-module source and the local `0.2.205` micro-menu pip change included in this sync. Full live-client verification remains outstanding.
 
-This document now tracks **bjarkiUI 0.2.204-local**. Sections 1–27 retain historical implementation notes and field studies; **section 28 supersedes older statements where behavior changed**. This is a maintenance reference, not a guarantee about undocumented WoW: Forever client behavior or taint safety.
+This document now tracks **bjarkiUI 0.2.206-local**. Sections 1–28 retain historical implementation notes; **section 29 supersedes older statements where behavior changed**. This is a maintenance reference, not a guarantee about undocumented WoW: Forever client behavior or taint safety.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -682,3 +682,19 @@ The familiar party1–party4, then player visual order is unchanged when those c
 ### 28.3 Validation boundary
 
 Source-side verification should include the five-token share-string diff, matching embedded/reference layouts, both `.toc` module lists, syntax compilation of all five Lua modules, and mocked combat/raid/orientation/queue paths. Real client behavior, especially Edit Mode, party grouping, and combat transitions, must be retested before claiming runtime safety. This is a focused edit: no health/power colors, typography, Soft Dark materials, PRD geometry, or portrait-aura logic were modified.
+
+## 29. Four-module release and micro-menu pip preservation: 0.2.206-local (2026-10-15)
+
+### 29.1 NameplateTimers removed completely
+
+The player preferred Blizzard's native nameplate aura countdown size to a separate custom 13/14 pt intervention. The four runtime modules are now exactly `bjarkiUI.lua`, `PartyOrder.lua`, `SoftDark.lua`, and `TrackedBuffSeconds.lua` in both the regular and Camelot manifests. `NameplateTimers.lua` was removed from the repository and the shipped ZIP. This also removes the `/bui nameplates` override and the associated nameplate-aura SetAura/RefreshList hooks. Ordinary class-color/nameplate presentation in `bjarkiUI.lua` and integer-second **tracked buffs** in `TrackedBuffSeconds.lua` are unaffected.
+
+A previously stored `bjarkiUISettings.nameplateTimerFontSize` can remain in the per-character SavedVariables table but is inert: no loaded source references or consumes it. The cleanup does not modify unrelated SavedVariables or Edit Mode layout.
+
+### 29.2 Previously local-only 0.2.205 micro-menu change now synchronized
+
+Version `0.2.205-local` was distributed as a local ZIP without updating GitHub `main`. Its changed code broadens overlay-only notification pip suppression to recognized Legacy, Guild, Help, and Game Menu microbuttons. The synchronization of `0.2.206-local` deliberately includes the exact preceding local `0.2.205` microbutton code (with only the version constant changing) so those changes are not lost. The action buttons and click behavior remain Blizzard-owned; successful suppression of every Forever notification artwork variant still requires a live client test.
+
+### 29.3 Verification boundary
+
+Both manifests declare the same four Lua files. All four passed Lua 5.4 syntax compilation and the installation ZIP contains no NameplateTimers module. The packed Edit Mode reference and the remaining modules `PartyOrder.lua`, `SoftDark.lua`, and `TrackedBuffSeconds.lua` are unchanged from `0.2.205-local`. GitHub source blob parity with the release archive, packaging completeness, and in-game behavior are independent checks; successful compilation and packaging do not imply tested combat taint safety.
