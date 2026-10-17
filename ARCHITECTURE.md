@@ -698,3 +698,31 @@ Version `0.2.205-local` was distributed as a local ZIP without updating GitHub `
 ### 29.3 Verification boundary
 
 Both manifests declare the same four Lua files. All four passed Lua 5.4 syntax compilation and the installation ZIP contains no NameplateTimers module. The packed Edit Mode reference and the remaining modules `PartyOrder.lua`, `SoftDark.lua`, and `TrackedBuffSeconds.lua` are unchanged from `0.2.205-local`. GitHub source blob parity with the release archive, packaging completeness, and in-game behavior are independent checks; successful compilation and packaging do not imply tested combat taint safety.
+
+## 30. Forever 1.60.1 post-patch synchronization: 0.2.220-macro-labels-test (2026-10-17)
+
+This commit promotes the **exact tested local 0.2.220 runtime ZIP** from the local-only 0.2.207–0.2.220 experimentation series directly onto GitHub `main`. Intermediate local versions are not retroactively represented as public commits. The four runtime Lua modules and both TOCs, plus the embedded Edit Mode reference, must match the accepted `bjarkiUI-0.2.220-hide-macro-text-test.zip` byte-for-byte. This synchronization edits no packaged runtime content beyond the tested snapshot.
+
+### 30.1 Blizzard-owned native unit-frame presentation
+
+- The 1.60.1 native frame redesign superseded the old custom bar-height, mask, black-backing, and texture adjustments. `bjarkiUI` keeps **native frame art and bar geometry** while class-coloring native player health fills (including Target/Focus/ToT/ToF), matching appropriate NPC nameplate/reaction colors when readable, and leaving pet treatments native.
+- The accepted post-patch exceptions are the horizontal compact Target-of-Target/Focus-of-Target alignment, Target frame placement, Player hit-feedback above the separate PRD, level-indicator treatment, targeted status-text optical anchors and subdued/rested highlight treatment. Native name text, portrait ring and most threat/healing animations remain Blizzard-owned. No PRD-style replacement bars or historical unit-frame resizes return.
+- Class, reaction, nameplate and relationship information can become inaccessible or rewritten after combat/duels. The class-color repair and `/bui colors` diagnostics are evidence-gated; unreadable classification must not be replaced by a remembered guess. A historical green Focus frame after a duel is not, by itself, proof of repair in all conditions.
+- Separate PRD and speedometer remain in their existing visual state, including the event/throttle design and native scaling ownership. `bjarkiPortraits` owns the aura images/timers; unit-frame changes must not rework their calibration.
+
+### 30.2 Compact circle alignment and Edit Mode
+
+- Target-of-Target and Focus-of-Target are moved as **whole compact frames** horizontally to center their visible circular bezels beneath their parent portraits. The 0.2.217/0.2.218 optical corrections are scale-aware and non-cumulative; their internal bars, names, scale and vertical placement stay native. Aura artwork and countdown centering within the circle are exclusively `bjarkiPortraits` concerns.
+- The installed Edit Mode share string is the user's finalized 2026-10-17 export, stored identically in `bjarkiUI.lua` and `EditMode-0.2.181.txt`. The Target preset is `-292.5, -161`, and the party stack's final narrow width is stored without additional nudges. Serialized opaque flags must be preserved rather than inferred or reformatted.
+- The preset remains **install-if-absent**: users with existing SavedVariables/layouts are not silently reset or migrated. Preserve `PartyOrder.lua`'s fail-closed combat and raid restrictions, and do not infer protected party sorting or edit-mode safe writes from screenshot alignment alone.
+
+### 30.3 Other presentation changes and module scope
+
+- Soft Dark remains active for eligible non-unit-frame elements, while quest/gossip paper stays readable and the flight-map frame chrome receives the intended dark treatment. New borderless faction glyphs are excluded from old circle-darkening. The minimap day/night `MinimapCluster.DielFrame` disc/rim is suppressed as an entire decorative control; unrelated minimap clock, tracking and calendar behavior remain Blizzard-owned.
+- The post-patch action-bar macro-caption option in 0.2.220 suppresses **only the `Name` FontStrings** on the standard Blizzard action buttons. Hotkeys, charge/stack counts, cooldown numbers, icons, tooltips and click actions remain intact. Reapply only at addon load and permitted lifecycle/Edit Mode points; no per-frame poller or macro rewriting is installed.
+- The four modules in both manifest files are `bjarkiUI.lua`, `PartyOrder.lua`, `SoftDark.lua`, `TrackedBuffSeconds.lua`. `NameplateTimers.lua` remains retired. The tracked buff countdown presentation stays separate from the ActionBar macro label change.
+
+### 30.4 Verification and unresolved behavior
+
+- The local 0.2.220 candidate compiled as four Lua modules and passed focused macro-caption tests, plus retained form-state checks performed in the paired test run. Several historical assertions fail **also on the unchanged 0.2.219 baseline**, so do not advertise the historical aggregate as wholly passing. Git blob/ZIP byte parity, compiler checks, and live WoW rendering/taint proof are distinct evidence classes.
+- Live screenshot comparisons support the selected post-patch optical positioning and native bar usage; they do not settle every PvP/instance/Focus/aggro/nameplate behavior. Track remaining open observations in `KNOWN_ISSUES.md` until current-client reproductions or narrow negative tests close them.

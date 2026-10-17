@@ -36,3 +36,12 @@ No live WoW test has confirmed these reports fixed in 0.2.90-local. See
 [`ARCHITECTURE.md`](ARCHITECTURE.md) for the frame/color implementation and
 reported BG diagnostics. Pet portraits and aura category failures are tracked
 in the [bjarkiPortraits issue list](https://github.com/bjoern-janson/bjarkiPortraits/blob/main/KNOWN_ISSUES.md).
+
+## Current post-patch follow-up: 0.2.220 (2026-10-17)
+
+- Opposite-faction and Focus class-colored health fills, native redraws after duels, and occasional wrong-color reports require renewed verification on the current 1.60.1 client. Source guards and screenshot examples do not establish full coverage across Battleground secrecy transitions.
+- A historical aggro/flash border remaining after untargeting motivated narrower Target/Focus highlight handling. Recheck the actual target/focus warning lifecycle on the current build; do not disable legitimate flash effects to mask a stale state.
+- Compact ToT/ToF position, Player/Target/Focus status text optical anchors and nameplate CC edge avoidance have been visually calibrated but remain dependent on UI scale and current native artwork. Any future alignment changes should use native screen-pixel evidence without restoring obsolete bar geometry.
+- Minimap day/night decorative glyph removal and action-button macro-name suppression need in-game verification under loading-screen changes, Edit Mode and alternative action-bar visibility. The initial candidate uses native objects only; retain hotkey/stack text and click functionality.
+- The packaged Edit Mode preset records the final user-provided party width. Existing saved layouts remain untouched by the install-if-absent contract.
+- Four-Lua-module syntax checks and focused offline assertions pass; some older historical test expectations also fail against the unchanged pre-sync local source. Do not claim complete live taint correctness or a uniformly green historical regression suite on this basis.

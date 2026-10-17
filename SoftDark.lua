@@ -53,24 +53,15 @@ local CHROME_PATHS = {
     "MinimapCluster.MinimapContainer.Minimap.MinimapBackdrop.MinimapCompassTexture",
 }
 
--- Forever's visible faction badge is NOT the retail PVPIcon. Its gold
--- backing circle is independent from the faction glyph. Tint only the circle
--- so the Horde/Alliance mark stays recognizable and its visual state remains
--- exclusively Blizzard-owned. The three paths were confirmed against the
--- Forever frame hierarchy; missing paths simply result in no change.
-local EMBLEM_CHROME_RELATIVE_BRIGHTNESS = 0.80
-local PVP_CIRCLE_PATHS = {
-    "PlayerFrame.PlayerFrameContent.PlayerFrameContentMain.PvpBackgroundCircle",
-    "TargetFrame.TargetFrameContent.TargetFrameContentContextual.PvpBackgroundCircle",
-    "FocusFrame.TargetFrameContent.TargetFrameContentContextual.PvpBackgroundCircle",
-}
+-- Post-patch faction glyphs are bare icons. They and any obsolete backing
+-- fields are intentionally outside Soft Dark's decorative-art ownership.
 
 -- Limit window changes to dedicated border and background artwork.
 -- Never tint the frame root or its arbitrary children/regions.
 local WINDOW_FRAMES = {
     "CharacterFrame", "CharacterFrameInset", "SpellBookFrame", "PlayerSpellsFrame",
     "PlayerTalentFrame", "ClassTalentFrame", "QuestLogFrame", "QuestMapFrame",
-    "FriendsFrame", "GameMenuFrame", "MerchantFrame", "GossipFrame",
+    "FriendsFrame", "GameMenuFrame", "MerchantFrame", "GossipFrame", "QuestFrame", "TaxiFrame",
     "MailFrame", "BankFrame", "WorldMapFrame", "PVEFrame",
     "CollectionsJournal", "ProfessionsFrame", "SettingsPanel",
     "StaticPopup1", "StaticPopup2",
@@ -427,56 +418,6 @@ local function atlasName(texture)
     return atlas
 end
 
--- The frame stack confirms PvpBackgroundCircle/PvpBackgroundIcon in
--- PlayerFrameContentMain. On target-style frames they live in the contextual
--- child instead. Earlier retail-only PVPIcon/prestige and atlas discovery
--- paths were ineffective and are deliberately removed. There is no broad
--- frame recursion here, and PvpBackgroundIcon is never tinted.
-local function tintPvPEmblems(apply)
-    local count, seen = 0, {}
-    for _, path in ipairs(PVP_CIRCLE_PATHS) do
-        local texture = resolve(path)
-        if isTexture(texture) and not seen[texture] then
-            seen[texture] = true
-            if apply(texture, EMBLEM_CHROME_RELATIVE_BRIGHTNESS) then
-                count = count + 1
-            end
-        end
-    end
-    return count
-end
-
--- The WoW: Forever minimap's real sun/moon indicator has separate native
--- textures for the disc and bronze rim. Find only the exact cycle-rim atlas
--- in the bounded minimap tree. Do NOT tint the daylight/moonlight disc, and
--- do not recurse through unrelated UIParent children or spell icons.
-local function tintDayNightRim(apply)
-    local count, visited = 0, {}
-    local function scan(frame, depth)
-        if depth < 0 or not readable(frame) or visited[frame] then return end
-        visited[frame] = true
-        local getRegions = child(frame, "GetRegions")
-        if type(getRegions) == "function" then
-            local ok, regions = pcall(function() return { frame:GetRegions() } end)
-            if ok and type(regions) == "table" then
-                for _, region in ipairs(regions) do
-                    if atlasName(region) == "UI-HUD-Minimap-Frame-Cycle"
-                        and apply(region) then count = count + 1 end
-                end
-            end
-        end
-        if depth > 0 and type(child(frame, "GetChildren")) == "function" then
-            local ok, children = pcall(function() return { frame:GetChildren() } end)
-            if ok and type(children) == "table" then
-                for _, descendant in ipairs(children) do scan(descendant, depth - 1) end
-            end
-        end
-    end
-    scan(resolve("MinimapCluster"), 5)
-    scan(resolve("Minimap"), 3)
-    return count
-end
-
 -- Native bag slots draw their gold chrome in their Normal/PushedTexture,
 -- independently of the bag glyph. Some Forever builds do not return the
 -- retail bag-border atlas names from GetAtlas(), so atlas equality cannot be
@@ -830,13 +771,6 @@ local function applyTheme()
         return ok
     end
 
-    -- Tint only Forever's PvpBackgroundCircle on player/target/focus;
-    -- leave PvpBackgroundIcon and all native status/visibility writes intact.
-    stats.chrome = stats.chrome + tintPvPEmblems(tint)
-    -- WoW: Forever's native sun/moon orb uses its own border atlas, not
-    -- GameTimeFrame's calendar-day NormalTexture. Darken *only* the rim.
-    stats.chrome = stats.chrome + tintDayNightRim(tint)
-
     local bagDividerVisited = {}
     local function tintBagDivider(texture)
         if not isTexture(texture) then return false end
@@ -976,7 +910,22 @@ local function applyTheme()
             -- Panel background and border are separate in modern Blizzard UI.
             -- These names come from standard panel templates; absent names are skipped.
             for _, key in ipairs({ "NineSlice", "Bg", "Background", "BackgroundTexture", "TopTileStreaks" }) do
-                count = count + decorative(child(frame, key))
+                -- GossipFrame.Background is the reading parchment, not border
+                -- art. Keep both gossip and quest reading surfaces native.
+                local parchment = (name == "GossipFrame" or name == "QuestFrame")
+                    and (key == "Background" or key == "BackgroundTexture")
+                if not parchment then count = count + decorative(child(frame, key)) end
+            end
+            if name == "TaxiFrame" then
+                -- Forever's BasicFrameTemplateWithInset exposes these pieces
+                -- directly, not as NineSlice. Do not walk TaxiRouteMap, tint
+                -- its terrain/nodes, or touch the title FontString/close button.
+                for _, key in ipairs({ "TopLeftCorner", "TopRightCorner", "TopBorder",
+                    "BotLeftCorner", "BotRightCorner", "BottomBorder", "LeftBorder",
+                    "RightBorder", "TitleBg" }) do
+                    local art = child(frame, key)
+                    if isTexture(art) and tint(art) then count = count + 1 end
+                end
             end
             local inset = child(frame, "Inset")
             if inset then
@@ -1226,19 +1175,13 @@ for _, event in ipairs({
     "PLAYER_LOGIN", "PLAYER_ENTERING_WORLD", "ADDON_LOADED",
     "PLAYER_REGEN_ENABLED", "EDIT_MODE_LAYOUTS_UPDATED",
     "PLAYER_TARGET_CHANGED", "PLAYER_FOCUS_CHANGED",
-    "UNIT_FACTION", "PLAYER_FLAGS_CHANGED",
+    "TAXIMAP_OPENED",
 }) do lifecycle:RegisterEvent(event) end
 lifecycle:SetScript("OnEvent", function(_, event, addon)
-    if event == "PLAYER_TARGET_CHANGED" or event == "PLAYER_FOCUS_CHANGED"
-        or event == "UNIT_FACTION" or event == "PLAYER_FLAGS_CHANGED" then
-        if event == "UNIT_FACTION" and addon ~= "player"
-            and addon ~= "target" and addon ~= "focus" then return end
+    if event == "PLAYER_TARGET_CHANGED" or event == "PLAYER_FOCUS_CHANGED" then
         if settings.softDarkEnabled ~= true or loadedDarkMode() then return end
         if inCombat() then pending = true; return end
-        if event == "PLAYER_TARGET_CHANGED" or event == "PLAYER_FOCUS_CHANGED" then
-            tintCompactChrome(tintTexture)
-        end
-        tintPvPEmblems(tintTexture)
+        tintCompactChrome(tintTexture)
         return
     end
     if event == "ADDON_LOADED" and type(addon) == "string"
