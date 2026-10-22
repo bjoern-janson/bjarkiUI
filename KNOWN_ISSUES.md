@@ -1,6 +1,8 @@
 # Known issues and bugs
 
-Current repository baseline (2026-10-22): **bjarkiUI 0.2.246-foundation-v15-fixes-test**. The reports below are historical client observations and remain open pending current-client verification. Offline source, syntax and modeled-API checks do not close them. See architecture section 31 for the current behavior, including the one-time `.233` Edit Mode preset replacement.
+**v16 suite update (2026-10-22):** this addon receives release-version metadata only. Its behavior is byte-identical to v15 apart from that version string. The three timing repairs are in bjarkiCC Model/Observer. The full v16 suite passes 49 regression scripts and 28 runtime syntax checks on both Lua 5.1 and Lua 5.4; live-client findings below retain their existing status. The behavior described in architecture section 31 remains applicable.
+
+Current repository baseline (2026-10-22): **bjarkiUI 0.2.247-foundation-v16-fixes-test**. The reports below are historical client observations and remain open pending current-client verification. Offline source, syntax and modeled-API checks do not close them. See architecture section 31 for the current behavior, including the one-time `.233` Edit Mode preset replacement.
 
 Original status recorded 2026-10-08 for **bjarkiUI 0.2.90-local**.
 
