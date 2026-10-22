@@ -1,13 +1,15 @@
 # bjarkiUI architecture
 
-> **Current repository baseline (2026-10-15):** `0.2.206-local`. Sections 1–28 are historical implementation and release notes; section 29 documents the current four-module source and the local `0.2.205` micro-menu pip change included in this sync. Full live-client verification remains outstanding.
+> **Current repository baseline (2026-10-22):** `0.2.246-foundation-v15-fixes-test`. Sections 1–30 are historical implementation and release notes; section 31 documents the current source. Full live-client verification remains outstanding.
 
-This document now tracks **bjarkiUI 0.2.206-local**. Sections 1–28 retain historical implementation notes; **section 29 supersedes older statements where behavior changed**. This is a maintenance reference, not a guarantee about undocumented WoW: Forever client behavior or taint safety.
+This document now tracks **bjarkiUI 0.2.246-foundation-v15-fixes-test**. **Section 31 supersedes older statements where behavior changed**. This is a maintenance reference, not a guarantee about undocumented WoW: Forever client behavior or taint safety.
 
 The addon is deliberately small. The runtime consists of:
 
 - `bjarkiUI.lua` — unit-frame presentation, names, highlights, Edit Mode setup, combat text placement, and event hooks.
 - `PartyOrder.lua` — visual ordering of raid-style party frames.
+- `SoftDark.lua` — the fixed decorative theme.
+- `TrackedBuffSeconds.lua` — integer-second tracked buff countdown presentation.
 - two matching `.toc` manifests.
 
 `ARCHITECTURE.md` is not loaded by the game.
@@ -726,3 +728,25 @@ This commit promotes the **exact tested local 0.2.220 runtime ZIP** from the loc
 
 - The local 0.2.220 candidate compiled as four Lua modules and passed focused macro-caption tests, plus retained form-state checks performed in the paired test run. Several historical assertions fail **also on the unchanged 0.2.219 baseline**, so do not advertise the historical aggregate as wholly passing. Git blob/ZIP byte parity, compiler checks, and live WoW rendering/taint proof are distinct evidence classes.
 - Live screenshot comparisons support the selected post-patch optical positioning and native bar usage; they do not settle every PvP/instance/Focus/aggro/nameplate behavior. Track remaining open observations in `KNOWN_ISSUES.md` until current-client reproductions or narrow negative tests close them.
+
+## 31. Verified foundation synchronization: 0.2.246-foundation-v15-fixes-test (2026-10-22)
+
+The four Lua modules, both TOCs and `EditMode-0.2.233.txt` match the verified v15 suite byte-for-byte. The prior repository source was `0.2.220-macro-labels-test` at `f011180c33d64624b0c1be7f74b155d80e32f451`; this synchronization imports the intervening accepted source directly. Relative to the verified v14 UI, v15 changes only the version constant and TOC versions. The v15 behavioral repairs belong to `bjarkiCC`.
+
+### 31.1 Current presentation and ownership
+
+- Native unit-frame artwork and geometry remain the baseline. Full names, including surnames, use Blizzard's `GetUnitName`; the old chat, Communities, compact-frame and Damage Meter name-shortening hooks and `/bui names` diagnostic are removed. Unit-frame and nameplate labels receive class colors only through current player or supported pet/totem-owner evidence.
+- Player, Target and Focus percentage-only status labels use guarded one-decimal formatting after the native text writer. Native zero, hidden, paused and two-column modes remain native; inaccessible inputs do not authorize Lua arithmetic. The earlier unit-frame and PRD status-text anchor overrides are removed.
+- An unreadable native health-color write invalidates the old readable snapshot. Fallback restores native artwork without repainting an obsolete color; deferred primary repairs recheck the current binding and class evidence. Derived native updates avoid redundant color passes.
+- Incoming hit feedback is anchored above the Player health bar. The old UI error-stack relocation and icon-only Loss of Control treatment are removed. The active fourth PRD speed bar is replaced by dormant, independent speed text: `SPEED_TEXT_ENABLED = false` creates no display or polling loop. Native PRD track backings and alternate-Mana treatment remain.
+- Party ordering is vertical-only, requires readable out-of-combat/non-raid/orientation evidence and coalesces repairs to the next tick. Horizontal member, pet and border anchors remain native. Separate connection-event registrations cover all five supported tokens. Soft Dark coalesces an eligible addon-load burst into its immediate pass plus one deferred pass. `TrackedBuffSeconds.lua` is unchanged from the prior repository.
+
+### 31.2 Edit Mode and packaging
+
+The embedded preset exactly matches `EditMode-0.2.233.txt`. On first application of revision `bjarkiUI-layout-0.2.233`, an existing named `bjarkiUI` layout receives a **one-time full replacement of its systems**, preserving its layout identity and list position. A failed save restores the original systems; later player edits are left alone once the revision is recorded. This supersedes the older install-if-absent and recognized-coordinate-only migration descriptions. An absent layout is still installed through the existing creation path.
+
+`EditMode-0.2.181.txt` remains a historical repository reference; it is not the current embedded preset or packaged layout. The packaging workflow now stages `.233`, together with the four TOC-declared modules and matching manifests, and records their SHA-256 checksums. Repository documentation remains outside the addon load list.
+
+### 31.3 Verification boundary
+
+The source has exact v15 runtime parity, matching manifests and embedded/reference layout, four Lua 5.4 syntax checks, and local execution of the repository's packaging validation. The verified suite also exercises modeled native-color restoration, delayed primary repair, party gates, Soft Dark lifecycle and tracked-buff iteration. These checks do not establish native-client taint safety, every secrecy transition or rendered appearance; the historical client observations in `KNOWN_ISSUES.md` remain open.

@@ -35,7 +35,7 @@ jobs:
           package = Path("dist/bjarkiUI")
           package.mkdir(parents=True, exist_ok=True)
           inputs = manifests + [root / path for path in source_modules]
-          layout = root / "EditMode-0.2.181.txt"
+          layout = root / "EditMode-0.2.233.txt"
           if layout.is_file():
               inputs.append(layout)
 

@@ -1170,6 +1170,7 @@ SlashCmdList.BJARKISOFTDARK = command
 
 -- Revisit only at ordinary UI lifecycle boundaries. One optional deferred
 -- pass catches art created on ADDON_LOADED after the event dispatch.
+local deferredThemeQueued = false
 local lifecycle = CreateFrame("Frame")
 for _, event in ipairs({
     "PLAYER_LOGIN", "PLAYER_ENTERING_WORLD", "ADDON_LOADED",
@@ -1188,15 +1189,20 @@ lifecycle:SetScript("OnEvent", function(_, event, addon)
         and addon ~= "bjarkiUI" and not addon:match("^Blizzard_") then
         return
     end
+    -- Paint the first load immediately, then let one next-tick pass collect
+    -- the rest of this load burst and any art created after event dispatch.
+    if event == "ADDON_LOADED" and deferredThemeQueued then return end
     installDividerHook()
     installBagBorderHooks()
     installBagSiblingLayoutHook()
     installBagSiblingEditModeHooks()
     applyTheme()
     if event == "ADDON_LOADED" and C_Timer and type(C_Timer.After) == "function" then
+        deferredThemeQueued = true
         C_Timer.After(0, function()
+            deferredThemeQueued = false
             installDividerHook()
-                    installBagBorderHooks()
+            installBagBorderHooks()
             installBagSiblingLayoutHook()
             installBagSiblingEditModeHooks()
             applyTheme()

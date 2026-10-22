@@ -1,6 +1,8 @@
 # Known issues and bugs
 
-Status recorded 2026-10-08 for **bjarkiUI 0.2.90-local**.
+Current repository baseline (2026-10-22): **bjarkiUI 0.2.246-foundation-v15-fixes-test**. The reports below are historical client observations and remain open pending current-client verification. Offline source, syntax and modeled-API checks do not close them. See architecture section 31 for the current behavior, including the one-time `.233` Edit Mode preset replacement.
+
+Original status recorded 2026-10-08 for **bjarkiUI 0.2.90-local**.
 
 The items below reflect reports and diagnostic output from Battleground
 sessions. They remain open until checked in the live client against this build.
@@ -37,7 +39,7 @@ No live WoW test has confirmed these reports fixed in 0.2.90-local. See
 reported BG diagnostics. Pet portraits and aura category failures are tracked
 in the [bjarkiPortraits issue list](https://github.com/bjoern-janson/bjarkiPortraits/blob/main/KNOWN_ISSUES.md).
 
-## Current post-patch follow-up: 0.2.220 (2026-10-17)
+## Historical post-patch follow-up: 0.2.220 (2026-10-17)
 
 - Opposite-faction and Focus class-colored health fills, native redraws after duels, and occasional wrong-color reports require renewed verification on the current 1.60.1 client. Source guards and screenshot examples do not establish full coverage across Battleground secrecy transitions.
 - A historical aggro/flash border remaining after untargeting motivated narrower Target/Focus highlight handling. Recheck the actual target/focus warning lifecycle on the current build; do not disable legitimate flash effects to mask a stale state.
