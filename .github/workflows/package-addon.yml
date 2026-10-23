@@ -35,9 +35,15 @@ jobs:
           package = Path("dist/bjarkiUI")
           package.mkdir(parents=True, exist_ok=True)
           inputs = manifests + [root / path for path in source_modules]
-          layout = root / "EditMode-0.2.233.txt"
-          if layout.is_file():
-              inputs.append(layout)
+          # Keep shared installations free of preset files and layout writers.
+          assert not list(root.glob("EditMode-*.txt")), "Bundled Edit Mode presets are prohibited"
+          for module in source_modules:
+              source = (root / module).read_text(encoding="utf-8")
+              if any(name in source for name in (
+                  "C_EditMode.SaveLayouts", "C_EditMode.OnLayoutAdded",
+                  "C_EditMode.SetActiveLayout", "C_EditMode.ConvertStringToLayoutInfo",
+              )):
+                  raise RuntimeError(f"Unexpected Edit Mode layout writer in {module}")
 
           for item in inputs:
               if not item.is_file():

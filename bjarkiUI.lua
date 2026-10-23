@@ -1,92 +1,12 @@
-local BJARKI_UI_VERSION = "0.2.247-foundation-v16-fixes-test"
+local BJARKI_UI_VERSION = "0.2.248-foundation-v16-layout-neutral"
 -- Standalone PRD treatment is retained. Unit-frame resource bars stay native.
 local PRD_MANA_R, PRD_MANA_G, PRD_MANA_B = 0.10, 0.25, 1.00
 local WORLD_TEXT_SCREEN_Y = "0.0430"
 local WORLD_TEXT_CRIT_SCREEN_Y = "0.0555"
 
-local EDIT_MODE_LAYOUT_NAME = "bjarkiUI"
-
 bjarkiUISettings = bjarkiUISettings or {}
 if bjarkiUISettings.showLevelNumbers == nil then
     bjarkiUISettings.showLevelNumbers = true
-end
-
-local EDIT_MODE_LAYOUT_STRING = [=[5 0 59 0 0 1 8 6 MicroMenuContainer -4.5 -4.0 -1 ##$$%/&('%)#+$,$ 0 1 1 7 7 UIParent 0.0 0.0 -1 ##$$%/&('%(#,# 0 2 1 7 7 UIParent 0.0 0.0 -1 ##$$%/&('%(#,# 0 3 1 5 5 UIParent -5.0 -77.0 -1 #$$$%/&('%(#,# 0 4 1 5 5 UIParent -5.0 -77.0 -1 #$$$%/&('%(#,# 0 5 0 2 0 MultiBarLeft -4.0 0.0 -1 #$$$%/&('%(#,# 0 6 1 1 4 UIParent 0.0 -50.0 -1 ##$$%/&('%(#,$ 0 7 1 1 4 UIParent 0.0 -100.0 -1 ##$$%/&('%(#,$ 0 10 1 7 7 UIParent 0.0 -4.0 -1 ##$$&)'' 0 11 1 7 7 UIParent 0.0 -4.0 -1 ##$$&)'',# 0 12 1 7 7 UIParent 0.0 -4.0 -1 ##$$&)'' 1 -1 0 4 4 UIParent 0.0 -276.0 -1 #%$#%$ 2 -1 1 2 2 UIParent 0.0 0.0 -1 ##$#%(&( 3 0 0 0 0 UIParent 257.0 -151.7 -1 $#3' 3 1 0 1 1 UIParent -283.0 -153.6 -1 %#3' 3 2 0 4 4 UIParent 358.0 -163.0 -1 %#&$3' 3 3 0 0 0 UIParent 512.0 -420.0 -1 '$(#)#-k.5/#1$3#5#6,7-7$8(9, 3 4 0 0 0 UIParent 21.8 -0.0 -1 ,$-#.#/#0#1#2(3#5#6(7-7$8(9( 3 5 0 2 2 UIParent -153.0 -272.9 -1 &$*$3# 3 6 1 5 5 UIParent 0.0 0.0 -1 -=.+/#4$5#6(7-7$8(9( 3 7 1 4 4 UIParent 0.0 0.0 -1 3' 4 -1 1 7 7 UIParent 0.0 -4.0 -1 # 5 -1 1 7 7 UIParent 0.0 -4.0 -1 # 6 0 0 2 2 UIParent -254.5 -17.5 -1 ##$#%#&3(,)( 6 1 0 2 2 UIParent -272.5 -164.5 -1 ##$#%#'+(,)(-# 6 2 1 1 1 UIParent 0.0 -25.0 -1 ##$#%$&.(()(+#,-,$ 7 -1 1 7 7 UIParent 0.0 -4.0 -1 # 8 -1 0 3 3 UIParent 34.0 -220.0 -1 #'$d%$&i 9 -1 1 7 7 UIParent 0.0 -4.0 -1 # 10 -1 1 0 0 UIParent 16.0 -116.0 -1 # 11 -1 0 8 6 MultiBar5 -4.0 0.0 -1 # 12 -1 0 5 3 MultiBar5 -4.0 -2.0 -1 #8$#%# 13 -1 1 7 7 UIParent 116.5 6.0 -1 ##$#%) 14 -1 1 6 8 MicroMenuContainer 7.0 -4.0 -1 ##$#%( 15 0 1 7 7 UIParent 0.0 0.0 -1 &- 15 1 1 1 1 UIParent 0.0 17.0 -1 &- 16 -1 0 5 3 MultiBar5 -4.2 273.9 -1 #* 17 -1 1 1 1 UIParent 0.0 -100.0 -1 #$ 18 -1 1 5 5 UIParent 0.0 0.0 -1 #- 19 -1 1 7 7 UIParent 0.0 0.0 -1 ## 20 0 0 1 1 UIParent -859.2 -2.0 -1 ##$/%$&('%(-($)#+$,$-# 20 1 0 0 6 EssentialCooldownViewer 0.0 -4.0 -1 ##$*%$&('%(-($)#+$,$-# 20 2 0 4 4 UIParent 152.0 0.0 -1 #$$$%$&''((-($)#+$,$-$ 20 3 0 0 0 UIParent 1132.5 -355.5 -1 #$$$%#&('#(U)#*#+$,$-#.U 21 -1 0 0 0 UIParent 365.1 -240.5 -1 #$%$&$'#(#)#*U+#,&-#.#/%0#1# 22 0 1 8 7 UIParent -457.0 336.0 -1 #$$$%#&('((#)U*$+%,$-#.#/U0% 22 1 1 1 1 UIParent 0.0 -40.0 -1 &('()U*#+% 22 2 1 1 1 UIParent 0.0 -90.0 -1 &('()U*#+% 22 3 1 1 1 UIParent 0.0 -130.0 -1 &('()U*#+% 23 -1 0 8 6 MultiBar5 -4.0 0.0 -1 ##$#%$&i'B'$(#)U+$,$-,.)/# 24 -1 1 1 1 UIParent 0.0 -182.0 -1 # 25 -1 1 5 7 UIParent -28.0 128.0 -1 # 26 0 1 5 3 MainActionBar 30.0 5.0 -1 #$ 26 1 1 3 5 BagsBar -30.0 5.0 -1 #$ 27 -1 1 4 4 Minimap -68.0 -68.0 -1 #+ 28 -1 1 4 4 UIParent 0.0 0.0 -1 #& 29 0 1 7 7 UIParent 0.0 450.0 -1 #($U%$&K'#(#)# 29 1 1 7 7 UIParent 0.0 425.0 -1 #($U%$&K'#(#)# 29 2 1 7 7 UIParent 0.0 400.0 -1 #($U%$&K'#(#)#]=]
--- The full bjarkiUI preset is replaced once for this revision; afterward,
--- ordinary player changes in Edit Mode are left alone.
-local EDIT_MODE_PRESET_REVISION = "bjarkiUI-layout-0.2.233"
-local editModeLayoutChecked = false
-
-local function installEditModeLayout()
-    if editModeLayoutChecked then return end
-    if type(InCombatLockdown) == "function" then
-        local okCombat, combat = pcall(InCombatLockdown)
-        if not okCombat or combat then return end
-    end
-    if not C_EditMode or not C_EditMode.GetLayouts or not C_EditMode.ConvertStringToLayoutInfo
-        or not C_EditMode.SaveLayouts or not Enum or not Enum.EditModeLayoutType
-    then
-        return
-    end
-
-    local ok, layouts = pcall(C_EditMode.GetLayouts)
-    if not ok or type(layouts) ~= "table" or type(layouts.layouts) ~= "table" then return end
-
-    for _, existing in ipairs(layouts.layouts) do
-        if type(existing) == "table" and existing.layoutName == EDIT_MODE_LAYOUT_NAME then
-            if bjarkiUISettings.editModePresetRevision ~= EDIT_MODE_PRESET_REVISION then
-                local converted, replacement = pcall(C_EditMode.ConvertStringToLayoutInfo, EDIT_MODE_LAYOUT_STRING)
-                if not converted or type(replacement) ~= "table" or type(replacement.systems) ~= "table" then
-                    return -- Leave the existing preset intact if decoding fails.
-                end
-                -- Preserve the existing preset's identity and position in
-                -- the layout list. A failed save must restore its old systems.
-                local originalSystems = existing.systems
-                existing.systems = replacement.systems
-                local okSave, result = pcall(C_EditMode.SaveLayouts, layouts)
-                if not okSave or result == false then
-                    existing.systems = originalSystems
-                    return
-                end
-                bjarkiUISettings.editModePresetRevision = EDIT_MODE_PRESET_REVISION
-            end
-            -- Do not keep reapplying: normal future Edit Mode adjustments
-            -- should remain under the player's control.
-            editModeLayoutChecked = true
-            return
-        end
-    end
-
-    local converted, layoutInfo = pcall(C_EditMode.ConvertStringToLayoutInfo, EDIT_MODE_LAYOUT_STRING)
-    if not converted or type(layoutInfo) ~= "table" or type(layoutInfo.systems) ~= "table" then return end
-
-    local layoutType = Enum.EditModeLayoutType.Character
-    local count = 0
-    for _, saved in ipairs(layouts.layouts) do
-        if type(saved) == "table" and saved.layoutType == layoutType then count = count + 1 end
-    end
-    local maximum = Constants and Constants.EditModeConsts and Constants.EditModeConsts.EditModeMaxLayoutsPerType
-    if type(maximum) == "number" and count >= maximum then return end
-
-    layoutInfo.layoutName = EDIT_MODE_LAYOUT_NAME
-    layoutInfo.layoutType = layoutType
-    table.insert(layouts.layouts, layoutInfo)
-    local newIndex = #layouts.layouts
-
-    local saved, result = pcall(C_EditMode.SaveLayouts, layouts)
-    if not saved or result == false then
-        table.remove(layouts.layouts, newIndex)
-        return
-    end
-
-    -- Existing behavior for first-time installations only.
-    if C_EditMode.OnLayoutAdded then
-        pcall(C_EditMode.OnLayoutAdded, newIndex, true, true)
-    elseif C_EditMode.SetActiveLayout then
-        pcall(C_EditMode.SetActiveLayout, newIndex)
-    end
-    bjarkiUISettings.editModePresetRevision = EDIT_MODE_PRESET_REVISION
-    editModeLayoutChecked = true
 end
 
 local function applyWorldTextPosition()
@@ -2335,7 +2255,6 @@ events:SetScript("OnEvent", function(_, event, unit)
         hideMinimapDayNightIndicator()
         installNameplateControlLayout()
         repairFocusFlashAnchor()
-        installEditModeLayout()
         applyWorldTextPosition()
         installHooks()
         installDerivedFrameAlignment()
@@ -2352,7 +2271,6 @@ events:SetScript("OnEvent", function(_, event, unit)
         hideMinimapDayNightIndicator()
         installNameplateControlLayout()
         repairFocusFlashAnchor()
-        installEditModeLayout()
         applyWorldTextPosition()
         installDerivedFrameAlignment()
         installPRDAlternateManaColor()
@@ -2383,7 +2301,6 @@ events:SetScript("OnEvent", function(_, event, unit)
         for _, token in ipairs({ "player", "target", "focus", "targettarget", "focustarget" }) do
             applyClassNameColor(token)
         end
-        installEditModeLayout()
         installDerivedFrameAlignment()
         installPRDAlternateManaColor()
         installMovementSpeedRow()
@@ -2608,28 +2525,25 @@ local function printHealthColorAudit()
     end
 end
 
--- Read-only inspection: verify the actual saved Tracked Buffs anchor and
--- whether bjarkiUI is the current active Edit Mode layout. Nothing is moved
--- or unanchored by this diagnostic.
-local function nearlyEqual(a, b)
-    return type(a) == "number" and math.abs(a - b) <= 0.11
-end
-
+-- Read-only Tracked Buffs inspection of the player's current layout.
+-- Never creates, replaces, saves, imports, or activates Edit Mode layouts.
 local function printTrackedBuffLayoutAudit()
-    local function out(s)
+    local function out(message)
         if DEFAULT_CHAT_FRAME then
-            DEFAULT_CHAT_FRAME:AddMessage("|cff74c7ecbjarkiUI|r: " .. tostring(s))
+            DEFAULT_CHAT_FRAME:AddMessage("|cff74c7ecbjarkiUI|r: " .. tostring(message))
         elseif type(print) == "function" then
-            print("bjarkiUI: " .. tostring(s))
+            print("bjarkiUI: " .. tostring(message))
         end
     end
+
     local viewer = _G.BuffIconCooldownViewer
     local liveIndex = viewer and not isSecret(viewer) and viewer.systemIndex or nil
     if isSecret(liveIndex) then liveIndex = nil end
-    local active = _G.EditModeManagerFrame
+
     local activeName = "unknown"
-    if active and not isSecret(active) and type(active.GetActiveLayoutInfo) == "function" then
-        local ok, info = pcall(active.GetActiveLayoutInfo, active)
+    local manager = _G.EditModeManagerFrame
+    if manager and not isSecret(manager) and type(manager.GetActiveLayoutInfo) == "function" then
+        local ok, info = pcall(manager.GetActiveLayoutInfo, manager)
         if ok and info and not isSecret(info) then
             local okName, name = pcall(function() return info.layoutName end)
             if okName and not isSecret(name) and type(name) == "string" then
@@ -2637,35 +2551,7 @@ local function printTrackedBuffLayoutAudit()
             end
         end
     end
-    local savedX, savedIndex = "not found", "?"
-    if C_EditMode and type(C_EditMode.GetLayouts) == "function" then
-        local ok, layouts = pcall(C_EditMode.GetLayouts)
-        if ok and type(layouts) == "table" and type(layouts.layouts) == "table" then
-            for _, layout in ipairs(layouts.layouts) do
-                if type(layout) == "table" and layout.layoutName == EDIT_MODE_LAYOUT_NAME
-                    and type(layout.systems) == "table" then
-                    for _, entry in ipairs(layout.systems) do
-                        if type(entry) == "table" and entry.system == 20
-                            and type(entry.anchorInfo) == "table" then
-                            local anchor = entry.anchorInfo
-                            -- Locate the expected Tracked Buffs anchor, but do
-                            -- not assume the export and runtime indexes match.
-                            if anchor.relativeTo == "UIParent" and nearlyEqual(anchor.offsetY, 0.0)
-                                and (nearlyEqual(anchor.offsetX, 144.9)
-                                    or nearlyEqual(anchor.offsetX, 145.0)
-                                    or nearlyEqual(anchor.offsetX, 151.9)
-                                    or nearlyEqual(anchor.offsetX, 152.0)) then
-                                savedX = tostring(anchor.offsetX)
-                                savedIndex = tostring(entry.systemIndex)
-                                break
-                            end
-                        end
-                    end
-                    break
-                end
-            end
-        end
-    end
+
     local liveX, liveY = "?", "?"
     if viewer and not isSecret(viewer) and type(viewer.GetPoint) == "function" then
         local ok, _, _, _, x, y = pcall(viewer.GetPoint, viewer, 1)
@@ -2674,15 +2560,10 @@ local function printTrackedBuffLayoutAudit()
             if type(y) == "number" then liveY = tostring(y) end
         end
     end
+
     out("tracked buffs: activeLayout=" .. activeName
-        .. ", savedX=" .. savedX
-        .. ", savedIndex=" .. savedIndex
         .. ", liveBuffIconIndex=" .. tostring(liveIndex or "unknown")
-        .. ", liveOffset=" .. liveX .. "," .. liveY
-        .. ", revision=" .. tostring(bjarkiUISettings.editModePresetRevision or "none"))
-    if activeName ~= "unknown" and activeName ~= EDIT_MODE_LAYOUT_NAME then
-        out("tracked buffs: the bjarkiUI preset is not active; use that preset in Edit Mode to see its saved placement")
-    end
+        .. ", liveOffset=" .. liveX .. "," .. liveY)
 end
 
 -- Read-only geometry inspection for the compact ToT/ToF seam. Moving a

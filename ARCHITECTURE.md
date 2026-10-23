@@ -1,14 +1,16 @@
 # bjarkiUI architecture
 
+**Layout-neutral release (2026-10-23):** `0.2.248-foundation-v16-layout-neutral` removes both bundled Edit Mode presets and all code that creates, replaces, saves, activates, or migrates player layouts. The addon retains only existing presentation refreshes triggered by Edit Mode changes; it never writes the serialized layout. Former installs are not retroactively undone: pre-existing saved layouts remain user-owned. Section 32 documents this change.
+
 **v16 suite update (2026-10-22):** this addon receives release-version metadata only. Its behavior is byte-identical to v15 apart from that version string. The three timing repairs are in bjarkiCC Model/Observer. The full v16 suite passes 49 regression scripts and 28 runtime syntax checks on both Lua 5.1 and Lua 5.4; live-client findings below retain their existing status. The behavior described in architecture section 31 remains applicable.
 
-> **Current repository baseline (2026-10-22):** `0.2.247-foundation-v16-fixes-test`. Sections 1–30 are historical implementation and release notes; section 31 documents the current source. Full live-client verification remains outstanding.
+> **Current repository baseline (2026-10-23):** `0.2.248-foundation-v16-layout-neutral`. Sections 1–31 are historical implementation and release notes; section 32 documents the current layout policy. Live-client verification of other UI behavior remains outstanding.
 
-This document now tracks **bjarkiUI 0.2.247-foundation-v16-fixes-test**. **Section 31 supersedes older statements where behavior changed**. This is a maintenance reference, not a guarantee about undocumented WoW: Forever client behavior or taint safety.
+This document now tracks **bjarkiUI 0.2.248-foundation-v16-layout-neutral**. **Section 32 supersedes historical layout behavior**. This is a maintenance reference, not a guarantee about undocumented WoW: Forever client behavior or taint safety.
 
 The addon is deliberately small. The runtime consists of:
 
-- `bjarkiUI.lua` — unit-frame presentation, names, highlights, Edit Mode setup, combat text placement, and event hooks.
+- `bjarkiUI.lua` — unit-frame presentation, names, highlights, non-persistent UI adjustments, combat text placement, and event hooks.
 - `PartyOrder.lua` — visual ordering of raid-style party frames.
 - `SoftDark.lua` — the fixed decorative theme.
 - `TrackedBuffSeconds.lua` — integer-second tracked buff countdown presentation.
@@ -115,11 +117,9 @@ When level numbers are shown again, target/focus defer to Blizzard's own level c
 
 ## 6. Edit Mode and bottom UI
 
-On first use, the addon can import a named Edit Mode layout called `bjarkiUI`.
+The addon ships no Edit Mode layout or preset and never creates, imports, replaces, migrates, saves, or activates a layout. Player-saved layouts remain entirely user-owned. The `EDIT_MODE_LAYOUTS_UPDATED` event is used only to refresh presentation after a user-initiated layout change.
 
-Once a layout with that name exists, the addon treats it as user-owned and does not continuously overwrite its coordinates.
-
-The Micro Menu correction is separate from the serialized Edit Mode layout. The addon leaves `MicroMenuContainer` in place and offsets the visible `MicroMenu` child downward by one UI unit after Blizzard anchors it.
+The Micro Menu correction is independent of the player's serialized Edit Mode layout. The addon leaves `MicroMenuContainer` in place and offsets the visible `MicroMenu` child downward by one UI unit after Blizzard anchors it.
 
 This avoids moving the shared container that other bottom-bar elements may use as an anchor.
 
@@ -752,3 +752,12 @@ The embedded preset exactly matches `EditMode-0.2.233.txt`. On first application
 ### 31.3 Verification boundary
 
 The source has exact v15 runtime parity, matching manifests and embedded/reference layout, four Lua 5.4 syntax checks, and local execution of the repository's packaging validation. The verified suite also exercises modeled native-color restoration, delayed primary repair, party gates, Soft Dark lifecycle and tracked-buff iteration. These checks do not establish native-client taint safety, every secrecy transition or rendered appearance; the historical client observations in `KNOWN_ISSUES.md` remain open.
+
+## 32. Layout-neutral release: 0.2.248-foundation-v16-layout-neutral (2026-10-23)
+
+- Delete both formerly bundled `EditMode-0.2.181.txt` and `EditMode-0.2.233.txt` references from the repository. Remove the embedded share string, the named `bjarkiUI` preset, its revision gate and all `C_EditMode` layout-write or activation calls.
+- Neither a fresh install nor an upgrade creates or changes any player-saved Edit Mode layout. A previous release may already have altered a layout; this version deliberately does **not** try to undo it, delete it, or clear unrelated per-character settings.
+- Keep `EDIT_MODE_LAYOUTS_UPDATED` and out-of-combat layout-responsive presentation (e.g. micro-menu child offset, ToT/ToF optical alignment, combat text). These adjust specific runtime visuals without persisting layout systems.
+- `/bui tracked` is read-only and reports the current active layout name, native Tracked Buffs viewer index and live offset; it has no baked-in `bjarkiUI` layout or coordinate expectations.
+- Packaging stages only the two manifests and their four declared Lua modules, with SHA-256 checksums; a guard rejects future bundled preset files or known native layout-write calls. No historical Edit Mode text file is shipped.
+- This scope is source/packaging hygiene; it does not establish additional in-client rendering, combat or taint guarantees.

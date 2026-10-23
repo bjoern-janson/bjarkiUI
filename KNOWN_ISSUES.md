@@ -1,8 +1,10 @@
 # Known issues and bugs
 
+**Layout ownership (2026-10-23):** `0.2.248-foundation-v16-layout-neutral` contains no bundled Edit Mode presets or automatic layout installation/replacement. Existing saved layouts are left untouched; any previous migration is not reversed.
+
 **v16 suite update (2026-10-22):** this addon receives release-version metadata only. Its behavior is byte-identical to v15 apart from that version string. The three timing repairs are in bjarkiCC Model/Observer. The full v16 suite passes 49 regression scripts and 28 runtime syntax checks on both Lua 5.1 and Lua 5.4; live-client findings below retain their existing status. The behavior described in architecture section 31 remains applicable.
 
-Current repository baseline (2026-10-22): **bjarkiUI 0.2.247-foundation-v16-fixes-test**. The reports below are historical client observations and remain open pending current-client verification. Offline source, syntax and modeled-API checks do not close them. See architecture section 31 for the current behavior, including the one-time `.233` Edit Mode preset replacement.
+Current repository baseline (2026-10-23): **bjarkiUI 0.2.248-foundation-v16-layout-neutral**. The reports below are historical client observations and remain open pending current-client verification. Offline source, syntax and modeled-API checks do not close them. See architecture section 32 for the current layout-neutral behavior.
 
 Original status recorded 2026-10-08 for **bjarkiUI 0.2.90-local**.
 
@@ -47,5 +49,5 @@ in the [bjarkiPortraits issue list](https://github.com/bjoern-janson/bjarkiPortr
 - A historical aggro/flash border remaining after untargeting motivated narrower Target/Focus highlight handling. Recheck the actual target/focus warning lifecycle on the current build; do not disable legitimate flash effects to mask a stale state.
 - Compact ToT/ToF position, Player/Target/Focus status text optical anchors and nameplate CC edge avoidance have been visually calibrated but remain dependent on UI scale and current native artwork. Any future alignment changes should use native screen-pixel evidence without restoring obsolete bar geometry.
 - Minimap day/night decorative glyph removal and action-button macro-name suppression need in-game verification under loading-screen changes, Edit Mode and alternative action-bar visibility. The initial candidate uses native objects only; retain hotkey/stack text and click functionality.
-- The packaged Edit Mode preset records the final user-provided party width. Existing saved layouts remain untouched by the install-if-absent contract.
+- Historical 0.2.220 builds bundled an Edit Mode preset. That behavior was retired in 0.2.248; the current addon does not install, replace, or activate layouts.
 - Four-Lua-module syntax checks and focused offline assertions pass; some older historical test expectations also fail against the unchanged pre-sync local source. Do not claim complete live taint correctness or a uniformly green historical regression suite on this basis.
