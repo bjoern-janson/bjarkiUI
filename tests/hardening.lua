@@ -232,7 +232,10 @@ end
 
 check(ui:find('if type(unit) == "string" and unit:match("^Blizzard_") then', 1, true) ~= nil,
     "Blizzard ADDON_LOADED path retries native hooks")
-check(ui:find('installNativeUpdateHooks()\n        installNameplateClassNameColors()', 1, true) ~= nil,
+local worldEntryStart = assert(ui:find('elseif event == "PLAYER_ENTERING_WORLD" then', 1, true))
+local worldEntryEnd = assert(ui:find('elseif event == "EDIT_MODE_LAYOUTS_UPDATED" then', worldEntryStart, true))
+local worldEntry = ui:sub(worldEntryStart, worldEntryEnd - 1)
+check(worldEntry:find("installNativeUpdateHooks()", 1, true) ~= nil,
     "PLAYER_ENTERING_WORLD retries native hooks")
 check(not ui:find("C_EditMode.SaveLayouts", 1, true), "saved layouts remain untouched")
 print("bjarkiUI hardening: " .. passed .. " source-backed assertions passed")
