@@ -1,5 +1,7 @@
 # bjarkiUI architecture
 
+**Prelaunch offline repairs (2026-10-25):** `0.2.251-foundation-v16-offline-fixes-test` fixes Tracked Buffs pool iteration, completes PartyOrder visibility/geometry fail-closed preflight, retries remaining native presentation hooks without duplication, and verifies native color restoration setter success. Soft Dark Edit Mode callback registration is independently retryable. Section 35 records the scope and testing boundaries.
+
 **Lifecycle repair (2026-10-25):** `0.2.250-foundation-v16-lifecycle-repair-test` adds repeatable notification-pip suppression, per-method PartyOrder hook retry, fail-closed secrecy probes, and guaranteed health-color recursion-guard cleanup. See section 34.
 
 **Hardening update (2026-10-25):** `0.2.249-foundation-v16-hardening-test` makes classic nameplate CC offsets fail closed on unreadable permissions, restores captured native compact-border alpha, and retries missing native update hooks individually at Blizzard module/world-entry boundaries. CI now compiles all four Lua modules with Lua 5.1/5.4 and runs source-backed mocked regressions. The no-preset policy and saved-layout ownership remain unchanged.
@@ -8,9 +10,9 @@
 
 **v16 suite update (2026-10-22):** this addon receives release-version metadata only. Its behavior is byte-identical to v15 apart from that version string. The three timing repairs are in bjarkiCC Model/Observer. The full v16 suite passes 49 regression scripts and 28 runtime syntax checks on both Lua 5.1 and Lua 5.4; live-client findings below retain their existing status. The behavior described in architecture section 31 remains applicable.
 
-> **Current repository baseline (2026-10-25):** `0.2.250-foundation-v16-lifecycle-repair-test`. Sections 1–33 are historical implementation notes; section 34 covers current lifecycle repairs. Live-client verification remains outstanding.
+> **Current repository baseline (2026-10-25):** `0.2.251-foundation-v16-offline-fixes-test`. Sections 1–34 are historical implementation notes; section 35 describes the latest offline fixes. Live-client verification remains outstanding.
 
-This document now tracks **bjarkiUI 0.2.250-foundation-v16-lifecycle-repair-test**. **Section 32 supersedes historical layout behavior; sections 33–34 document the current safeguards**. This is a maintenance reference, not a guarantee about undocumented WoW: Forever client behavior or taint safety.
+This document now tracks **bjarkiUI 0.2.251-foundation-v16-offline-fixes-test**. **Section 32 supersedes historical layout behavior; sections 33–35 document the current safeguards**. This is a maintenance reference, not a guarantee about undocumented WoW: Forever client behavior or taint safety.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -784,3 +786,14 @@ The source has exact v15 runtime parity, matching manifests and embedded/referen
 - Retry nameplate class-name hook installation when `Blizzard_CompactUnitFrame` becomes available after login. No new polling or layout-management code is introduced.
 - `tests/lifecycle.lua` adds source-backed mocked regressions in both Lua 5.1 and 5.4, alongside the existing hardening tests. GitHub CI compiles both tests and the four runtime modules.
 - Native alpha-zero reuse, recycled name-color ownership, and Battleground secrecy transitions remain **client-dependent/unverified**. No speculative hooks or ownership inference were introduced. The saved Edit Mode layout remains fully user-owned.
+
+## 35. Prelaunch offline corrections: 0.2.251-foundation-v16-offline-fixes-test (2026-10-25)
+
+- `TrackedBuffSeconds.lua` retains the entire native `EnumerateActive()` iterator triple through `pcall`; the existing whole-second formatting remains limited to Tracked Buff Icons. If an iterator becomes invalid during native recycling, the formatting attempt fails locally without aborting the viewer update.
+- `PartyOrder.lua` preserves true/false/unknown visibility for visible member enumeration and Edit Mode previews. Unknown member visibility cancels the custom order. It preflights title height, border visibility, pet visibility and anchor methods before writing any member anchors, while keeping its vertical, out-of-combat/non-raid order.
+- Derived class-color hooks, level-ring visibility hooks, individual level-text `Show`/`SetShown` hooks, name-backdrop hooks, native compact aura border hooks and micro-menu offset hook now record successful registration only. Failed registrations remain retryable at their existing lifecycle boundaries.
+- Threat flash `SetVertexColor` post-hooks install before the initial alpha seed, so a failed registration cannot multiply the initial alpha repeatedly. The same owner-only hooks retry at world-entry/Edit Mode lifecycle boundaries without duplicate installation.
+- Native health style restoration now reports individual atlas/desaturation/status-bar setter failures and preserves retry ownership after a partial restore. Its recursion guard remains cleared on all outcomes.
+- Soft Dark registers Edit Mode Enter/Exit callbacks independently; an Exit failure no longer duplicates a successful Enter callback.
+- `tests/presentation.lua` provides additional source-backed Lua 5.1/5.4 scenarios, including full Tracked Buff event/viewer iteration, PartyOrder no-write cases, restoration setter failure/retry, native hook partial success, and Soft Dark callback recovery. CI compiles all four modules plus all tests, then runs the three test scripts; tests are excluded from the shipped addon.
+- No saved Edit Mode layout writer, periodic runtime poller, or additional CVar change is introduced. Existing speculative cases (pooled alpha-zero native ownership, native name-color snapshot replacement, Battleground secret identity transitions) remain deferred to client evidence.

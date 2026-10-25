@@ -119,7 +119,8 @@ local tintBagChromeTexture -- forward-declared for the bounded sibling pass
 local BAG_SIBLING_ART_COUNT = 7
 local bagSiblingEditModeActive = false
 local bagSiblingLayoutHookInstalled = false
-local bagSiblingEditModeHooksInstalled = false
+local bagSiblingEditModeEnterHookInstalled = false
+local bagSiblingEditModeExitHookInstalled = false
 local lastBagSiblingCount = 0
 local lastBagSiblingTextureCount = 0
 local lastBagSiblingAlphaFallbackCount = 0
@@ -1038,20 +1039,27 @@ end
 -- Avoid repainting native chrome while Edit Mode is active, then refresh
 -- the verified bag siblings on exit.
 local function installBagSiblingEditModeHooks()
-    if bagSiblingEditModeHooksInstalled then return end
+    if bagSiblingEditModeEnterHookInstalled and bagSiblingEditModeExitHookInstalled then return end
     local registry = EventRegistry
     if not registry or type(child(registry, "RegisterCallback")) ~= "function" then return end
-    local okEnter = pcall(registry.RegisterCallback, registry, "EditMode.Enter", function()
-        bagSiblingEditModeActive = true
-        restoreBagSiblingArt()
-    end)
-    local okExit = pcall(registry.RegisterCallback, registry, "EditMode.Exit", function()
-        bagSiblingEditModeActive = false
-        if settings.softDarkEnabled ~= true or loadedDarkMode() then return end
-        if inCombat() then pending = true; return end
-        styleBagSiblingArt()
-    end)
-    bagSiblingEditModeHooksInstalled = okEnter and okExit
+    -- Retry only the callback that failed; a successful Enter registration
+    -- must never be registered again just because Exit was unavailable.
+    if not bagSiblingEditModeEnterHookInstalled then
+        bagSiblingEditModeEnterHookInstalled =
+            pcall(registry.RegisterCallback, registry, "EditMode.Enter", function()
+                bagSiblingEditModeActive = true
+                restoreBagSiblingArt()
+            end)
+    end
+    if not bagSiblingEditModeExitHookInstalled then
+        bagSiblingEditModeExitHookInstalled =
+            pcall(registry.RegisterCallback, registry, "EditMode.Exit", function()
+                bagSiblingEditModeActive = false
+                if settings.softDarkEnabled ~= true or loadedDarkMode() then return end
+                if inCombat() then pending = true; return end
+                styleBagSiblingArt()
+            end)
+    end
 end
 
 local function audit()

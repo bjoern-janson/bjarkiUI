@@ -21,11 +21,17 @@ local function updateViewer(viewer)
     if not viewer then return end
     local pool = viewer.itemFramePool
     if not pool or type(pool.EnumerateActive) ~= "function" then return end
-    local ok, iterator = pcall(pool.EnumerateActive, pool)
+    -- Native ObjectPoolMixin returns iterator, state, and initial key.
+    -- Keep the complete triple; losing state makes next() error at runtime.
+    local ok, iterator, state, initial = pcall(pool.EnumerateActive, pool)
     if not ok or type(iterator) ~= "function" then return end
-    for item in iterator do
-        setWholeSeconds(item)
-    end
+    -- A pool can be recycled during a refresh. Keep native widget errors
+    -- local to this optional formatting pass.
+    pcall(function()
+        for item in iterator, state, initial do
+            setWholeSeconds(item)
+        end
+    end)
 end
 
 local function setup()

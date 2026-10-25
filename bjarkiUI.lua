@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.250-foundation-v16-lifecycle-repair-test"
+local BJARKI_UI_VERSION = "0.2.251-foundation-v16-offline-fixes-test"
 -- Standalone PRD treatment is retained. Unit-frame resource bars stay native.
 local PRD_MANA_R, PRD_MANA_G, PRD_MANA_B = 0.10, 0.25, 1.00
 local WORLD_TEXT_SCREEN_Y = "0.0430"
@@ -628,24 +628,33 @@ function nativeHealthStyle.Restore(bar)
     local state = nativeHealthStyle.states[bar]
     if not state or not state.applied then return end
     healthColorWrites[bar] = true
-    -- A native texture getter may fail after frame reuse. Never leave the
-    -- color-write guard set; preserve retry state on an unexpected exception.
+    -- Setter failures must retain restoration authority just like exceptions.
+    local restored = true
     local ok = pcall(function()
         if state.texture == currentHealthTexture(bar) then
             local got, atlas = pcall(state.texture.GetAtlas, state.texture)
-            if got and not isSecret(atlas) and atlas == state.colorable then
-                pcall(state.texture.SetAtlas, state.texture, state.originalAtlas, false)
+            if not got or isSecret(atlas) then
+                restored = false
+            elseif atlas == state.colorable then
+                if not pcall(state.texture.SetAtlas, state.texture, state.originalAtlas, false) then
+                    restored = false
+                end
             end
-            if state.desaturated then
-                pcall(state.texture.SetDesaturated, state.texture, state.originalDesaturated)
+            if state.desaturated
+                and not pcall(state.texture.SetDesaturated, state.texture, state.originalDesaturated) then
+                restored = false
             end
         end
-        if state.nativeColor then pcall(bar.SetStatusBarColor, bar, unpack(state.nativeColor)) end
+        if state.nativeColor
+            and not pcall(bar.SetStatusBarColor, bar, unpack(state.nativeColor)) then
+            restored = false
+        end
     end)
     healthColorWrites[bar] = nil
-    if ok then
+    if ok and restored then
         state.applied, state.desaturated = false, false
     end
+    return ok and restored
 end
 function nativeHealthStyle.Prepare(bar)
     local texture = currentHealthTexture(bar)
@@ -833,18 +842,16 @@ end
 
 local derivedColorHooks = setmetatable({}, { __mode = "k" })
 local function installDerivedColorHook(bar, unit)
-    if not bar or derivedColorHooks[bar] or not hooksecurefunc or not bar.SetStatusBarColor then return end
+    if not bar or derivedColorHooks[bar] or type(hooksecurefunc) ~= "function"
+        or type(bar.SetStatusBarColor) ~= "function" then return end
     if unit ~= "targettarget" and unit ~= "focustarget" then return end
-    derivedColorHooks[bar] = true
-    -- Own the final tint write on these two reusable bars only. Re-resolve the
-    -- current referent; a delayed native color write must not restore an old one.
-    hooksecurefunc(bar, "SetStatusBarColor", function(self)
+    -- A failed hook must leave this reused bar eligible for another attempt.
+    derivedColorHooks[bar] = pcall(hooksecurefunc, bar, "SetStatusBarColor", function(self)
         if not healthColorWrites[self] and self == healthBar(unit) then
             applyHealthColor(self, unit)
         end
     end)
 end
-
 -- Primary bars have a native green default writer. A late native write or a
 -- temporary identity-access gap can outlive the existing immediate post-hook.
 -- Recheck only after an external color write, using live evidence next tick.
@@ -1049,13 +1056,17 @@ local function hideNameBackdrop(unit)
     if not region or isSecret(region) or type(region.Hide) ~= "function" then return end
     local function hide(self) pcall(self.Hide, self) end
     hide(region)
-    if not nameBackdropHooks[region] and hooksecurefunc then
-        local showOK = type(region.Show) ~= "function" or pcall(hooksecurefunc, region, "Show", hide)
-        local shownOK = type(region.SetShown) ~= "function" or pcall(hooksecurefunc, region, "SetShown", hide)
-        nameBackdropHooks[region] = showOK and shownOK
+    if type(hooksecurefunc) ~= "function" then return end
+    local state = nameBackdropHooks[region]
+    if not state then state = {}; nameBackdropHooks[region] = state end
+    -- Show and SetShown may become available independently.
+    if not state.show and type(region.Show) == "function" then
+        state.show = pcall(hooksecurefunc, region, "Show", hide)
+    end
+    if not state.setShown and type(region.SetShown) == "function" then
+        state.setShown = pcall(hooksecurefunc, region, "SetShown", hide)
     end
 end
-
 -- BEGIN BJARKI_NAMEPLATE_CLASS_NAMES
 local installNameplateClassNameColors
 do
@@ -1157,9 +1168,8 @@ local function hideLevelRing(ring)
     if not ring or not ring.Hide then return end
     pcall(ring.Hide, ring)
 
-    if hiddenLevelRings[ring] or not hooksecurefunc then return end
-    hiddenLevelRings[ring] = true
-    hooksecurefunc(ring, "Show", function(self)
+    if hiddenLevelRings[ring] or type(hooksecurefunc) ~= "function" then return end
+    hiddenLevelRings[ring] = pcall(hooksecurefunc, ring, "Show", function(self)
         if self._bjarkiUIHidingLevelRing then return end
         self._bjarkiUIHidingLevelRing = true
         pcall(self.Hide, self)
@@ -1196,23 +1206,24 @@ local function levelNumbersEnabled()
 end
 
 local function installLevelVisibilityHook(textRegion)
-    if not textRegion or levelVisibilityHooks[textRegion] or not hooksecurefunc
-        or not textRegion.Show or not textRegion.Hide
-    then
+    if not textRegion or type(hooksecurefunc) ~= "function"
+        or type(textRegion.Show) ~= "function" or type(textRegion.Hide) ~= "function" then
         return
     end
 
-    levelVisibilityHooks[textRegion] = true
+    local state = levelVisibilityHooks[textRegion]
+    if not state then state = {}; levelVisibilityHooks[textRegion] = state end
     local function enforceHidden(self)
         if levelNumbersEnabled() then return end
         pcall(self.Hide, self)
     end
-    hooksecurefunc(textRegion, "Show", enforceHidden)
-    if type(textRegion.SetShown) == "function" then
-        hooksecurefunc(textRegion, "SetShown", enforceHidden)
+    if not state.show then
+        state.show = pcall(hooksecurefunc, textRegion, "Show", enforceHidden)
+    end
+    if not state.setShown and type(textRegion.SetShown) == "function" then
+        state.setShown = pcall(hooksecurefunc, textRegion, "SetShown", enforceHidden)
     end
 end
-
 local function applyLevelNumberVisibility()
     for _, unit in ipairs({ "player", "target", "focus" }) do
         local textRegion = levelTextFor(unit)
@@ -1295,21 +1306,16 @@ local HIGHLIGHT_SCALE = 0.25
 local textureScaleGuards = setmetatable({}, { __mode = "k" })
 
 local function installVertexAlphaScale(texture, scale)
-    if not texture or not texture.SetVertexColor or not hooksecurefunc then return end
-    local state = textureScaleGuards[texture] or {}
-    textureScaleGuards[texture] = state
+    if not texture or type(texture.SetVertexColor) ~= "function"
+        or type(hooksecurefunc) ~= "function" then return end
+    local state = textureScaleGuards[texture]
+    if not state then state = {}; textureScaleGuards[texture] = state end
     if state.vertexInstalled then return end
-    state.vertexInstalled = true
 
     local function apply(r, g, b, a)
         if state.vertexGuard then return end
         local resolvedScale = scale
         if isSecret(resolvedScale) or type(resolvedScale) ~= "number" then resolvedScale = 1 end
-
-        -- Secret color components can throw on comparison/arithmetic before
-        -- pcall(texture.SetVertexColor, ...) is even entered. Reject them before
-        -- setting the recursion guard so one protected update cannot permanently
-        -- strand this texture in guarded state.
         if isSecret(r) or isSecret(g) or isSecret(b) or isSecret(a) then return end
         local red = type(r) == "number" and r or 1
         local green = type(g) == "number" and g or 0
@@ -1321,16 +1327,17 @@ local function installVertexAlphaScale(texture, scale)
         state.vertexGuard = false
     end
 
-    if texture.GetVertexColor then
+    -- Register before seeding. If registration fails, a later retry must not
+    -- repeatedly multiply the already-scaled alpha.
+    state.vertexInstalled = pcall(hooksecurefunc, texture, "SetVertexColor", function(_self, r, g, b, a)
+        apply(r, g, b, a)
+    end)
+    if not state.vertexInstalled then return end
+    if type(texture.GetVertexColor) == "function" then
         local ok, r, g, b, a = pcall(texture.GetVertexColor, texture)
         if ok then apply(r, g, b, a) end
     end
-
-    pcall(hooksecurefunc, texture, "SetVertexColor", function(_self, r, g, b, a)
-        apply(r, g, b, a)
-    end)
 end
-
 -- The 70425 Camelot TargetFrame mixin anchors BOTH Target and Focus flash
 -- textures to TargetFrame.TargetFrameContainer. A live Focus warning can then
 -- look like a ghost Target after clearing Target. Repair only that exact binding.
@@ -1365,6 +1372,15 @@ local function queueFocusFlashAnchorRepair()
     if not scheduled then focusFlashRepairQueued = false end
 end
 
+local function retryThreatAlphaHooks()
+    local player, target, focus = _G.PlayerFrame, _G.TargetFrame, _G.FocusFrame
+    installVertexAlphaScale(player and player.PlayerFrameContainer and player.PlayerFrameContainer.FrameFlash, HIGHLIGHT_SCALE)
+    installVertexAlphaScale(target and target.TargetFrameContainer and target.TargetFrameContainer.Flash, HIGHLIGHT_SCALE)
+    installVertexAlphaScale(focus and focus.TargetFrameContainer and focus.TargetFrameContainer.Flash, HIGHLIGHT_SCALE)
+    installVertexAlphaScale(_G.PetFrameFlash, HIGHLIGHT_SCALE)
+    installVertexAlphaScale(_G.PetAttackModeTexture, HIGHLIGHT_SCALE)
+end
+
 local function installThreatScaling()
     local player, target, focus = _G.PlayerFrame, _G.TargetFrame, _G.FocusFrame
     local playerFlash = player and player.PlayerFrameContainer and player.PlayerFrameContainer.FrameFlash
@@ -1383,11 +1399,7 @@ local function installThreatScaling()
     -- Each frame keeps its own Blizzard atlas/geometry; only intensity is
     -- normalized. This makes the player warning read like the target warning
     -- instead of using the unrelated StatusTexture art.
-    installVertexAlphaScale(playerFlash, HIGHLIGHT_SCALE)
-    installVertexAlphaScale(targetFlash, HIGHLIGHT_SCALE)
-    installVertexAlphaScale(focusFlash, HIGHLIGHT_SCALE)
-    installVertexAlphaScale(_G.PetFrameFlash, HIGHLIGHT_SCALE)
-    installVertexAlphaScale(_G.PetAttackModeTexture, HIGHLIGHT_SCALE)
+    retryThreatAlphaHooks()
 
     -- Blizzard's StatusTexture is a separate red/yellow portrait+name-bar pulse.
     -- Keep it disabled. Resting instead gets a static yellow copy of the native
@@ -1962,10 +1974,9 @@ local function installCompactDebuffBorderNeutralization()
     if not compactDebuffBorderHookInstalled
         and type(CompactUnitFrame_UtilSetDebuff) == "function"
     then
-        hooksecurefunc("CompactUnitFrame_UtilSetDebuff", function(debuffFrame)
+        compactDebuffBorderHookInstalled = pcall(hooksecurefunc, "CompactUnitFrame_UtilSetDebuff", function(debuffFrame)
             neutralizeCompactDebuffBorder(debuffFrame)
         end)
-        compactDebuffBorderHookInstalled = true
     end
 
     -- A post-hook on the complete public debuff refresh is the final boundary.
@@ -1974,10 +1985,9 @@ local function installCompactDebuffBorderNeutralization()
     if not compactDebuffUpdateHookInstalled
         and type(CompactUnitFrame_UpdateDebuffs) == "function"
     then
-        hooksecurefunc("CompactUnitFrame_UpdateDebuffs", function(frame)
+        compactDebuffUpdateHookInstalled = pcall(hooksecurefunc, "CompactUnitFrame_UpdateDebuffs", function(frame)
             neutralizeCompactDebuffFrames(frame)
         end)
-        compactDebuffUpdateHookInstalled = true
     end
 
     -- Some public renderers route aura refreshes through UpdateAuras instead of
@@ -1986,10 +1996,9 @@ local function installCompactDebuffBorderNeutralization()
     if not compactDebuffAuraUpdateHookInstalled
         and type(CompactUnitFrame_UpdateAuras) == "function"
     then
-        hooksecurefunc("CompactUnitFrame_UpdateAuras", function(frame)
+        compactDebuffAuraUpdateHookInstalled = pcall(hooksecurefunc, "CompactUnitFrame_UpdateAuras", function(frame)
             neutralizeCompactDebuffFrames(frame)
         end)
-        compactDebuffAuraUpdateHookInstalled = true
     end
 
     -- Public AuraUtil renderers only. Blizzard_PrivateAurasUI has a separate
@@ -1998,10 +2007,10 @@ local function installCompactDebuffBorderNeutralization()
         and type(AuraUtil) == "table"
         and type(AuraUtil.SetAuraBorderAtlas) == "function"
     then
-        hooksecurefunc(AuraUtil, "SetAuraBorderAtlas", function(borderRegion)
-            neutralizeCompactBorder(borderRegion)
-        end)
-        compactAuraBorderHookInstalled = true
+        compactAuraBorderHookInstalled = pcall(hooksecurefunc,
+            AuraUtil, "SetAuraBorderAtlas", function(borderRegion)
+                neutralizeCompactBorder(borderRegion)
+            end)
     end
 end
 
@@ -2125,8 +2134,8 @@ local function installMicroMenuChildOffset()
     then
         -- Blizzard may re-anchor MicroMenu whenever it lays out. Apply the
         -- visual offset after that exact operation; no polling required.
-        hooksecurefunc(menu, "AnchorToMenuContainer", applyMicroMenuChildOffset)
-        microMenuChildOffsetHookInstalled = true
+        microMenuChildOffsetHookInstalled =
+            pcall(hooksecurefunc, menu, "AnchorToMenuContainer", applyMicroMenuChildOffset)
     end
 
     applyMicroMenuChildOffset()
@@ -2315,6 +2324,7 @@ events:SetScript("OnEvent", function(_, event, unit)
         applyAll()
     elseif event == "PLAYER_ENTERING_WORLD" then
         installNativeUpdateHooks()
+        retryThreatAlphaHooks()
         installNameplateClassNameColors()
         hideActionBarMacroLabels()
         hideMinimapDayNightIndicator()
@@ -2330,6 +2340,7 @@ events:SetScript("OnEvent", function(_, event, unit)
         anchorCombatText()
         applyAll()
     elseif event == "EDIT_MODE_LAYOUTS_UPDATED" then
+        retryThreatAlphaHooks()
         hideActionBarMacroLabels()
         hideMinimapDayNightIndicator()
         installDerivedFrameAlignment()

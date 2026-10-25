@@ -51,7 +51,8 @@ local function mayReanchor()
 end
 
 local function shown(frame)
-    return frame and safeBool(frame.IsShown, frame) == true
+    if not frame then return nil end
+    return safeBool(frame.IsShown, frame)
 end
 
 local function visualMembers(frame)
@@ -64,15 +65,21 @@ local function visualMembers(frame)
         -- native preview array as positional evidence rather than trusting tokens.
         local ordered = {}
         for i = 2, #members do
-            if shown(members[i]) then ordered[#ordered + 1] = members[i] end
+            local visible = shown(members[i])
+            if visible == nil then return nil end
+            if visible then ordered[#ordered + 1] = members[i] end
         end
-        if shown(members[1]) then ordered[#ordered + 1] = members[1] end
+        local playerVisible = shown(members[1])
+        if playerVisible == nil then return nil end
+        if playerVisible then ordered[#ordered + 1] = members[1] end
         return ordered
     end
 
     local byToken, extras = {}, {}
     for _, member in ipairs(members) do
-        if shown(member) then
+        local visible = shown(member)
+        if visible == nil then return nil end
+        if visible then
             local unit = readableUnitToken(member.unit)
             -- Missing/secret unit identity cannot authorize a custom order.
             if not unit then return nil end
@@ -119,7 +126,31 @@ local function applyVisualOrder(frame)
 
     local ordered = visualMembers(frame)
     if not ordered or #ordered == 0 then return end
-    local titleHeight = safeNumberMethod(frame.title, frame.title and frame.title.GetHeight) or 0
+    -- Resolve every required visual input before changing even the first
+    -- native anchor; a partial order would be worse than leaving it native.
+    local titleHeight = 0
+    if frame.title then
+        titleHeight = safeNumberMethod(frame.title, frame.title.GetHeight)
+        if not titleHeight or titleHeight ~= titleHeight
+            or titleHeight < 0 or titleHeight == math.huge then return end
+    end
+    local border = frame.borderFrame
+    if border and shown(border) == nil then return end
+    local pets = frame.petUnitFrames
+    if pets ~= nil then
+        if type(pets) ~= "table" then return end
+        for _, pet in ipairs(pets) do
+            if shown(pet) == nil then return end
+            if type(pet.ClearAllPoints) ~= "function"
+                or type(pet.SetPoint) ~= "function" then return end
+        end
+    end
+    for _, member in ipairs(ordered) do
+        if type(member.ClearAllPoints) ~= "function"
+            or type(member.SetPoint) ~= "function" then return end
+    end
+    if border and (type(border.ClearAllPoints) ~= "function"
+        or type(border.SetPoint) ~= "function") then return end
     local first = ordered[1]
     first:ClearAllPoints()
     first:SetPoint("TOP", frame, "TOP", 0, -titleHeight)
@@ -130,7 +161,6 @@ local function applyVisualOrder(frame)
         member:SetPoint("TOP", previous, "BOTTOM", 0, 0)
         previous = member
     end
-    local border = frame.borderFrame
     if border and shown(border) then
         border:ClearAllPoints()
         border:SetPoint("TOPLEFT", first, "TOPLEFT", -2, 2)
