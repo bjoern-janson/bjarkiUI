@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.248-foundation-v16-layout-neutral"
+local BJARKI_UI_VERSION = "0.2.249-foundation-v16-hardening-test"
 -- Standalone PRD treatment is retained. Unit-frame resource bars stay native.
 local PRD_MANA_R, PRD_MANA_G, PRD_MANA_B = 0.10, 0.25, 1.00
 local WORLD_TEXT_SCREEN_Y = "0.0430"
@@ -1455,59 +1455,71 @@ local function installThreatScaling()
 end
 
 
+-- BEGIN BJARKI_NATIVE_UPDATE_HOOKS
+-- Native functions can become available after PLAYER_LOGIN. Install each
+-- post-hook independently, record success only, and safely retry missing ones
+-- when another Blizzard module loads. No duplicate hooks or native refreshes.
+local nativeFrameUpdateHookInstalled = false
+local nativeNameplateHealthHookInstalled = false
+
+local function installNativeUpdateHooks()
+    if type(hooksecurefunc) ~= "function" then return end
+
+    if not nativeHealthUpdateHookInstalled
+        and type(UnitFrameHealthBar_Update) == "function" then
+        nativeHealthUpdateHookInstalled = pcall(hooksecurefunc, "UnitFrameHealthBar_Update", function(bar, unit)
+            local nativeUnit = readableUnitToken(unit)
+            -- Route by the current bar binding, not a transient caller alias.
+            unit = bar and readableUnitToken(bar.unit)
+            if unit and bar == healthBar(unit) then
+                local skipDerived = derivedColorHooks[bar] and nativeUnit == unit
+                if skipDerived then
+                    -- A secret lock flag must not be evaluated as a Lua boolean.
+                    local lockColor, lockValues = bar.lockColor, bar.lockValues
+                    skipDerived = not isSecret(lockColor) and not isSecret(lockValues)
+                        and not lockColor and not lockValues
+                end
+                if not skipDerived then applyHealthColor(bar, unit) end
+            end
+        end)
+    end
+
+    if not nativeFrameUpdateHookInstalled and type(UnitFrame_Update) == "function" then
+        nativeFrameUpdateHookInstalled = pcall(hooksecurefunc, "UnitFrame_Update", function(frame)
+            local unit = trackedFrame(frame)
+            if unit then applyUnit(unit, true) end
+        end)
+    end
+
+    -- Native nameplate color selection can finish after a tracked bar update.
+    if not nativeNameplateHealthHookInstalled
+        and type(CompactUnitFrame_UpdateHealthColor) == "function" then
+        nativeNameplateHealthHookInstalled = pcall(hooksecurefunc, "CompactUnitFrame_UpdateHealthColor",
+            function(frame)
+                local ok, plateUnit = pcall(function()
+                    if isSecret(frame) or not frame
+                        or (frame.IsForbidden and readableBool(frame.IsForbidden, frame) ~= false)
+                    then return nil end
+                    return readableUnitToken(frame.unit)
+                end)
+                if not ok or not plateUnit or not plateUnit:match("^nameplate%d+$") then return end
+                for _, unit in ipairs({ "target", "focus", "targettarget", "focustarget" }) do
+                    if sameUnit(unit, plateUnit) then
+                        applyHealthColor(healthBar(unit), unit)
+                    end
+                end
+            end)
+    end
+end
+
 local function installHooks()
+    installNativeUpdateHooks()
     if hooksInstalled then return end
     hooksInstalled = true
-
-    if hooksecurefunc and type(UnitFrameHealthBar_Update) == "function" then
-        hooksecurefunc("UnitFrameHealthBar_Update", function(bar, unit)
-            local nativeUnit = readableUnitToken(unit)
-            -- The event can name another alias of this actor (for example
-            -- target while updating focus). Route by the bar's bound unit.
-            unit = bar and readableUnitToken(bar.unit)
-            -- Only touch the actual unit-frame health bar, excluding auxiliary
-            -- damage/absorb bars that can carry the same unit token.
-            if unit and bar == healthBar(unit) then
-                -- Only an unlocked, matching native call reaches the derived
-                -- SetStatusBarColor final writer. Keep this fallback otherwise.
-                if not (derivedColorHooks[bar] and nativeUnit == unit and not bar.lockColor and not bar.lockValues) then
-                    applyHealthColor(bar, unit)
-                end
-            end
-        end)
-        nativeHealthUpdateHookInstalled = true
-    end
-    if hooksecurefunc and type(UnitFrame_Update) == "function" then
-        hooksecurefunc("UnitFrame_Update", function(frame)
-            local unit = trackedFrame(frame)
-            if unit then
-                -- Keep native names, portraits, artwork and animations intact.
-                applyUnit(unit, true)
-
-            end
-        end)
-    end
-    -- Owned bars can refresh before the nameplate's deferred health update.
-    -- Re-sample matching plates after their native color selection finishes.
-    if hooksecurefunc and type(CompactUnitFrame_UpdateHealthColor) == "function" then
-        hooksecurefunc("CompactUnitFrame_UpdateHealthColor", function(frame)
-            local ok, plateUnit = pcall(function()
-                if isSecret(frame) or not frame
-                    or (frame.IsForbidden and readableBool(frame.IsForbidden, frame) ~= false)
-                then return nil end
-                return readableUnitToken(frame.unit)
-            end)
-            if not ok or not plateUnit or not plateUnit:match("^nameplate%d+$") then return end
-            for _, unit in ipairs({ "target", "focus", "targettarget", "focustarget" }) do
-                if sameUnit(unit, plateUnit) then
-                    applyHealthColor(healthBar(unit), unit)
-                end
-            end
-        end)
-    end
+    -- The static threat/resting presentation is installed only once.
     installThreatScaling()
-
 end
+-- END BJARKI_NATIVE_UPDATE_HOOKS
 
 local derivedFrameAlignment = setmetatable({}, { __mode = "k" })
 
@@ -1847,29 +1859,51 @@ local function isCompactPartyRaidFrame(frame)
     return nil
 end
 
+-- Preserve the last readable native alpha, not an assumed fully opaque
+-- fallback. Pooled borders may be reused by other Blizzard frame owners.
+local function readableBorderAlpha(border)
+    local ok, alpha = pcall(function() return border:GetAlpha() end)
+    if not ok or isSecret(alpha) or type(alpha) ~= "number"
+        or alpha ~= alpha or alpha < 0 or alpha > 1 then return nil end
+    return alpha
+end
+
 local function neutralizeCompactBorder(border)
     if not border or isSecret(border) then return end
     local ok, setAlpha = pcall(function()
-        if border.IsForbidden and readableBool(border.IsForbidden, border) ~= false then return nil end
+        if readableBool(border.IsForbidden, border) ~= false then return nil end
         return border.SetAlpha
     end)
     if not ok or type(setAlpha) ~= "function" then return end
 
     local compact = isCompactPartyRaidFrame(border)
-    if compact then
-        -- The border is already the final native presentation object here.
-        -- Alpha-zero hides only the dispel-colored border; icon, cooldown,
-        -- stacks, and the debuff frame itself remain untouched.
+    if compact == true then
+        local alpha = readableBorderAlpha(border)
+        if alpha == nil then return end
+        local state = compactHiddenDebuffBorders[border]
+        if not state then
+            state = { nativeAlpha = alpha }
+        elseif alpha ~= 0 then
+            -- A native writer has repainted this pooled border. Keep its new
+            -- readable alpha rather than the prior occupant's snapshot.
+            state.nativeAlpha = alpha
+        end
         if pcall(setAlpha, border, 0) then
-            compactHiddenDebuffBorders[border] = true
+            compactHiddenDebuffBorders[border] = state
         end
-    elseif compact == false and compactHiddenDebuffBorders[border] then
-        -- Compact aura textures are pooled. Restore native presentation if a
-        -- previously hidden border is later reused outside compact frames.
-        if pcall(setAlpha, border, 1) then
-            compactHiddenDebuffBorders[border] = nil
+    elseif compact == false then
+        local state = compactHiddenDebuffBorders[border]
+        if not state then return end
+        local alpha = readableBorderAlpha(border)
+        if alpha == nil then return end
+        if alpha == 0 then
+            -- Only undo our still-visible suppression. A newer nonzero native
+            -- value already owns the border and must not be overwritten.
+            if not pcall(setAlpha, border, state.nativeAlpha) then return end
         end
+        compactHiddenDebuffBorders[border] = nil
     end
+    -- UNKNOWN ancestry authorizes neither hiding nor restoration.
 end
 
 local function neutralizeCompactDebuffBorder(debuffFrame)
@@ -2103,22 +2137,25 @@ local function repairNameplateControlLayout(frame)
     local options = _G.NamePlateSetupOptions
     if not options or isSecret(options) or isSecret(options.useClassicHealthBar)
         or options.useClassicHealthBar ~= true then return end
-    if readableBool(frame.IsForbidden, frame) == true then return end
+    -- Unknown or unavailable permission is not permission.
+    if readableBool(frame.IsForbidden, frame) ~= false then return end
     local container = frame.HealthBarsContainer
     local health = container and container.healthBar
     local edge = health and health.bgTexture
     local auras = frame.AurasFrame
-    if not edge or isSecret(edge) or not auras or isSecret(auras) then return end
+    if not edge or isSecret(edge) or not auras or isSecret(auras)
+        or readableBool(edge.IsForbidden, edge) ~= false then return end
     for _, key in ipairs({"CrowdControlListFrame", "LossOfControlFrame"}) do
         local list = auras[key]
-        if list and not isSecret(list) and type(list.ClearAllPoints) == "function"
-            and type(list.SetPoint) == "function" and readableBool(list.IsForbidden, list) ~= true then
+        if list and not isSecret(list) and type(list.SetPoint) == "function"
+            and readableBool(list.IsForbidden, list) == false then
             local protected = readableBool(list.IsProtected, list)
-            if protected == false or readableBool(InCombatLockdown) == false then
-                -- No aura enumeration, secret shown state, timer values, or
-                -- native health-bar geometry is consumed by this layout write.
-                -- Native UpdateAnchors owns this same LEFT anchor. Replace
-                -- that key atomically; do not clear a working layout first.
+            -- Only confirmed unprotected frames, or confirmed protected
+            -- frames outside combat, may receive this visual anchor.
+            if protected == false or
+                (protected == true and readableBool(InCombatLockdown) == false) then
+                -- Replace only Blizzard's LEFT anchor, without clearing the
+                -- rest of the native list layout or touching aura values.
                 pcall(list.SetPoint, list, "LEFT", edge, "RIGHT", 5, 0)
             end
         end
@@ -2222,6 +2259,9 @@ for _, event in ipairs({
 
 events:SetScript("OnEvent", function(_, event, unit)
     if event == "ADDON_LOADED" then
+        if type(unit) == "string" and unit:match("^Blizzard_") then
+            installNativeUpdateHooks()
+        end
         if unit == "Blizzard_ActionBar" then
             hideActionBarMacroLabels()
         elseif unit == "Blizzard_UnitFrame" then
@@ -2266,6 +2306,7 @@ events:SetScript("OnEvent", function(_, event, unit)
         anchorCombatText()
         applyAll()
     elseif event == "PLAYER_ENTERING_WORLD" then
+        installNativeUpdateHooks()
         installNameplateClassNameColors()
         hideActionBarMacroLabels()
         hideMinimapDayNightIndicator()
@@ -2408,6 +2449,9 @@ local function printUIAudit()
     end
 
     out("audit version=" .. BJARKI_UI_VERSION)
+    out("hooks nativeHealth=" .. tostring(nativeHealthUpdateHookInstalled)
+        .. " nativeFrame=" .. tostring(nativeFrameUpdateHookInstalled)
+        .. " nativeNameplateHealth=" .. tostring(nativeNameplateHealthHookInstalled))
     out("hooks compactLegacy=" .. tostring(compactDebuffBorderHookInstalled)
         .. " compactDebuffRefresh=" .. tostring(compactDebuffUpdateHookInstalled)
         .. " compactAuraRefresh=" .. tostring(compactDebuffAuraUpdateHookInstalled)

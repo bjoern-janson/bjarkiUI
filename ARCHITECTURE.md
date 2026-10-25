@@ -1,12 +1,14 @@
 # bjarkiUI architecture
 
+**Hardening update (2026-10-25):** `0.2.249-foundation-v16-hardening-test` makes classic nameplate CC offsets fail closed on unreadable permissions, restores captured native compact-border alpha, and retries missing native update hooks individually at Blizzard module/world-entry boundaries. CI now compiles all four Lua modules with Lua 5.1/5.4 and runs source-backed mocked regressions. The no-preset policy and saved-layout ownership remain unchanged.
+
 **Layout-neutral release (2026-10-23):** `0.2.248-foundation-v16-layout-neutral` removes both bundled Edit Mode presets and all code that creates, replaces, saves, activates, or migrates player layouts. The addon retains only existing presentation refreshes triggered by Edit Mode changes; it never writes the serialized layout. Former installs are not retroactively undone: pre-existing saved layouts remain user-owned. Section 32 documents this change.
 
 **v16 suite update (2026-10-22):** this addon receives release-version metadata only. Its behavior is byte-identical to v15 apart from that version string. The three timing repairs are in bjarkiCC Model/Observer. The full v16 suite passes 49 regression scripts and 28 runtime syntax checks on both Lua 5.1 and Lua 5.4; live-client findings below retain their existing status. The behavior described in architecture section 31 remains applicable.
 
-> **Current repository baseline (2026-10-23):** `0.2.248-foundation-v16-layout-neutral`. Sections 1–31 are historical implementation and release notes; section 32 documents the current layout policy. Live-client verification of other UI behavior remains outstanding.
+> **Current repository baseline (2026-10-25):** `0.2.249-foundation-v16-hardening-test`. Sections 1–32 are historical implementation and release notes; section 33 covers current hardening. Live-client verification remains outstanding.
 
-This document now tracks **bjarkiUI 0.2.248-foundation-v16-layout-neutral**. **Section 32 supersedes historical layout behavior**. This is a maintenance reference, not a guarantee about undocumented WoW: Forever client behavior or taint safety.
+This document now tracks **bjarkiUI 0.2.249-foundation-v16-hardening-test**. **Section 32 supersedes historical layout behavior; section 33 describes the latest safety adjustments**. This is a maintenance reference, not a guarantee about undocumented WoW: Forever client behavior or taint safety.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -761,3 +763,12 @@ The source has exact v15 runtime parity, matching manifests and embedded/referen
 - `/bui tracked` is read-only and reports the current active layout name, native Tracked Buffs viewer index and live offset; it has no baked-in `bjarkiUI` layout or coordinate expectations.
 - Packaging stages only the two manifests and their four declared Lua modules, with SHA-256 checksums; a guard rejects future bundled preset files or known native layout-write calls. No historical Edit Mode text file is shipped.
 - This scope is source/packaging hygiene; it does not establish additional in-client rendering, combat or taint guarantees.
+
+## 33. Native hook, nameplate, compact border and CI hardening: 0.2.249-foundation-v16-hardening-test (2026-10-25)
+
+- A classic nameplate CC/LoC anchor correction now requires readable `IsForbidden() == false` for the owning frame, anchor texture and destination list; unknown list protection denies the write, and confirmed protected lists require confirmed out-of-combat state. Native anchoring remains in effect if permissions are inaccessible.
+- Public compact debuff-border suppression saves each qualifying texture's readable original alpha in weak-key state. On reuse outside compact frames it restores that value **only if the border still reads as hidden**. If a native writer already supplied nonzero alpha, the addon discards its snapshot instead of overriding the native value. Repeated compact updates retain the original alpha unless a new native nonzero write is observed.
+- Three native presentation post-hooks (`UnitFrameHealthBar_Update`, `UnitFrame_Update`, `CompactUnitFrame_UpdateHealthColor`) now register independently. Missing or failed installations retry at Blizzard `ADDON_LOADED` and world-entry boundaries; successful hooks are not duplicated. One-time threat/resting setup stays one-time. The derived-health path also avoids evaluating secret lock flags as Lua booleans.
+- `/bui audit` exposes read-only native hook installation states. This release does not introduce native frame refresh calls or new polling loops.
+- GitHub Actions compiles all four TOC-declared Lua modules and the regression test with Lua 5.1 and 5.4, then runs extracted-production-code mock scenarios for nameplate permission gates, pooled border restoration, and late native hook availability/failure/duplicate avoidance. Offline mocks and compilation are not a substitute for live Forever taint tests.
+- No serialized Edit Mode preset, layout creation, replacement, migration, or activation is reintroduced. PartyOrder, SoftDark, TrackedBuffSeconds, and all client CVar behavior are unchanged.
