@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.249-foundation-v16-hardening-test"
+local BJARKI_UI_VERSION = "0.2.250-foundation-v16-lifecycle-repair-test"
 -- Standalone PRD treatment is retained. Unit-frame resource bars stay native.
 local PRD_MANA_R, PRD_MANA_G, PRD_MANA_B = 0.10, 0.25, 1.00
 local WORLD_TEXT_SCREEN_Y = "0.0430"
@@ -22,9 +22,12 @@ local hooksInstalled = false
 local nativeHealthUpdateHookInstalled = false
 
 local function isSecret(value)
-    if not issecretvalue then return false end
+    -- Forever's secrecy probe must positively establish readability.
+    -- Older clients without this API retain the original compatibility path.
+    if type(issecretvalue) ~= "function" then return false end
     local ok, secret = pcall(issecretvalue, value)
-    return ok and secret == true
+    if not ok or type(secret) ~= "boolean" then return true end
+    return secret
 end
 
 local function readableBool(fn, ...)
@@ -625,20 +628,25 @@ function nativeHealthStyle.Restore(bar)
     local state = nativeHealthStyle.states[bar]
     if not state or not state.applied then return end
     healthColorWrites[bar] = true
-    if state.texture == currentHealthTexture(bar) then
-        local ok, atlas = pcall(state.texture.GetAtlas, state.texture)
-        if ok and not isSecret(atlas) and atlas == state.colorable then
-            pcall(state.texture.SetAtlas, state.texture, state.originalAtlas, false)
+    -- A native texture getter may fail after frame reuse. Never leave the
+    -- color-write guard set; preserve retry state on an unexpected exception.
+    local ok = pcall(function()
+        if state.texture == currentHealthTexture(bar) then
+            local got, atlas = pcall(state.texture.GetAtlas, state.texture)
+            if got and not isSecret(atlas) and atlas == state.colorable then
+                pcall(state.texture.SetAtlas, state.texture, state.originalAtlas, false)
+            end
+            if state.desaturated then
+                pcall(state.texture.SetDesaturated, state.texture, state.originalDesaturated)
+            end
         end
-        if state.desaturated then
-            pcall(state.texture.SetDesaturated, state.texture, state.originalDesaturated)
-        end
-    end
-    if state.nativeColor then pcall(bar.SetStatusBarColor, bar, unpack(state.nativeColor)) end
+        if state.nativeColor then pcall(bar.SetStatusBarColor, bar, unpack(state.nativeColor)) end
+    end)
     healthColorWrites[bar] = nil
-    state.applied, state.desaturated = false, false
+    if ok then
+        state.applied, state.desaturated = false, false
+    end
 end
-
 function nativeHealthStyle.Prepare(bar)
     local texture = currentHealthTexture(bar)
     if not texture or type(texture.GetAtlas) ~= "function" then return false end
@@ -689,10 +697,10 @@ end
 
 local function setHealthColor(bar, ...)
     healthColorWrites[bar] = true
-    local prepared = nativeHealthStyle.Prepare(bar)
-    local ok = prepared and pcall(bar.SetStatusBarColor, bar, ...)
+    local ran, prepared = pcall(nativeHealthStyle.Prepare, bar)
+    local ok = ran and prepared == true and pcall(bar.SetStatusBarColor, bar, ...)
     healthColorWrites[bar] = nil
-    if not ok then nativeHealthStyle.Restore(bar) end
+    if not ok then pcall(nativeHealthStyle.Restore, bar) end
     return ok
 end
 
@@ -1997,8 +2005,6 @@ local function installCompactDebuffBorderNeutralization()
     end
 end
 
-local legacyNotificationSuppressed = setmetatable({}, { __mode = "k" })
-
 local function microButtonIdentity(button)
     if not button then return nil, nil end
 
@@ -2042,18 +2048,17 @@ local function shouldSuppressMicroButtonNotification(button)
 end
 
 local function hideMicroButtonNotificationPip(button)
-    if not button then return end
-    local overlay = button.NotificationOverlay
-    if overlay and not legacyNotificationSuppressed[overlay] then
-        -- Preserve the button and its click behavior; suppress only the pip.
-        if overlay.SetAlpha then
-            pcall(overlay.SetAlpha, overlay, 0)
-        end
-        if overlay.Hide then
-            pcall(overlay.Hide, overlay)
-        end
-        legacyNotificationSuppressed[overlay] = true
-    end
+    if not button or isSecret(button) then return end
+    local ok, overlay = pcall(function() return button.NotificationOverlay end)
+    if not ok or not overlay or isSecret(overlay) then return end
+    -- A native refresh may re-show an already-seen overlay. The hide operation
+    -- is deliberately idempotent; only the hook registration is one-time.
+    local methodsOK, setAlpha, hide = pcall(function()
+        return overlay.SetAlpha, overlay.Hide
+    end)
+    if not methodsOK then return end
+    if type(setAlpha) == "function" then pcall(setAlpha, overlay, 0) end
+    if type(hide) == "function" then pcall(hide, overlay) end
 end
 
 local microButtonNotificationHookInstalled = setmetatable({}, { __mode = "k" })
@@ -2068,10 +2073,10 @@ local function suppressMicroMenuNotificationPips()
             if not microButtonNotificationHookInstalled[button] and hooksecurefunc
                 and type(button.UpdateNotificationIcon) == "function"
             then
-                hooksecurefunc(button, "UpdateNotificationIcon", function(self)
+                local ok = pcall(hooksecurefunc, button, "UpdateNotificationIcon", function(self)
                     hideMicroButtonNotificationPip(self)
                 end)
-                microButtonNotificationHookInstalled[button] = true
+                if ok then microButtonNotificationHookInstalled[button] = true end
             end
         end
     end
@@ -2286,6 +2291,9 @@ events:SetScript("OnEvent", function(_, event, unit)
             -- Compact-frame functions can become available after bjarkiUI's
             -- PLAYER_LOGIN path. Retry at the module boundary rather than
             -- claiming the hook is installed while the native writer is absent.
+            if unit == "Blizzard_CompactUnitFrame" then
+                installNameplateClassNameColors()
+            end
             installCompactDebuffBorderNeutralization()
         end
         return

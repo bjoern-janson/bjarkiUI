@@ -1,14 +1,16 @@
 # bjarkiUI architecture
 
+**Lifecycle repair (2026-10-25):** `0.2.250-foundation-v16-lifecycle-repair-test` adds repeatable notification-pip suppression, per-method PartyOrder hook retry, fail-closed secrecy probes, and guaranteed health-color recursion-guard cleanup. See section 34.
+
 **Hardening update (2026-10-25):** `0.2.249-foundation-v16-hardening-test` makes classic nameplate CC offsets fail closed on unreadable permissions, restores captured native compact-border alpha, and retries missing native update hooks individually at Blizzard module/world-entry boundaries. CI now compiles all four Lua modules with Lua 5.1/5.4 and runs source-backed mocked regressions. The no-preset policy and saved-layout ownership remain unchanged.
 
 **Layout-neutral release (2026-10-23):** `0.2.248-foundation-v16-layout-neutral` removes both bundled Edit Mode presets and all code that creates, replaces, saves, activates, or migrates player layouts. The addon retains only existing presentation refreshes triggered by Edit Mode changes; it never writes the serialized layout. Former installs are not retroactively undone: pre-existing saved layouts remain user-owned. Section 32 documents this change.
 
 **v16 suite update (2026-10-22):** this addon receives release-version metadata only. Its behavior is byte-identical to v15 apart from that version string. The three timing repairs are in bjarkiCC Model/Observer. The full v16 suite passes 49 regression scripts and 28 runtime syntax checks on both Lua 5.1 and Lua 5.4; live-client findings below retain their existing status. The behavior described in architecture section 31 remains applicable.
 
-> **Current repository baseline (2026-10-25):** `0.2.249-foundation-v16-hardening-test`. Sections 1–32 are historical implementation and release notes; section 33 covers current hardening. Live-client verification remains outstanding.
+> **Current repository baseline (2026-10-25):** `0.2.250-foundation-v16-lifecycle-repair-test`. Sections 1–33 are historical implementation notes; section 34 covers current lifecycle repairs. Live-client verification remains outstanding.
 
-This document now tracks **bjarkiUI 0.2.249-foundation-v16-hardening-test**. **Section 32 supersedes historical layout behavior; section 33 describes the latest safety adjustments**. This is a maintenance reference, not a guarantee about undocumented WoW: Forever client behavior or taint safety.
+This document now tracks **bjarkiUI 0.2.250-foundation-v16-lifecycle-repair-test**. **Section 32 supersedes historical layout behavior; sections 33–34 document the current safeguards**. This is a maintenance reference, not a guarantee about undocumented WoW: Forever client behavior or taint safety.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -772,3 +774,13 @@ The source has exact v15 runtime parity, matching manifests and embedded/referen
 - `/bui audit` exposes read-only native hook installation states. This release does not introduce native frame refresh calls or new polling loops.
 - GitHub Actions compiles all four TOC-declared Lua modules and the regression test with Lua 5.1 and 5.4, then runs extracted-production-code mock scenarios for nameplate permission gates, pooled border restoration, and late native hook availability/failure/duplicate avoidance. Offline mocks and compilation are not a substitute for live Forever taint tests.
 - No serialized Edit Mode preset, layout creation, replacement, migration, or activation is reintroduced. PartyOrder, SoftDark, TrackedBuffSeconds, and all client CVar behavior are unchanged.
+
+## 34. Lifecycle and failure-recovery repairs: 0.2.250-foundation-v16-lifecycle-repair-test (2026-10-25)
+
+- Micro-menu notification overlays are hidden on every qualifying native refresh, not only on first discovery. Successful hook installations remain deduplicated; failed registrations are retried.
+- `PartyOrder.lua` records successful global, `RefreshMembers`, direct `UpdateLayout`, and cached `updateLayoutFunc` hooks independently. Late native initialization can no longer permanently skip a hook. Failed deferred scheduling clears the pending flag without entering a protected refresh synchronously.
+- Main and party secrecy probes treat failed or unrecognized results as unreadable when `issecretvalue` exists; older clients without the API retain compatibility behavior.
+- Class-color set/restore pathways clear their recursion guards after unexpected native API failures, preserving restoration retry state on an uncaught getter exception. Native unit-frame geometry and class-color selection remain unchanged.
+- Retry nameplate class-name hook installation when `Blizzard_CompactUnitFrame` becomes available after login. No new polling or layout-management code is introduced.
+- `tests/lifecycle.lua` adds source-backed mocked regressions in both Lua 5.1 and 5.4, alongside the existing hardening tests. GitHub CI compiles both tests and the four runtime modules.
+- Native alpha-zero reuse, recycled name-color ownership, and Battleground secrecy transitions remain **client-dependent/unverified**. No speculative hooks or ownership inference were introduced. The saved Edit Mode layout remains fully user-owned.

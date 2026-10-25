@@ -16,9 +16,12 @@ local generatorHooked = false
 local visibilityHooked = false
 
 local function isSecret(value)
-    if not issecretvalue then return false end
+    -- Forever's secrecy probe must positively establish readability.
+    -- Older clients without this API retain the original compatibility path.
+    if type(issecretvalue) ~= "function" then return false end
     local ok, secret = pcall(issecretvalue, value)
-    return ok and secret == true
+    if not ok or type(secret) ~= "boolean" then return true end
+    return secret
 end
 
 local function safeBool(fn, ...)
@@ -150,37 +153,30 @@ local function queueVisualOrder(frame)
     -- our anchor writes inside their call stack; coalesce all repair onto the
     -- next tick and re-evaluate the live frame state there.
     if C_Timer and type(C_Timer.After) == "function" then
-        C_Timer.After(0, run)
-    else
-        -- Running immediately here would re-enter Blizzard's protected
-        -- compact-frame update; skip instead and retry at a later event.
-        queuedFrames[frame] = nil
+        if pcall(C_Timer.After, 0, run) then return end
     end
+    -- Skip a failed scheduler rather than re-entering a native protected
+    -- refresh. Clear the queued flag so later events can retry.
+    queuedFrames[frame] = nil
 end
 
+-- Install each native hook only after success, and retry when a party frame
+-- acquires its methods after initial creation. No direct compact refresh calls.
 local function install()
-    if not generatorHooked and hooksecurefunc
-        and type(_G.CompactPartyFrame_Generate) == "function"
-    then
-        generatorHooked = true
-        hooksecurefunc("CompactPartyFrame_Generate", install)
+    if not generatorHooked and type(hooksecurefunc) == "function"
+        and type(_G.CompactPartyFrame_Generate) == "function" then
+        generatorHooked = pcall(hooksecurefunc, "CompactPartyFrame_Generate", install)
     end
 
-    if not visibilityHooked and hooksecurefunc
-        and type(_G.CompactUnitFrame_OnVisiblityChanged) == "function"
-    then
-        visibilityHooked = true
-        -- Native member visibility can change without a party layout pass.
-        -- Observe its existing notification; keep member scripts and native
-        -- callbacks untouched, and move anchors only on the deferred tick.
-        hooksecurefunc("CompactUnitFrame_OnVisiblityChanged", function(unitFrame)
-            local party = _G.CompactPartyFrame
-            local members = party and party.memberUnitFrames
+    if not visibilityHooked and type(hooksecurefunc) == "function"
+        and type(_G.CompactUnitFrame_OnVisiblityChanged) == "function" then
+        visibilityHooked = pcall(hooksecurefunc, "CompactUnitFrame_OnVisiblityChanged", function(unitFrame)
+            local frame = _G.CompactPartyFrame
+            local members = frame and frame.memberUnitFrames
             if type(members) ~= "table" then return end
-
             for _, member in ipairs(members) do
                 if member == unitFrame then
-                    queueVisualOrder(party)
+                    queueVisualOrder(frame)
                     return
                 end
             end
@@ -189,42 +185,34 @@ local function install()
 
     local frame = _G.CompactPartyFrame
     if not frame then return end
-
-    if not hookedFrames[frame] and hooksecurefunc then
-        hookedFrames[frame] = true
-
-        if type(frame.RefreshMembers) == "function" then
-            -- GROUP_ROSTER_UPDATE and other roster rebuilds finish here.
-            hooksecurefunc(frame, "RefreshMembers", function(self)
-                if self == frame then
-                    queueVisualOrder(self)
-                end
+    if type(hooksecurefunc) == "function" then
+        local state = hookedFrames[frame]
+        if not state then
+            state = {}
+            hookedFrames[frame] = state
+        end
+        if not state.refreshMembers and type(frame.RefreshMembers) == "function" then
+            state.refreshMembers = pcall(hooksecurefunc, frame, "RefreshMembers", function(self)
+                if self == frame then queueVisualOrder(self) end
             end)
         end
-
-        -- CompactPartyFrame caches UpdateLayout into updateLayoutFunc during
-        -- OnLoad. Native code later calls that cached function directly, so a
-        -- hook on frame.UpdateLayout alone misses some relayouts.
-        if type(frame.updateLayoutFunc) == "function" then
-            hooksecurefunc(frame, "updateLayoutFunc", function(self)
-                if self == frame then
-                    queueVisualOrder(self)
-                end
+        -- Blizzard can invoke the cached method without calling UpdateLayout.
+        -- Installing the cached hook later is valid even if a direct fallback
+        -- was already installed while the native frame initialized.
+        if not state.cachedLayout and type(frame.updateLayoutFunc) == "function" then
+            state.cachedLayout = pcall(hooksecurefunc, frame, "updateLayoutFunc", function(self)
+                if self == frame then queueVisualOrder(self) end
             end)
-        elseif type(frame.UpdateLayout) == "function" then
-            hooksecurefunc(frame, "UpdateLayout", function(self)
-                if self == frame then
-                    queueVisualOrder(self)
-                end
+        end
+        if not state.cachedLayout and not state.directLayout
+            and type(frame.UpdateLayout) == "function" then
+            state.directLayout = pcall(hooksecurefunc, frame, "UpdateLayout", function(self)
+                if self == frame then queueVisualOrder(self) end
             end)
         end
     end
-
-
-
     queueVisualOrder(frame)
 end
-
 local events = CreateFrame("Frame")
 for _, event in ipairs({
     "PLAYER_LOGIN",
