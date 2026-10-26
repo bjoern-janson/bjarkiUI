@@ -1,5 +1,7 @@
 # Known issues and bugs
 
+**Text presentation (2026-10-26):** `0.2.252-foundation-v16-combat-text-test` positions incoming Player hit text two physical screen pixels above the native frame while preserving health-bar horizontal centering, and omits status percentage decimals at 100%. Offline tests verify coordinate math and threshold formatting; client-specific animation offsets still require launch testing.
+
 **Prelaunch offline correction (2026-10-25):** `0.2.251-foundation-v16-offline-fixes-test` repairs the Tracked Buff iterator contract, PartyOrder partial layout authorization, remaining visual hook retry flags, partial health-style restoration, and Soft Dark callback registration. New source-backed tests do not certify Forever's future live-client behavior.
 
 **Lifecycle repair candidate (2026-10-25):** `0.2.250-foundation-v16-lifecycle-repair-test` addresses repeated micro-menu notifications, incomplete PartyOrder hook installs, failed secrecy probes, and color-write guard cleanup. Offline checks cannot prove safety in the unreleased Forever client. Native alpha-zero reuse and name-color snapshot ownership remain unverified.
@@ -10,7 +12,7 @@
 
 **v16 suite update (2026-10-22):** this addon receives release-version metadata only. Its behavior is byte-identical to v15 apart from that version string. The three timing repairs are in bjarkiCC Model/Observer. The full v16 suite passes 49 regression scripts and 28 runtime syntax checks on both Lua 5.1 and Lua 5.4; live-client findings below retain their existing status. The behavior described in architecture section 31 remains applicable.
 
-Current repository baseline (2026-10-25): **bjarkiUI 0.2.251-foundation-v16-offline-fixes-test**. The reports below are historical client observations and remain open pending current-client verification. Offline source, syntax and modeled-API checks do not close them. See architecture section 32 for the current layout-neutral behavior.
+Current repository baseline (2026-10-26): **bjarkiUI 0.2.252-foundation-v16-combat-text-test**. The reports below are historical client observations and remain open pending current-client verification. Offline source, syntax and modeled-API checks do not close them. See architecture section 32 for the current layout-neutral behavior.
 
 Original status recorded 2026-10-08 for **bjarkiUI 0.2.90-local**.
 

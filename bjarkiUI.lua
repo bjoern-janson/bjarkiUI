@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.251-foundation-v16-offline-fixes-test"
+local BJARKI_UI_VERSION = "0.2.252-foundation-v16-combat-text-test"
 -- Standalone PRD treatment is retained. Unit-frame resource bars stay native.
 local PRD_MANA_R, PRD_MANA_G, PRD_MANA_B = 0.10, 0.25, 1.00
 local WORLD_TEXT_SCREEN_Y = "0.0430"
@@ -120,6 +120,34 @@ do
             and value > -math.huge and value < math.huge
     end
 
+    -- These thresholds are evaluated by Blizzard's numeric formatter,
+    -- including for secret health/power percentages that Lua cannot compare.
+    -- At 100 and above: 100%; below 100: 99.9%, 99.8%, etc.
+    local CONDITIONAL_PERCENT_OPTIONS = {
+        breakpointData = {
+            {breakpoint = 100, abbreviation = "%", significandDivisor = 1,
+                fractionDivisor = 1, abbreviationIsGlobal = false},
+            {breakpoint = 0, abbreviation = "%", significandDivisor = 0.1,
+                fractionDivisor = 10, abbreviationIsGlobal = false},
+        },
+    }
+
+    local function formatConditionalPercent(percent)
+        if type(AbbreviateNumbers) == "function" then
+            local ok, result = pcall(AbbreviateNumbers, percent, CONDITIONAL_PERCENT_OPTIONS)
+            if ok and not isSecret(result) and type(result) == "string" then
+                return result
+            end
+        end
+        -- No secret-value comparisons or Lua formatting of opaque numbers.
+        -- Without Blizzard's safe formatter, leave its native text untouched.
+        if isSecret(percent) or not finiteNumber(percent) then return nil end
+        if percent >= 100 then return string.format("%.0f%%", percent) end
+        -- Match the native breakpoint formatter: don't round 99.96% up to
+        -- 100.0% when the underlying bar is still below full.
+        return string.format("%.1f%%", math.floor(percent * 10 + 1e-9) / 10)
+    end
+
     local function opaquePercent(bar, frame, isPower)
         local unit = readableUnitToken(bar.unit)
         if not unit or readableUnitToken(frame.unit) ~= unit
@@ -185,6 +213,9 @@ do
         end
         if not isSecret(percent) and not finiteNumber(percent) then return end
 
+        local percentageText = formatConditionalPercent(percent)
+        if not percentageText then return end
+
         if bar.prefix then
             local cvarEnabled = false
             if bar.cvar and bar.textLockable then
@@ -194,11 +225,11 @@ do
             end
             if bar.alwaysPrefix or not cvarEnabled then
                 if type(bar.prefix) ~= "string" then return end
-                text:SetFormattedText("%s %.1f%%", bar.prefix, percent)
+                text:SetFormattedText("%s %s", bar.prefix, percentageText)
                 return
             end
         end
-        text:SetFormattedText("%.1f%%", percent)
+        text:SetFormattedText("%s", percentageText)
     end
 
     local function observeBar(frameToken, isPower)
@@ -1288,18 +1319,44 @@ SlashCmdList.BJARKIUI = function(message)
     print("bjarkiUI: /bui levels [on|off]")
 end
 
+local INCOMING_TEXT_GAP_PX = 2
 local function anchorCombatText()
     local frame = _G.PlayerFrame
     local indicator = frame and frame.PlayerFrameContent and frame.PlayerFrameContent.PlayerFrameContentMain
         and frame.PlayerFrameContent.PlayerFrameContentMain.HitIndicator
     local text = (indicator and indicator.HitText) or _G.PlayerHitIndicator or (frame and frame.feedbackText)
     local bar = healthBar("player")
-    if not text or not bar or not text.ClearAllPoints or not text.SetPoint then return end
-    -- The native health bar's top is ~40 UI units below PlayerFrame's top.
-    -- Keep incoming feedback centered over that bar and ~4 units above the
-    -- complete player frame. Anchoring to the bar follows Edit Mode moves.
+    if not frame or not bar or not text
+        or type(text.ClearAllPoints) ~= "function" or type(text.SetPoint) ~= "function"
+        or type(frame.GetCenter) ~= "function" or type(bar.GetCenter) ~= "function"
+        or type(frame.GetEffectiveScale) ~= "function"
+        or type(bar.GetEffectiveScale) ~= "function"
+        or type(text.GetEffectiveScale) ~= "function"
+        or readableBool(InCombatLockdown) ~= false then return end
+
+    -- Horizontal alignment stays at the native health bar's CENTER.
+    -- Vertical alignment follows PlayerFrame's TOP, with a two SCREEN-pixel
+    -- gap from the incoming text's bottom. Scale the measured X coordinates
+    -- into the same screen space before converting to text anchor units.
+    local frameOK, frameX = pcall(frame.GetCenter, frame)
+    local barOK, barX = pcall(bar.GetCenter, bar)
+    local fsOK, frameScale = pcall(frame.GetEffectiveScale, frame)
+    local bsOK, barScale = pcall(bar.GetEffectiveScale, bar)
+    local tsOK, textScale = pcall(text.GetEffectiveScale, text)
+    local function usable(n)
+        return not isSecret(n) and type(n) == "number"
+            and n == n and n > -math.huge and n < math.huge
+    end
+    if not (frameOK and barOK and fsOK and bsOK and tsOK
+        and usable(frameX) and usable(barX)
+        and usable(frameScale) and usable(barScale) and usable(textScale)
+        and frameScale > 0 and barScale > 0 and textScale > 0) then return end
+
+    local offsetX = (barX * barScale - frameX * frameScale) / textScale
+    local offsetY = INCOMING_TEXT_GAP_PX / textScale
+    if not usable(offsetX) or not usable(offsetY) then return end
     text:ClearAllPoints()
-    text:SetPoint("BOTTOM", bar, "TOP", 0, 44)
+    text:SetPoint("BOTTOM", frame, "TOP", offsetX, offsetY)
 end
 
 local HIGHLIGHT_SCALE = 0.25

@@ -1,5 +1,7 @@
 # bjarkiUI architecture
 
+**Player text positioning and conditional status precision (2026-10-26):** `0.2.252-foundation-v16-combat-text-test` keeps incoming player feedback horizontally aligned to the health bar and anchors its bottom two physical screen pixels above the top of the native PlayerFrame. Percentage-only status text uses integer precision at/above 100% and one decimal below 100%, with native secret-safe number formatting. See section 36.
+
 **Prelaunch offline repairs (2026-10-25):** `0.2.251-foundation-v16-offline-fixes-test` fixes Tracked Buffs pool iteration, completes PartyOrder visibility/geometry fail-closed preflight, retries remaining native presentation hooks without duplication, and verifies native color restoration setter success. Soft Dark Edit Mode callback registration is independently retryable. Section 35 records the scope and testing boundaries.
 
 **Lifecycle repair (2026-10-25):** `0.2.250-foundation-v16-lifecycle-repair-test` adds repeatable notification-pip suppression, per-method PartyOrder hook retry, fail-closed secrecy probes, and guaranteed health-color recursion-guard cleanup. See section 34.
@@ -10,9 +12,9 @@
 
 **v16 suite update (2026-10-22):** this addon receives release-version metadata only. Its behavior is byte-identical to v15 apart from that version string. The three timing repairs are in bjarkiCC Model/Observer. The full v16 suite passes 49 regression scripts and 28 runtime syntax checks on both Lua 5.1 and Lua 5.4; live-client findings below retain their existing status. The behavior described in architecture section 31 remains applicable.
 
-> **Current repository baseline (2026-10-25):** `0.2.251-foundation-v16-offline-fixes-test`. Sections 1–34 are historical implementation notes; section 35 describes the latest offline fixes. Live-client verification remains outstanding.
+> **Current repository baseline (2026-10-26):** `0.2.252-foundation-v16-combat-text-test`. Sections 1–35 are historical implementation notes; section 36 is the current text-presentation contract. Live-client verification remains outstanding.
 
-This document now tracks **bjarkiUI 0.2.251-foundation-v16-offline-fixes-test**. **Section 32 supersedes historical layout behavior; sections 33–35 document the current safeguards**. This is a maintenance reference, not a guarantee about undocumented WoW: Forever client behavior or taint safety.
+This document now tracks **bjarkiUI 0.2.252-foundation-v16-combat-text-test**. **Section 32 supersedes historical layout behavior; sections 33–36 document the current safeguards**. This is a maintenance reference, not a guarantee about undocumented WoW: Forever client behavior or taint safety.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -797,3 +799,11 @@ The source has exact v15 runtime parity, matching manifests and embedded/referen
 - Soft Dark registers Edit Mode Enter/Exit callbacks independently; an Exit failure no longer duplicates a successful Enter callback.
 - `tests/presentation.lua` provides additional source-backed Lua 5.1/5.4 scenarios, including full Tracked Buff event/viewer iteration, PartyOrder no-write cases, restoration setter failure/retry, native hook partial success, and Soft Dark callback recovery. CI compiles all four modules plus all tests, then runs the three test scripts; tests are excluded from the shipped addon.
 - No saved Edit Mode layout writer, periodic runtime poller, or additional CVar change is introduced. Existing speculative cases (pooled alpha-zero native ownership, native name-color snapshot replacement, Battleground secret identity transitions) remain deferred to client evidence.
+
+## 36. Incoming player text and status precision: 0.2.252-foundation-v16-combat-text-test (2026-10-26)
+
+- Incoming combat/heal feedback stays **horizontally centered on the native Player health bar**, but the feedback FontString's `BOTTOM` point is now anchored to the native `PlayerFrame` `TOP` with **2 physical screen pixels** of separation. The existing hit text, animation, font and Blizzard value production remain untouched. Guarded `GetCenter` and `GetEffectiveScale` measurements preserve its X position across UI scales while the PlayerFrame anchor follows normal Edit Mode moves. If geometry is secret/unreadable or the client is in combat, the addon leaves existing anchors untouched.
+- Player, Target and Focus *percentage-only* health/resource labels now show **`100%`** for percent values at or above 100 and **one decimal below 100** (for example `99.9%`), without modifying other Blizzard status-text modes, zeros or paused updates. This also applies to displayed percentage prefixes.
+- `AbbreviateNumbers` receives a descending 100/0 breakpoint configuration for secret-safe native precision selection. Lua performs no comparisons/arithmetic on opaque percentages. If that API is unavailable or fails on secret values, it leaves the previous native label alone. Readable values use matching bounded one-decimal truncation below 100 rather than rounding an incomplete bar up to `100.0%`.
+- `tests/status-combat.lua` supplies native-style formatter, prefix, secret fallback, status-mode, physical pixel-gap, horizontal alignment, Edit Mode movement and forbidden-geometry mocks under both Lua 5.1 and 5.4. It is not packaged with the runtime modules.
+- No saved Edit Mode preset/layout writer, new polling loop, CVar change, class-color rule, or unrelated geometry change is introduced. Native-client animation and screenshot-scale confirmation remain pending the Forever release.
