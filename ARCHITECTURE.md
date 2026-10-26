@@ -1,5 +1,7 @@
 # bjarkiUI architecture
 
+**Shop micro-menu notification (2026-10-26):** `0.2.253-shop-pip-test` suppresses the Shop/Store notification pip in-game, without hiding the button or changing its tooltip, action, or layout. This does not affect the character-selection screen, where character addons are not loaded. See section 37.
+
 **Player text positioning and conditional status precision (2026-10-26):** `0.2.252-foundation-v16-combat-text-test` keeps incoming player feedback horizontally aligned to the health bar and anchors its bottom two physical screen pixels above the top of the native PlayerFrame. Percentage-only status text uses integer precision at/above 100% and one decimal below 100%, with native secret-safe number formatting. See section 36.
 
 **Prelaunch offline repairs (2026-10-25):** `0.2.251-foundation-v16-offline-fixes-test` fixes Tracked Buffs pool iteration, completes PartyOrder visibility/geometry fail-closed preflight, retries remaining native presentation hooks without duplication, and verifies native color restoration setter success. Soft Dark Edit Mode callback registration is independently retryable. Section 35 records the scope and testing boundaries.
@@ -12,9 +14,9 @@
 
 **v16 suite update (2026-10-22):** this addon receives release-version metadata only. Its behavior is byte-identical to v15 apart from that version string. The three timing repairs are in bjarkiCC Model/Observer. The full v16 suite passes 49 regression scripts and 28 runtime syntax checks on both Lua 5.1 and Lua 5.4; live-client findings below retain their existing status. The behavior described in architecture section 31 remains applicable.
 
-> **Current repository baseline (2026-10-26):** `0.2.252-foundation-v16-combat-text-test`. Sections 1–35 are historical implementation notes; section 36 is the current text-presentation contract. Live-client verification remains outstanding.
+> **Current repository baseline (2026-10-26):** `0.2.253-shop-pip-test`. Sections 1–36 are historical implementation notes; section 37 documents the Shop notification update. Live-client verification remains outstanding.
 
-This document now tracks **bjarkiUI 0.2.252-foundation-v16-combat-text-test**. **Section 32 supersedes historical layout behavior; sections 33–36 document the current safeguards**. This is a maintenance reference, not a guarantee about undocumented WoW: Forever client behavior or taint safety.
+This document now tracks **bjarkiUI 0.2.253-shop-pip-test**. **Section 32 supersedes historical layout behavior; sections 33–37 document the current safeguards**. This is a maintenance reference, not a guarantee about undocumented WoW: Forever client behavior or taint safety.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -807,3 +809,10 @@ The source has exact v15 runtime parity, matching manifests and embedded/referen
 - `AbbreviateNumbers` receives a descending 100/0 breakpoint configuration for secret-safe native precision selection. Lua performs no comparisons/arithmetic on opaque percentages. If that API is unavailable or fails on secret values, it leaves the previous native label alone. Readable values use matching bounded one-decimal truncation below 100 rather than rounding an incomplete bar up to `100.0%`.
 - `tests/status-combat.lua` supplies native-style formatter, prefix, secret fallback, status-mode, physical pixel-gap, horizontal alignment, Edit Mode movement and forbidden-geometry mocks under both Lua 5.1 and 5.4. It is not packaged with the runtime modules.
 - No saved Edit Mode preset/layout writer, new polling loop, CVar change, class-color rule, or unrelated geometry change is introduced. Native-client animation and screenshot-scale confirmation remain pending the Forever release.
+
+## 37. Shop notification pip: 0.2.253-shop-pip-test (2026-10-26)
+
+- Extend the existing bounded micro-menu notification selection to the Shop button's known `StoreMicroButton` / `ShopMicroButton` names and `store` / `shop` commands. Existing Guild, Help, Game Menu and Legacy handling is unchanged.
+- Suppress only the button-owned `NotificationOverlay`. Existing `UpdateNotificationIcon` post-hook handling remains idempotent; Shop additionally observes the same overlay's native `Show` and `SetShown` writers to re-hide a pip without touching the actual button, its icon, tooltip, click action, or anchoring. A global Store/Shop button lookup covers clients where it is not a direct `MicroMenu` child.
+- Registration success is tracked independently with weak-key tables; failures can retry at existing lifecycle boundaries, without polling or new saved variables. `tests/lifecycle.lua` covers exact Shop identification, unrelated buttons, native pip reshow, partial hook failures, and Shop button interaction under Lua 5.1/5.4.
+- The login/character-selection screen loads before ordinary per-character UI addons. No unsupported login-frame manipulation is attempted; the character-select Shop marker remains client-owned.

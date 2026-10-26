@@ -89,6 +89,8 @@ do
     local env = {
         shouldSuppressMicroButtonNotification = function() return true end,
         hideMicroButtonNotificationPip = function() hides = hides + 1 end,
+        installShopPipHooks = function() end,
+        isSecret = function() return false end,
         MicroMenu = {GetChildren = function() return button end},
     }
     env.hooksecurefunc = function(_, method, fn)
@@ -100,7 +102,9 @@ do
     local suppress, installed = isolated(code,
         "local microButtonNotificationHookInstalled = setmetatable({}, {__mode = 'k'})\n" ..
         "local shouldSuppressMicroButtonNotification = _G.shouldSuppressMicroButtonNotification\n" ..
-        "local hideMicroButtonNotificationPip = _G.hideMicroButtonNotificationPip",
+        "local hideMicroButtonNotificationPip = _G.hideMicroButtonNotificationPip\n" ..
+        "local installShopPipHooks = _G.installShopPipHooks\n" ..
+        "local isSecret = _G.isSecret",
         "suppressMicroMenuNotificationPips, microButtonNotificationHookInstalled", env)
     suppress()
     eq(installed[button], nil, "failed micro hook not marked")
@@ -110,6 +114,111 @@ do
     eq(attempts, 2, "no duplicate hook")
     callback(button)
     eq(hides, 4, "native post-hook reapplies pip suppression")
+end
+
+-- Shop/Store microbutton identification stays exact and non-invasive:
+-- preserve the button and tooltip, hide only its existing NotificationOverlay.
+do
+    local code = section(ui, "local function microButtonIdentity(button)",
+        "local microMenuChildOffsetHookInstalled")
+    local hooks = setmetatable({}, {__mode = "k"})
+    local attempts = setmetatable({}, {__mode = "k"})
+    local storeClickCount = 0
+    local pip = {visible = true, alpha = 1}
+    function pip:Hide() self.visible = false end
+    function pip:SetAlpha(alpha) self.alpha = alpha end
+    function pip:Show()
+        self.visible = true
+        self.alpha = 1
+        local post = hooks[self] and hooks[self].Show
+        if post then post(self) end
+    end
+    function pip:SetShown(shown)
+        self.visible = shown and true or false
+        self.alpha = shown and 1 or 0
+        local post = hooks[self] and hooks[self].SetShown
+        if post then post(self, shown) end
+    end
+    local store = {
+        NotificationOverlay = pip,
+        commandName = "STORE",
+        tooltipText = "Shop",
+        GetName = function() return "StoreMicroButton" end,
+        UpdateNotificationIcon = function() end,
+        Click = function() storeClickCount = storeClickCount + 1 end,
+    }
+    local otherPip = {visible = true, Hide = function(self) self.visible = false end}
+    local other = {
+        NotificationOverlay = otherPip,
+        GetName = function() return "CharacterMicroButton" end,
+        UpdateNotificationIcon = function() end,
+    }
+    local env = {isSecret = function() return false end,
+        MicroMenu = {GetChildren = function() return store, other end},
+    }
+    env.hooksecurefunc = function(object, name, cb)
+        local map = attempts[object]
+        if not map then map = {}; attempts[object] = map end
+        map[name] = (map[name] or 0) + 1
+        if object == pip and name == "SetShown" and map[name] == 1 then
+            error("native SetShown not ready yet")
+        end
+        local installed = hooks[object]
+        if not installed then installed = {}; hooks[object] = installed end
+        installed[name] = cb
+    end
+    local isStore, shouldSuppress, suppress = isolated(code,
+        "local isSecret = _G.isSecret",
+        "isShopMicroButton, shouldSuppressMicroButtonNotification, suppressMicroMenuNotificationPips", env)
+
+    verify(isStore(store), "StoreMicroButton identified")
+    verify(isStore({GetName = function() return "ShopMicroButton" end}),
+        "ShopMicroButton alias identified")
+    verify(isStore({commandName = "shop"}), "Shop command identified")
+    verify(isStore({commandName = "store"}), "Store command identified")
+    verify(not isStore(other), "character button is not Shop")
+    verify(shouldSuppress(store), "Shop notification selected for suppression")
+    verify(not shouldSuppress(other), "unrelated character notifications unaffected")
+    verify(shouldSuppress({GetName = function() return "GuildMicroButton" end}),
+        "existing guild pip suppression preserved")
+    verify(shouldSuppress({GetName = function() return "MainMenuMicroButton" end}),
+        "existing main menu pip suppression preserved")
+
+    suppress()
+    eq(pip.visible, false, "initial Store pip hidden")
+    eq(pip.alpha, 0, "initial Store pip alpha removed")
+    eq(otherPip.visible, true, "unrelated microbutton untouched")
+    eq(attempts[pip].Show, 1, "Store Show hook installed once")
+    eq(attempts[pip].SetShown, 1, "failed SetShown hook attempted once")
+    suppress()
+    eq(attempts[pip].Show, 1, "successful Store Show hook not duplicated")
+    eq(attempts[pip].SetShown, 2, "failed Store SetShown hook retried")
+    pip:Show()
+    eq(pip.visible, false, "Shop pip re-hidden after native Show")
+    pip:SetShown(true)
+    eq(pip.visible, false, "Shop pip re-hidden after native SetShown")
+    local callback = hooks[store] and hooks[store].UpdateNotificationIcon
+    verify(type(callback) == "function", "Shop native update posthook installed")
+    pip.visible, pip.alpha = true, 1
+    callback(store)
+    eq(pip.visible, false, "Shop pip re-hidden after native notification refresh")
+    suppress()
+    eq(attempts[pip].Show, 1, "no repeated Show registration")
+    eq(attempts[pip].SetShown, 2, "no repeated SetShown registration")
+    eq(attempts[store].UpdateNotificationIcon, 1,
+        "no repeated Store update registration")
+    store:Click()
+    eq(storeClickCount, 1, "Shop button remains clickable")
+    eq(store.tooltipText, "Shop", "Shop tooltip unchanged")
+
+    -- A client may expose StoreMicroButton outside MicroMenu's immediate
+    -- children; the exact global fallback still finds its existing pip.
+    env.MicroMenu = {GetChildren = function() return other end}
+    env.StoreMicroButton = store
+    pip.visible, pip.alpha = true, 1
+    suppress()
+    eq(pip.visible, false, "global StoreMicroButton fallback hides pip")
+    eq(otherPip.visible, true, "global fallback leaves other buttons native")
 end
 
 -- A failed deferred party scheduler must release its per-frame pending bit.

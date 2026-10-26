@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.252-foundation-v16-combat-text-test"
+local BJARKI_UI_VERSION = "0.2.253-shop-pip-test"
 -- Standalone PRD treatment is retained. Unit-frame resource bars stay native.
 local PRD_MANA_R, PRD_MANA_G, PRD_MANA_B = 0.10, 0.25, 1.00
 local WORLD_TEXT_SCREEN_Y = "0.0430"
@@ -2084,6 +2084,18 @@ local function microButtonIdentity(button)
     return name, type(command) == "string" and command or nil
 end
 
+-- Forever can expose the in-game Shop as StoreMicroButton or ShopMicroButton.
+-- Limit the new notification behavior to these names/commands only.
+local function isShopMicroButton(button)
+    local name, command = microButtonIdentity(button)
+    local loweredName = type(name) == "string" and name:lower() or nil
+    local loweredCommand = type(command) == "string" and command:lower() or nil
+    return loweredName == "storemicrobutton"
+        or loweredName == "shopmicrobutton"
+        or loweredCommand == "store"
+        or loweredCommand == "shop"
+end
+
 local function shouldSuppressMicroButtonNotification(button)
     local name, command = microButtonIdentity(button)
     local loweredName = type(name) == "string" and name:lower() or nil
@@ -2091,6 +2103,7 @@ local function shouldSuppressMicroButtonNotification(button)
 
     if loweredName and loweredName:find("legacy", 1, true) then return true end
     if loweredCommand and loweredCommand:find("legacy", 1, true) then return true end
+    if isShopMicroButton(button) then return true end
 
     -- The guild and help / game-menu buttons can show blue notification pips
     -- that clash with the cleaned micro menu look. Keep the buttons functional
@@ -2127,25 +2140,63 @@ local function hideMicroButtonNotificationPip(button)
     if type(hide) == "function" then pcall(hide, overlay) end
 end
 
-local microButtonNotificationHookInstalled = setmetatable({}, { __mode = "k" })
+-- Some Store notifications re-show the same overlay without calling
+-- UpdateNotificationIcon. Observe only that existing Shop pip's own methods;
+-- never hide, disable or reposition the actual Shop button.
+local shopPipHooks = setmetatable({}, { __mode = "k" })
+local function installShopPipHooks(button)
+    if not button or isSecret(button) or not isShopMicroButton(button)
+        or type(hooksecurefunc) ~= "function" then return end
+    local ok, overlay = pcall(function() return button.NotificationOverlay end)
+    if not ok or not overlay or isSecret(overlay) then return end
+    local state = shopPipHooks[overlay]
+    if not state then state = {}; shopPipHooks[overlay] = state end
 
-local function suppressMicroMenuNotificationPips()
-    local menu = _G.MicroMenu
-    if not menu or not menu.GetChildren then return end
+    local function hideAgain(self)
+        if not self or isSecret(self) then return end
+        local safe, hide = pcall(function() return self.Hide end)
+        if safe and type(hide) == "function" then pcall(hide, self) end
+    end
 
-    for _, button in ipairs({ menu:GetChildren() }) do
-        if shouldSuppressMicroButtonNotification(button) then
-            hideMicroButtonNotificationPip(button)
-            if not microButtonNotificationHookInstalled[button] and hooksecurefunc
-                and type(button.UpdateNotificationIcon) == "function"
-            then
-                local ok = pcall(hooksecurefunc, button, "UpdateNotificationIcon", function(self)
-                    hideMicroButtonNotificationPip(self)
-                end)
-                if ok then microButtonNotificationHookInstalled[button] = true end
+    for _, methodName in ipairs({ "Show", "SetShown" }) do
+        if not state[methodName] then
+            local readable, method = pcall(function() return overlay[methodName] end)
+            if readable and type(method) == "function" then
+                state[methodName] = pcall(hooksecurefunc, overlay, methodName, hideAgain)
             end
         end
     end
+end
+
+local microButtonNotificationHookInstalled = setmetatable({}, { __mode = "k" })
+
+local function suppressMicroMenuNotificationPips()
+    local function visit(button)
+        if not button or isSecret(button)
+            or not shouldSuppressMicroButtonNotification(button) then return end
+        hideMicroButtonNotificationPip(button)
+        installShopPipHooks(button)
+        if not microButtonNotificationHookInstalled[button]
+            and type(hooksecurefunc) == "function"
+            and type(button.UpdateNotificationIcon) == "function" then
+            local ok = pcall(hooksecurefunc, button, "UpdateNotificationIcon", function(self)
+                hideMicroButtonNotificationPip(self)
+            end)
+            if ok then microButtonNotificationHookInstalled[button] = true end
+        end
+    end
+
+    local menu = _G.MicroMenu
+    if menu and type(menu.GetChildren) == "function" then
+        local ok, buttons = pcall(function() return { menu:GetChildren() } end)
+        if ok and type(buttons) == "table" then
+            for _, button in ipairs(buttons) do visit(button) end
+        end
+    end
+    -- Shop may be initialized outside MicroMenu's immediate child list.
+    -- Repeated visits are harmless; hook flags prevent duplicate registrations.
+    visit(_G.StoreMicroButton)
+    visit(_G.ShopMicroButton)
 end
 
 local microMenuChildOffsetHookInstalled = false
