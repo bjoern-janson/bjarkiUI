@@ -1,5 +1,7 @@
 # bjarkiUI architecture
 
+**Sub-five-second decimals (2026-10-26):** `0.2.256-five-second-decimals-test` adds one decimal to native action-button cooldowns strictly below five seconds. Whole seconds from five to 359 remain unchanged, as do six-minute-and-longer compact labels. The native formatter still receives protected values directly and no timer polling is introduced. Section 40 supersedes the lower-band presentation in section 39.
+
 **Native cooldown seconds (2026-10-26):** `0.2.255-native-cooldown-seconds-test` formats Blizzard-owned action-button cooldown counts as whole seconds strictly below 360 seconds (e.g. `1:45 → 105`, `5:21 → 321`) via a single native `NumericRuleFormatter`. Longer cooldowns retain compact minute/hour/day labels. No timer data is read by addon Lua, and no new per-frame updates are introduced. See section 39.
 
 **Native Player colors / minimalist status text (2026-10-26):** `0.2.254-native-player-shadow-text-test` stops custom class tinting of Player health and name while retaining class colors on Target/Focus/ToT/FoT. Health and power numeric FontStrings drop the font outline and receive a small native 1-pixel dark shadow. Native font family, size, text color, value updates and geometry remain unchanged. See section 38.
@@ -18,9 +20,9 @@
 
 **v16 suite update (2026-10-22):** this addon receives release-version metadata only. Its behavior is byte-identical to v15 apart from that version string. The three timing repairs are in bjarkiCC Model/Observer. The full v16 suite passes 49 regression scripts and 28 runtime syntax checks on both Lua 5.1 and Lua 5.4; live-client findings below retain their existing status. The behavior described in architecture section 31 remains applicable.
 
-> **Current repository baseline (2026-10-26):** `0.2.255-native-cooldown-seconds-test`. Sections 1–38 are historical implementation notes; section 39 documents the action-button cooldown formatting. Live-client verification remains outstanding.
+> **Current repository baseline (2026-10-26):** `0.2.256-five-second-decimals-test`. Sections 1–39 are historical implementation notes; section 40 documents the sub-five-second decimal update. Live-client verification remains outstanding.
 
-This document now tracks **bjarkiUI 0.2.255-native-cooldown-seconds-test**. **Section 32 supersedes historical layout behavior; sections 33–39 document the current safeguards**. This is a maintenance reference, not a guarantee about undocumented WoW: Forever client behavior or taint safety.
+This document now tracks **bjarkiUI 0.2.256-five-second-decimals-test**. **Section 32 supersedes historical layout behavior; sections 33–40 document the current safeguards**. This is a maintenance reference, not a guarantee about undocumented WoW: Forever client behavior or taint safety.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -839,3 +841,10 @@ The source has exact v15 runtime parity, matching manifests and embedded/referen
 - Restrict writes to positive, readable native cooldown objects outside combat. Use a weak-key installation cache, optional `GetCountdownFormatter` recheck, and existing lifecycle events: login, world entry, native action-bar load, Edit Mode and combat exit. Reuse action-bar button names already recognized by bjarkiUI; no continuous scan. When the native formatter API isn't available, **leave Blizzard formatting intact** rather than trying a secret-unsafe Lua replacement.
 - `tests/cooldown-seconds.lua` verifies the real module with mocked native formatters and buttons under Lua 5.1/5.4: boundaries, secret/forbidden objects, charge/loss-of-control variants, normal/native replacement, independent failures, out-of-combat deferral, late-loaded bars and missing API. The tests are not packaged for the game.
 - This release changes only countdown *presentation*. Blizzard continues to own action-button art, cooldown readiness, charge logic, swipe, edge, color and countdown font. Exact 1.60.1 implementation support and visual size must be checked on the Forever launch client.
+
+## 40. Native action-button decimals below five seconds: 0.2.256-five-second-decimals-test (2026-10-26)
+
+- Reuse the single `CooldownSeconds.lua` native `NumericRuleFormatter`, adding `threshold = 0, format = "%.1f"` and moving the previous integer-second rule to `threshold = 5`. The six-minute, one-hour and one-day rules retain their previous thresholds, rounding policies and formats.
+- Example outputs: `4.9 → 4.9`, `5 → 5`, `59 → 59`, `105 → 105`, `321 → 321`, `360 → 6m`. The formatter, not Lua, decides which rule applies to secrecy-protected countdown values. The sub-five-second `%.1f` rule follows the familiar native one-decimal rounding behavior, with no custom per-tick update.
+- `tests/cooldown-seconds.lua` asserts the exact 5-second transition and the unchanged 360/3600/86400-second transitions under Lua 5.1 and 5.4. All other addon modules, countdown eligibility guards and saved-layout policy remain unchanged.
+- Native 1.60.1 support for `SetCountdownFormatter` and the precise rendered font appearance still require live-client verification.
