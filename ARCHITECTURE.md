@@ -1,5 +1,7 @@
 # bjarkiUI architecture
 
+**Native Player colors / minimalist status text (2026-10-26):** `0.2.254-native-player-shadow-text-test` stops custom class tinting of Player health and name while retaining class colors on Target/Focus/ToT/FoT. Health and power numeric FontStrings drop the font outline and receive a small native 1-pixel dark shadow. Native font family, size, text color, value updates and geometry remain unchanged. See section 38.
+
 **Shop micro-menu notification (2026-10-26):** `0.2.253-shop-pip-test` suppresses the Shop/Store notification pip in-game, without hiding the button or changing its tooltip, action, or layout. This does not affect the character-selection screen, where character addons are not loaded. See section 37.
 
 **Player text positioning and conditional status precision (2026-10-26):** `0.2.252-foundation-v16-combat-text-test` keeps incoming player feedback horizontally aligned to the health bar and anchors its bottom two physical screen pixels above the top of the native PlayerFrame. Percentage-only status text uses integer precision at/above 100% and one decimal below 100%, with native secret-safe number formatting. See section 36.
@@ -14,9 +16,9 @@
 
 **v16 suite update (2026-10-22):** this addon receives release-version metadata only. Its behavior is byte-identical to v15 apart from that version string. The three timing repairs are in bjarkiCC Model/Observer. The full v16 suite passes 49 regression scripts and 28 runtime syntax checks on both Lua 5.1 and Lua 5.4; live-client findings below retain their existing status. The behavior described in architecture section 31 remains applicable.
 
-> **Current repository baseline (2026-10-26):** `0.2.253-shop-pip-test`. Sections 1–36 are historical implementation notes; section 37 documents the Shop notification update. Live-client verification remains outstanding.
+> **Current repository baseline (2026-10-26):** `0.2.254-native-player-shadow-text-test`. Sections 1–37 are historical implementation notes; section 38 documents the current Player/text presentation. Live-client verification remains outstanding.
 
-This document now tracks **bjarkiUI 0.2.253-shop-pip-test**. **Section 32 supersedes historical layout behavior; sections 33–37 document the current safeguards**. This is a maintenance reference, not a guarantee about undocumented WoW: Forever client behavior or taint safety.
+This document now tracks **bjarkiUI 0.2.254-native-player-shadow-text-test**. **Section 32 supersedes historical layout behavior; sections 33–38 document the current safeguards**. This is a maintenance reference, not a guarantee about undocumented WoW: Forever client behavior or taint safety.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -816,3 +818,12 @@ The source has exact v15 runtime parity, matching manifests and embedded/referen
 - Suppress only the button-owned `NotificationOverlay`. Existing `UpdateNotificationIcon` post-hook handling remains idempotent; Shop additionally observes the same overlay's native `Show` and `SetShown` writers to re-hide a pip without touching the actual button, its icon, tooltip, click action, or anchoring. A global Store/Shop button lookup covers clients where it is not a direct `MicroMenu` child.
 - Registration success is tracked independently with weak-key tables; failures can retry at existing lifecycle boundaries, without polling or new saved variables. `tests/lifecycle.lua` covers exact Shop identification, unrelated buttons, native pip reshow, partial hook failures, and Shop button interaction under Lua 5.1/5.4.
 - The login/character-selection screen loads before ordinary per-character UI addons. No unsupported login-frame manipulation is attempted; the character-select Shop marker remains client-owned.
+
+## 38. Native Player colors and restrained status-text shadows: 0.2.254-native-player-shadow-text-test (2026-10-26)
+
+- The Player frame is no longer class tinted by bjarkiUI: `applyHealthColor("player")` declines all writes and `applyUnit("player")` retains full-name correction and numerical styling, but does not install the class health-color hooks or tint its name. `applyClassNameColor("player")` also declines external calls. **Blizzard owns Player health fill and Player name colors.** Target, Focus, ToT and FoT retain their existing class/NPC-color decisions, race portraits, bars, and native frame geometry.
+- Health/resource numeric FontStrings for Player, Target, Focus, ToT and FoT, plus the PRD's three native status bars, use the same restrained font treatment. Only known bar-owned `TextString`, `LeftText`, `RightText` and the lowercase left/right aliases are eligible. Name, level, aura, cooldown, cast, action-bar and combat text remain unchanged.
+- Preserve native font file, point size, color and anchoring; remove only `OUTLINE`/`THICKOUTLINE` font flags and preserve independent flags such as `MONOCHROME`. Add black shadow alpha `0.78`, with offset `(+1, -1)` **physical screen pixel** when the text's effective scale is readable. No new font assets or glyph replacement.
+- Native FontString `SetFont` post-hooks reapply the look only after a native font-template update and avoid recursion. A weak-key registry prevents duplicate hooks. Secret/unreadable or forbidden FontStrings fail closed; presentation changes are skipped in combat and retried at existing unit/world/edit-mode or `PLAYER_REGEN_ENABLED` events. No new `OnUpdate` loops or layout management.
+- `tests/status-style.lua` exercises status-only field selection, outline flag removal, one-screen-pixel shadows, name/level exclusion, native font resets, combat/secret behavior, and Player/Target color boundaries under Lua 5.1 and 5.4. No test files are packaged.
+- Native-client typography and scale-specific optical judgment still need launch screenshots. Existing unrelated CVar behavior, whole-second tracked buffs, incoming combat-text anchoring, soft dark, and saved Edit Mode layout ownership remain unchanged.

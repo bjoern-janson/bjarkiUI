@@ -18,13 +18,14 @@ jobs:
         run: |
           set -euo pipefail
           for version in 5.1 5.4; do
-            for file in bjarkiUI.lua PartyOrder.lua SoftDark.lua TrackedBuffSeconds.lua tests/hardening.lua tests/lifecycle.lua tests/presentation.lua tests/status-combat.lua; do
+            for file in bjarkiUI.lua PartyOrder.lua SoftDark.lua TrackedBuffSeconds.lua tests/hardening.lua tests/lifecycle.lua tests/presentation.lua tests/status-combat.lua tests/status-style.lua; do
               "luac${version}" -p "$file"
             done
             "lua${version}" tests/hardening.lua
             "lua${version}" tests/lifecycle.lua
             "lua${version}" tests/presentation.lua
             "lua${version}" tests/status-combat.lua
+            "lua${version}" tests/status-style.lua
           done
       - name: Validate manifests and stage addon
         run: |

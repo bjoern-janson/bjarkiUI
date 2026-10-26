@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.253-shop-pip-test"
+local BJARKI_UI_VERSION = "0.2.254-native-player-shadow-text-test"
 -- Standalone PRD treatment is retained. Unit-frame resource bars stay native.
 local PRD_MANA_R, PRD_MANA_G, PRD_MANA_B = 0.10, 0.25, 1.00
 local WORLD_TEXT_SCREEN_Y = "0.0430"
@@ -96,6 +96,115 @@ local function healthBar(unit)
         return _G.PetFrameHealthBar or (_G.PetFrame and _G.PetFrame.healthbar)
     end
 end
+
+-- BEGIN BJARKI_STATUS_TEXT_SHADOWS
+-- Only numeric health/resource FontStrings on the five native unit frames and
+-- the personal resource display. Never restyle name, level, aura, cast or timer
+-- text; font face, size, color and alignment remain Blizzard-owned.
+local STATUS_SHADOW_ALPHA = 0.78
+local statusTextFonts = setmetatable({}, { __mode = "k" })
+local statusTextFields = { "TextString", "LeftText", "RightText", "leftText", "rightText" }
+
+local function statusFontWithoutOutline(flags)
+    local remaining = {}
+    for token in flags:gmatch("[^,%s]+") do
+        local upper = token:upper()
+        if upper ~= "OUTLINE" and upper ~= "THICKOUTLINE" then
+            remaining[#remaining + 1] = token
+        end
+    end
+    return table.concat(remaining, ",")
+end
+
+local function styleStatusFont(text, state)
+    if not text or isSecret(text) or state.applying then return false end
+    if readableBool(InCombatLockdown) ~= false then state.dirty = true; return false end
+    local ok, font, size, flags = pcall(text.GetFont, text)
+    if not ok or isSecret(font) or type(font) ~= "string" or font == ""
+        or isSecret(size) or type(size) ~= "number" or size <= 0
+        or isSecret(flags) or (flags ~= nil and type(flags) ~= "string") then
+        return false
+    end
+    local nativeFlags = flags or ""
+    local cleaned = statusFontWithoutOutline(nativeFlags)
+    if cleaned ~= nativeFlags then
+        state.applying = true
+        local success, result = pcall(text.SetFont, text, font, size, cleaned)
+        state.applying = false
+        if not success or result == false then return false end
+    end
+
+    -- Native API offsets are UI units. Convert to a one-screen-pixel offset
+    -- when the current FontString scale is readable.
+    local offset = 1
+    if type(text.GetEffectiveScale) == "function" then
+        local gotScale, scale = pcall(text.GetEffectiveScale, text)
+        if gotScale and not isSecret(scale) and type(scale) == "number"
+            and scale > 0 and scale < math.huge then
+            offset = 1 / scale
+        end
+    end
+    local colored = pcall(text.SetShadowColor, text, 0, 0, 0, STATUS_SHADOW_ALPHA)
+    local positioned = pcall(text.SetShadowOffset, text, offset, -offset)
+    state.applied = colored and positioned
+    state.dirty = not state.applied
+    return state.applied
+end
+
+local function installStatusFont(text)
+    if not text or isSecret(text) then return end
+    local ok, font, shadowColor, shadowOffset = pcall(function()
+        if text.IsForbidden and readableBool(text.IsForbidden, text) ~= false then return end
+        return text.GetFont, text.SetShadowColor, text.SetShadowOffset
+    end)
+    if not ok or type(font) ~= "function"
+        or type(shadowColor) ~= "function" or type(shadowOffset) ~= "function"
+        or type(text.SetFont) ~= "function" then return end
+
+    local state = statusTextFonts[text]
+    if not state then state = {}; statusTextFonts[text] = state end
+    if not state.applied or state.dirty then styleStatusFont(text, state) end
+    if state.hooked or type(hooksecurefunc) ~= "function" then return end
+    -- If Blizzard reapplies the font template, restore our presentation after
+    -- its writer. The recursion guard prevents hooking our own SetFont call.
+    state.hooked = pcall(hooksecurefunc, text, "SetFont", function(self)
+        if state.applying then return end
+        state.dirty = true
+        styleStatusFont(self, state)
+    end)
+end
+
+local function installStatusBarFonts(bar)
+    if not bar or isSecret(bar) then return end
+    for _, field in ipairs(statusTextFields) do
+        local ok, text = pcall(function() return bar[field] end)
+        if ok and text and not isSecret(text) then installStatusFont(text) end
+    end
+end
+
+local function installUnitStatusFonts(unit)
+    local frame = unitFrame(unit)
+    installStatusBarFonts(healthBar(unit))
+    if isSecret(frame) or not frame then return end
+    local ok, power = pcall(function()
+        return frame.manabar or frame.ManaBar or frame.PowerBar or frame.powerbar
+    end)
+    if ok then installStatusBarFonts(power) end
+end
+
+local function installPRDStatusFonts()
+    local prd = _G.PersonalResourceDisplayFrame
+    if not prd or isSecret(prd) then return end
+    local ok, health, power, alternate = pcall(function()
+        local container = prd.HealthBarsContainer
+        return container and container.healthBar, prd.PowerBar, prd.AlternatePowerBar
+    end)
+    if not ok then return end
+    installStatusBarFonts(health)
+    installStatusBarFonts(power)
+    installStatusBarFonts(alternate)
+end
+-- END BJARKI_STATUS_TEXT_SHADOWS
 
 -- BEGIN BJARKI_STATUS_PERCENT_DECIMALS
 do
@@ -816,6 +925,9 @@ local function npcHealthColor(unit)
 end
 
 local function applyHealthColor(bar, unit)
+    -- Player health uses Blizzard's native fill and tint. Never apply class
+    -- coloring to the player's own frame, including delayed native post-hooks.
+    if unit == "player" then return false end
     if isSecret(unit) or type(unit) ~= "string" or not CLASS_HEALTH_UNITS[unit]
         or isSecret(bar) or not bar or type(bar.SetStatusBarColor) ~= "function"
         or bar ~= healthBar(unit) or readableUnitToken(bar.unit) ~= unit
@@ -1038,7 +1150,9 @@ local function classColorFromPetOrTotemOwner(unit)
 end
 
 local function applyClassNameColor(unit)
-    if not CLASS_HEALTH_UNITS[unit] then return end
+    -- Keep the Player name at its native text color; target-like names retain
+    -- their existing class-color behavior.
+    if unit == "player" or not CLASS_HEALTH_UNITS[unit] then return end
     local frame = unitFrame(unit)
     if not frame or readableUnitToken(frame.unit) ~= unit then return end
     local text = frame.name or (unit == "player" and _G.PlayerName) or frame.Name
@@ -1155,7 +1269,11 @@ end
 local function applyUnit(unit, nativeFrameUpdate)
     unit = readableUnitToken(unit)
     if not unit or not CLASS_HEALTH_UNITS[unit] then return end
+    installUnitStatusFonts(unit)
     repairMissingUnitName(unit)
+    -- Player stays wholly native for health and name color. We still retain
+    -- full-name repair and the numeric status-font treatment above.
+    if unit == "player" then return end
     applyClassNameColor(unit)
     hideNameBackdrop(unit)
     local health = healthBar(unit)
@@ -2371,6 +2489,7 @@ local function applyAll()
     for _, unit in ipairs({ "player", "target", "focus", "targettarget", "focustarget" }) do
         applyUnit(unit)
     end
+    installPRDStatusFonts()
 end
 
 local events = CreateFrame("Frame")
@@ -2389,6 +2508,7 @@ events:SetScript("OnEvent", function(_, event, unit)
         elseif unit == "Blizzard_UnitFrame" then
             installNameplateClassNameColors()
             installDerivedFrameAlignment()
+            applyAll()
         elseif unit == "Blizzard_Minimap" then
             hideMinimapDayNightIndicator()
         elseif unit == "Blizzard_NamePlates" then
@@ -2397,6 +2517,7 @@ events:SetScript("OnEvent", function(_, event, unit)
         elseif unit == "Blizzard_PersonalResourceDisplay" then
             installPRDAlternateManaColor()
             installMovementSpeedRow()
+            installPRDStatusFonts()
         elseif unit == "Blizzard_MicroMenu" then
             suppressMicroMenuNotificationPips()
         elseif unit == "Blizzard_PrivateAurasUI"
@@ -2472,6 +2593,7 @@ events:SetScript("OnEvent", function(_, event, unit)
         installDerivedFrameAlignment()
         installPRDAlternateManaColor()
         installMovementSpeedRow()
+        applyAll()
 
     elseif event == "PLAYER_TARGET_CHANGED" then
         installDerivedFrameAlignment()
