@@ -2,10 +2,11 @@
 ## Title: bjarkiUI
 ## Notes: Ultralight unit-frame presentation for WoW: Forever
 ## Author: Bjarki / OpenAI
-## Version: 0.2.254-native-player-shadow-text-test
+## Version: 0.2.255-native-cooldown-seconds-test
 ## SavedVariablesPerCharacter: bjarkiUISettings
 
 bjarkiUI.lua
 PartyOrder.lua
 SoftDark.lua
 TrackedBuffSeconds.lua
+CooldownSeconds.lua

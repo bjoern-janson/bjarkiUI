@@ -1,5 +1,7 @@
 # bjarkiUI architecture
 
+**Native cooldown seconds (2026-10-26):** `0.2.255-native-cooldown-seconds-test` formats Blizzard-owned action-button cooldown counts as whole seconds strictly below 360 seconds (e.g. `1:45 → 105`, `5:21 → 321`) via a single native `NumericRuleFormatter`. Longer cooldowns retain compact minute/hour/day labels. No timer data is read by addon Lua, and no new per-frame updates are introduced. See section 39.
+
 **Native Player colors / minimalist status text (2026-10-26):** `0.2.254-native-player-shadow-text-test` stops custom class tinting of Player health and name while retaining class colors on Target/Focus/ToT/FoT. Health and power numeric FontStrings drop the font outline and receive a small native 1-pixel dark shadow. Native font family, size, text color, value updates and geometry remain unchanged. See section 38.
 
 **Shop micro-menu notification (2026-10-26):** `0.2.253-shop-pip-test` suppresses the Shop/Store notification pip in-game, without hiding the button or changing its tooltip, action, or layout. This does not affect the character-selection screen, where character addons are not loaded. See section 37.
@@ -16,9 +18,9 @@
 
 **v16 suite update (2026-10-22):** this addon receives release-version metadata only. Its behavior is byte-identical to v15 apart from that version string. The three timing repairs are in bjarkiCC Model/Observer. The full v16 suite passes 49 regression scripts and 28 runtime syntax checks on both Lua 5.1 and Lua 5.4; live-client findings below retain their existing status. The behavior described in architecture section 31 remains applicable.
 
-> **Current repository baseline (2026-10-26):** `0.2.254-native-player-shadow-text-test`. Sections 1–37 are historical implementation notes; section 38 documents the current Player/text presentation. Live-client verification remains outstanding.
+> **Current repository baseline (2026-10-26):** `0.2.255-native-cooldown-seconds-test`. Sections 1–38 are historical implementation notes; section 39 documents the action-button cooldown formatting. Live-client verification remains outstanding.
 
-This document now tracks **bjarkiUI 0.2.254-native-player-shadow-text-test**. **Section 32 supersedes historical layout behavior; sections 33–38 document the current safeguards**. This is a maintenance reference, not a guarantee about undocumented WoW: Forever client behavior or taint safety.
+This document now tracks **bjarkiUI 0.2.255-native-cooldown-seconds-test**. **Section 32 supersedes historical layout behavior; sections 33–39 document the current safeguards**. This is a maintenance reference, not a guarantee about undocumented WoW: Forever client behavior or taint safety.
 
 The addon is deliberately small. The runtime consists of:
 
@@ -26,6 +28,7 @@ The addon is deliberately small. The runtime consists of:
 - `PartyOrder.lua` — visual ordering of raid-style party frames.
 - `SoftDark.lua` — the fixed decorative theme.
 - `TrackedBuffSeconds.lua` — integer-second tracked buff countdown presentation.
+- `CooldownSeconds.lua` — bounded, native-format-only action-button cooldown presentation.
 - two matching `.toc` manifests.
 
 `ARCHITECTURE.md` is not loaded by the game.
@@ -827,3 +830,12 @@ The source has exact v15 runtime parity, matching manifests and embedded/referen
 - Native FontString `SetFont` post-hooks reapply the look only after a native font-template update and avoid recursion. A weak-key registry prevents duplicate hooks. Secret/unreadable or forbidden FontStrings fail closed; presentation changes are skipped in combat and retried at existing unit/world/edit-mode or `PLAYER_REGEN_ENABLED` events. No new `OnUpdate` loops or layout management.
 - `tests/status-style.lua` exercises status-only field selection, outline flag removal, one-screen-pixel shadows, name/level exclusion, native font resets, combat/secret behavior, and Player/Target color boundaries under Lua 5.1 and 5.4. No test files are packaged.
 - Native-client typography and scale-specific optical judgment still need launch screenshots. Existing unrelated CVar behavior, whole-second tracked buffs, incoming combat-text anchoring, soft dark, and saved Edit Mode layout ownership remain unchanged.
+
+## 39. Native seconds below six minutes: 0.2.255-native-cooldown-seconds-test (2026-10-26)
+
+- Apply only to existing Blizzard action button cooldown widgets: main/multi bars, pet, stance and possess buttons, including their native `cooldown`, `chargeCooldown`, and `lossOfControlCooldown` variants when actually exposed. Do not touch the portrait aura cooldowns, Tracked Buff Icon timers, bag items, ability IDs, state values or font sizes.
+- Use **one** `C_StringUtil.CreateNumericRuleFormatter` with native `NumericRuleFormatter:SetBreakpoints`. Strictly below 360 seconds render integer seconds (e.g. `59`, `105`, `321`, `359`), rounding down consistently with the portrait timer policy. At/above 360 seconds use compact minute/hour/day labels (e.g. `6m`, `1h`, `2d`), rounding larger unit bands upward.
+- Apply the formatter through `Cooldown:SetCountdownFormatter`; unlike `SetCountdownAbbrevThreshold`, this controls the actual countdown text and accepts secrecy-protected native times without passing those values through addon Lua. No custom `OnUpdate`, text replacement, duration arithmetic, or cooldown restarts.
+- Restrict writes to positive, readable native cooldown objects outside combat. Use a weak-key installation cache, optional `GetCountdownFormatter` recheck, and existing lifecycle events: login, world entry, native action-bar load, Edit Mode and combat exit. Reuse action-bar button names already recognized by bjarkiUI; no continuous scan. When the native formatter API isn't available, **leave Blizzard formatting intact** rather than trying a secret-unsafe Lua replacement.
+- `tests/cooldown-seconds.lua` verifies the real module with mocked native formatters and buttons under Lua 5.1/5.4: boundaries, secret/forbidden objects, charge/loss-of-control variants, normal/native replacement, independent failures, out-of-combat deferral, late-loaded bars and missing API. The tests are not packaged for the game.
+- This release changes only countdown *presentation*. Blizzard continues to own action-button art, cooldown readiness, charge logic, swipe, edge, color and countdown font. Exact 1.60.1 implementation support and visual size must be checked on the Forever launch client.
