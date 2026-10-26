@@ -111,6 +111,9 @@ do
         readableBool = readableBool,
         currentBar = function() return bar, frame end,
         formatConditionalPercent = formatPercent,
+        controlFields = evaluate(
+            slice("local controlFields = {", "local function currentBar("),
+            "", "controlFields"),
         opaquePercent = function() return secret end,
         GetCVar = function() return "PERCENT" end,
     }
@@ -119,6 +122,7 @@ do
         "local isSecret = _G.isSecret\nlocal finiteNumber = _G.finiteNumber\n" ..
         "local readableBool = _G.readableBool\nlocal currentBar = _G.currentBar\n" ..
         "local formatConditionalPercent = _G.formatConditionalPercent\n" ..
+        "local controlFields = _G.controlFields\n" ..
         "local opaquePercent = _G.opaquePercent",
         "applyPrecision", env2)
     apply("player", false, bar, text, 1741, 1741)
