@@ -118,6 +118,10 @@ local lastBagScan = { discovered = 0, direct = 0, nested = 0 }
 local tintBagChromeTexture -- forward-declared for the bounded sibling pass
 local BAG_SIBLING_ART_COUNT = 7
 local bagSiblingEditModeActive = false
+-- A registration gap may have lost Exit. Reconcile only after both callbacks
+-- are available, outside delivered Enter, at an existing repaint boundary.
+local bagSiblingEditModeRecoveryPending = false
+local bagSiblingEditModeCallbackActive = false
 local bagSiblingLayoutHookInstalled = false
 local bagSiblingEditModeEnterHookInstalled = false
 local bagSiblingEditModeExitHookInstalled = false
@@ -254,20 +258,27 @@ local function restoreBagSiblingArt()
     -- without undoing the rest of the Soft Dark presentation.
     for texture in pairs(bagSiblingStyledTextures) do
         if readable(texture) then
+            local colorRestored, saturationRestored = true, true
             local base = originalColor[texture]
             if base then
-                pcall(texture.SetVertexColor, texture, base[1], base[2], base[3], base[4])
+                colorRestored = pcall(texture.SetVertexColor, texture,
+                    base[1], base[2], base[3], base[4])
             end
             local previous = originalBagDesaturation[texture]
             if previous then
+                saturationRestored = false
                 if previous.mode == "level" then
-                    pcall(texture.SetDesaturation, texture, previous.value)
+                    saturationRestored = pcall(texture.SetDesaturation, texture, previous.value)
                 elseif previous.mode == "bool" then
-                    pcall(texture.SetDesaturated, texture, previous.value)
+                    saturationRestored = pcall(texture.SetDesaturated, texture, previous.value)
                 end
             end
+            -- Keep failed siblings eligible for the next Edit Mode/layout retry.
+            -- Originals remain available while the rest of the theme is active.
+            if colorRestored and saturationRestored then
+                bagSiblingStyledTextures[texture] = nil
+            end
         end
-        bagSiblingStyledTextures[texture] = nil
     end
     lastBagSiblingCount = 0
     lastBagSiblingTextureCount = 0
@@ -303,6 +314,20 @@ end
 
 local function styleBagSiblingArt(tint)
     local manager = resolve("EditModeManagerFrame")
+    if bagSiblingEditModeRecoveryPending and not bagSiblingEditModeCallbackActive
+        and bagSiblingEditModeEnterHookInstalled and bagSiblingEditModeExitHookInstalled then
+        -- child() intentionally drops false; recovery needs an actual readable
+        -- boolean. Missing/secret state and native true retain this retry.
+        local ok, active = pcall(function() return manager.editModeActive end)
+        if not ok or not readable(active) or type(active) ~= "boolean" then
+            restoreBagSiblingArt()
+            return 0
+        end
+        if active == false then
+            bagSiblingEditModeActive = false
+            bagSiblingEditModeRecoveryPending = false
+        end
+    end
     if bagSiblingEditModeActive or child(manager, "editModeActive") == true then
         restoreBagSiblingArt()
         return 0
@@ -329,25 +354,39 @@ local function styleBagSiblingArt(tint)
 end
 
 local function restore()
-    restoreBagSiblingArt()
+    -- The global pass includes siblings: attempt each property only once.
+    -- Retire only successful writes; failures keep their weak-key originals
+    -- for an explicit/lifecycle retry or a noncompounding direct re-enable.
     for texture, base in pairs(originalColor) do
-        if readable(texture) then
-            pcall(texture.SetVertexColor, texture, base[1], base[2], base[3], base[4])
+        if readable(texture) and pcall(texture.SetVertexColor, texture,
+            base[1], base[2], base[3], base[4]) then
+            originalColor[texture] = nil
+            if not originalBagDesaturation[texture] then
+                bagSiblingStyledTextures[texture] = nil
+            end
         end
     end
     -- Restore saturation independently of the vertex tint (the two shader
     -- properties can be changed without replacing any Blizzard textures).
     for texture, previous in pairs(originalBagDesaturation) do
         if readable(texture) then
+            local restored = false
             if previous.mode == "level" then
-                pcall(texture.SetDesaturation, texture, previous.value)
+                restored = pcall(texture.SetDesaturation, texture, previous.value)
             elseif previous.mode == "bool" then
-                pcall(texture.SetDesaturated, texture, previous.value)
+                restored = pcall(texture.SetDesaturated, texture, previous.value)
+            end
+            if restored then
+                originalBagDesaturation[texture] = nil
+                if not originalColor[texture] then
+                    bagSiblingStyledTextures[texture] = nil
+                end
             end
         end
     end
-    originalBagDesaturation = setmetatable({}, { __mode = "k" })
-    originalColor = setmetatable({}, { __mode = "k" })
+    lastBagSiblingCount = 0
+    lastBagSiblingTextureCount = 0
+    lastBagSiblingAlphaFallbackCount = 0
     lastBagScan = { discovered = 0, direct = 0, nested = 0 }
     lastStats = { chrome = 0, windows = 0, buttons = 0, textures = 0, dividers = 0, bagArt = 0, bagBorders = 0, bagDetails = 0, bagDividers = 0, compactChrome = 0, compactBackdrops = 0, compactLower = 0 }
 end
@@ -1030,7 +1069,7 @@ local function installBagSiblingLayoutHook()
     if type(child(bar, "Layout")) ~= "function" then return end
     bagSiblingLayoutHookInstalled = pcall(hooksecurefunc, bar, "Layout", function()
         if settings.softDarkEnabled ~= true or loadedDarkMode()
-            or bagSiblingEditModeActive then return end
+            or (bagSiblingEditModeActive and not bagSiblingEditModeRecoveryPending) then return end
         if inCombat() then pending = true; return end
         styleBagSiblingArt()
     end)
@@ -1041,24 +1080,39 @@ end
 local function installBagSiblingEditModeHooks()
     if bagSiblingEditModeEnterHookInstalled and bagSiblingEditModeExitHookInstalled then return end
     local registry = EventRegistry
-    if not registry or type(child(registry, "RegisterCallback")) ~= "function" then return end
+    if not registry or type(child(registry, "RegisterCallback")) ~= "function" then
+        bagSiblingEditModeRecoveryPending = true
+        return
+    end
     -- Retry only the callback that failed; a successful Enter registration
     -- must never be registered again just because Exit was unavailable.
     if not bagSiblingEditModeEnterHookInstalled then
         bagSiblingEditModeEnterHookInstalled =
             pcall(registry.RegisterCallback, registry, "EditMode.Enter", function()
                 bagSiblingEditModeActive = true
-                restoreBagSiblingArt()
+                bagSiblingEditModeRecoveryPending = not
+                    (bagSiblingEditModeEnterHookInstalled and bagSiblingEditModeExitHookInstalled)
+                -- Native state can lag this Enter, even if a setter reenters a
+                -- lifecycle pass and finishes registration before we return.
+                local previousCallbackActive = bagSiblingEditModeCallbackActive
+                bagSiblingEditModeCallbackActive = true
+                local ok, err = pcall(restoreBagSiblingArt)
+                bagSiblingEditModeCallbackActive = previousCallbackActive
+                if not ok then error(err, 0) end
             end)
     end
     if not bagSiblingEditModeExitHookInstalled then
         bagSiblingEditModeExitHookInstalled =
             pcall(registry.RegisterCallback, registry, "EditMode.Exit", function()
                 bagSiblingEditModeActive = false
+                bagSiblingEditModeRecoveryPending = false
                 if settings.softDarkEnabled ~= true or loadedDarkMode() then return end
                 if inCombat() then pending = true; return end
                 styleBagSiblingArt()
             end)
+    end
+    if not bagSiblingEditModeEnterHookInstalled or not bagSiblingEditModeExitHookInstalled then
+        bagSiblingEditModeRecoveryPending = true
     end
 end
 

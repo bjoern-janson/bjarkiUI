@@ -1,5 +1,11 @@
 # Known issues and bugs
 
+**Conditional recovery repairs (2026-10-27):** `0.2.259-recovery-test` isolates incoming hit-text setter errors from the remaining lifecycle repairs, and recovers stale Soft Dark Edit Mode state after incomplete callback registration. Both defects were reproduced with modeled API failures against the exact `0.2.258-hit-text-recovery-test` build. Native occurrence, event ordering, protected writes, rendering and taint still need in-game validation. Existing historical reports and other conditional compatibility questions remain open.
+
+**Incoming hit-text lifecycle (2026-10-27):** `0.2.258-hit-text-recovery-test` retries Player incoming-text anchoring at combat exit and refreshes it after UI scale/display changes, using the existing guarded helper and current geometry. Full-module lifecycle regressions compare with `0.2.257-presentation-recovery-test`; live rendering, event ordering and taint still require in-game validation. Unrelated conditional gaps and historical Battleground reports remain open.
+
+**Presentation recovery (2026-10-27):** `0.2.257-presentation-recovery-test` repairs stale status-shadow scale caching and retains failed Soft Dark restoration state for retry. Focused Lua 5.1/5.4 regressions compare these paths with `0.2.256-five-second-decimals-test`; they do not establish live-client scale-event ordering, native setter behavior, taint safety or rendering. Other conditional compatibility gaps and the historical Battleground reports remain open.
+
 **Sub-five-second cooldown precision (2026-10-26):** `0.2.256-five-second-decimals-test` shows one decimal on native action-button countdowns only below five seconds, while preserving whole seconds through 359 and larger compact units. Native secret-safe formatter support and visual appearance remain launch-client checks.
 
 **Native cooldown seconds (2026-10-26):** `0.2.255-native-cooldown-seconds-test` adds native-format-only action-button cooldown counts in seconds below six minutes, with compact unit labels thereafter. This requires `NumericRuleFormatter` and `Cooldown:SetCountdownFormatter` on the Forever build; if either is unavailable, native text is preserved. CI mock tests do not prove live-client availability or taint safety.
@@ -20,7 +26,7 @@
 
 **v16 suite update (2026-10-22):** this addon receives release-version metadata only. Its behavior is byte-identical to v15 apart from that version string. The three timing repairs are in bjarkiCC Model/Observer. The full v16 suite passes 49 regression scripts and 28 runtime syntax checks on both Lua 5.1 and Lua 5.4; live-client findings below retain their existing status. The behavior described in architecture section 31 remains applicable.
 
-Current repository baseline (2026-10-26): **bjarkiUI 0.2.256-five-second-decimals-test**. The reports below are historical client observations and remain open pending current-client verification. Offline source, syntax and modeled-API checks do not close them. See architecture section 32 for the current layout-neutral behavior.
+Current packaged source baseline (2026-10-27): **bjarkiUI 0.2.259-recovery-test**. The reports below are historical client observations and remain open pending current-client verification. Offline source, syntax and modeled-API checks do not close them. See architecture section 32 for the current layout-neutral behavior.
 
 Original status recorded 2026-10-08 for **bjarkiUI 0.2.90-local**.
 

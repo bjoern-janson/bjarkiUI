@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.256-five-second-decimals-test"
+local BJARKI_UI_VERSION = "0.2.259-recovery-test"
 -- Standalone PRD treatment is retained. Unit-frame resource bars stay native.
 local PRD_MANA_R, PRD_MANA_G, PRD_MANA_B = 0.10, 0.25, 1.00
 local WORLD_TEXT_SCREEN_Y = "0.0430"
@@ -116,7 +116,16 @@ local function statusFontWithoutOutline(flags)
     return table.concat(remaining, ",")
 end
 
-local function styleStatusFont(text, state)
+local function statusFontScale(text)
+    if type(text.GetEffectiveScale) ~= "function" then return nil end
+    local ok, scale = pcall(text.GetEffectiveScale, text)
+    if ok and not isSecret(scale) and type(scale) == "number"
+        and scale > 0 and scale < math.huge then
+        return scale
+    end
+end
+
+local function styleStatusFont(text, state, scale)
     if not text or isSecret(text) or state.applying then return false end
     if readableBool(InCombatLockdown) ~= false then state.dirty = true; return false end
     local ok, font, size, flags = pcall(text.GetFont, text)
@@ -136,17 +145,11 @@ local function styleStatusFont(text, state)
 
     -- Native API offsets are UI units. Convert to a one-screen-pixel offset
     -- when the current FontString scale is readable.
-    local offset = 1
-    if type(text.GetEffectiveScale) == "function" then
-        local gotScale, scale = pcall(text.GetEffectiveScale, text)
-        if gotScale and not isSecret(scale) and type(scale) == "number"
-            and scale > 0 and scale < math.huge then
-            offset = 1 / scale
-        end
-    end
+    local offset = scale and (1 / scale) or 1
     local colored = pcall(text.SetShadowColor, text, 0, 0, 0, STATUS_SHADOW_ALPHA)
     local positioned = pcall(text.SetShadowOffset, text, offset, -offset)
     state.applied = colored and positioned
+    if state.applied then state.scale = scale end
     state.dirty = not state.applied
     return state.applied
 end
@@ -163,14 +166,18 @@ local function installStatusFont(text)
 
     local state = statusTextFonts[text]
     if not state then state = {}; statusTextFonts[text] = state end
-    if not state.applied or state.dirty then styleStatusFont(text, state) end
+    -- Effective scale can change without Blizzard calling SetFont.
+    local scale = statusFontScale(text)
+    if not state.applied or state.dirty or state.scale ~= scale then
+        styleStatusFont(text, state, scale)
+    end
     if state.hooked or type(hooksecurefunc) ~= "function" then return end
     -- If Blizzard reapplies the font template, restore our presentation after
     -- its writer. The recursion guard prevents hooking our own SetFont call.
     state.hooked = pcall(hooksecurefunc, text, "SetFont", function(self)
         if state.applying then return end
         state.dirty = true
-        styleStatusFont(self, state)
+        styleStatusFont(self, state, statusFontScale(self))
     end)
 end
 
@@ -1473,8 +1480,11 @@ local function anchorCombatText()
     local offsetX = (barX * barScale - frameX * frameScale) / textScale
     local offsetY = INCOMING_TEXT_GAP_PX / textScale
     if not usable(offsetX) or not usable(offsetY) then return end
-    text:ClearAllPoints()
-    text:SetPoint("BOTTOM", frame, "TOP", offsetX, offsetY)
+    -- Optional native positioning must not interrupt the remaining lifecycle
+    -- repairs. Skip the dependent write if clearing fails; a later event retries
+    -- with the current text object and geometry.
+    if not pcall(text.ClearAllPoints, text) then return end
+    pcall(text.SetPoint, text, "BOTTOM", frame, "TOP", offsetX, offsetY)
 end
 
 local HIGHLIGHT_SCALE = 0.25
@@ -2496,6 +2506,7 @@ local events = CreateFrame("Frame")
 for _, event in ipairs({
     "PLAYER_LOGIN", "PLAYER_ENTERING_WORLD", "PLAYER_TARGET_CHANGED", "PLAYER_FOCUS_CHANGED",
     "EDIT_MODE_LAYOUTS_UPDATED", "ADDON_LOADED", "PLAYER_REGEN_ENABLED",
+    "UI_SCALE_CHANGED", "DISPLAY_SIZE_CHANGED",
 }) do events:RegisterEvent(event) end
 
 events:SetScript("OnEvent", function(_, event, unit)
@@ -2578,6 +2589,14 @@ events:SetScript("OnEvent", function(_, event, unit)
         installMicroMenuChildOffset()
         anchorCombatText()
         applyAll()
+    elseif event == "UI_SCALE_CHANGED" or event == "DISPLAY_SIZE_CHANGED" then
+        -- Refresh scale-dependent status fonts and incoming hit-text anchors.
+        -- Combat deferrals retry on regeneration.
+        for _, token in ipairs({ "player", "target", "focus", "targettarget", "focustarget" }) do
+            installUnitStatusFonts(token)
+        end
+        installPRDStatusFonts()
+        anchorCombatText()
     elseif event == "PLAYER_REGEN_ENABLED" then
         repairFocusFlashAnchor()
         installNameplateControlLayout()
@@ -2593,6 +2612,7 @@ events:SetScript("OnEvent", function(_, event, unit)
         installDerivedFrameAlignment()
         installPRDAlternateManaColor()
         installMovementSpeedRow()
+        anchorCombatText()
         applyAll()
 
     elseif event == "PLAYER_TARGET_CHANGED" then
