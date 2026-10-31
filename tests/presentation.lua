@@ -253,6 +253,7 @@ do
     local calls = 0
     local env = {
         derivedColorHooks = state,
+        nativeHealthStyle = {colorHooks = {[bar] = true}},
         healthColorWrites = {},
         healthBar = function() return bar end,
         applyHealthColor = function() end,
@@ -263,6 +264,7 @@ do
     end
     local install = isolated(code,
         "local derivedColorHooks = _G.derivedColorHooks\n" ..
+        "local nativeHealthStyle = _G.nativeHealthStyle\n" ..
         "local healthColorWrites = _G.healthColorWrites\n" ..
         "local healthBar = _G.healthBar\n" ..
         "local applyHealthColor = _G.applyHealthColor",

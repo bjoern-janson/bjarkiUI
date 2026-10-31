@@ -16,7 +16,7 @@ local function same(actual, expected, message)
         for j = 1, 5 do eq(actual[i][j], p[j], message .. ' point ' .. i .. '/' .. j) end
     end
 end
-local function fixture()
+local function fixture(nativeChain)
     local env, timers, events, calls = {}, {}, {}, {}
     setmetatable(env, {__index = _G}); env._G = env
     local owner = {}
@@ -36,7 +36,22 @@ local function fixture()
             end
         end
         function f:ClearAllPoints() writer(self, 'ClearAllPoints'); self.points = {} end
-        function f:SetPoint(...) writer(self, 'SetPoint'); self.points[#self.points + 1] = {...} end
+        function f:SetPoint(...)
+            writer(self, 'SetPoint')
+            local point = {...}
+            -- Native SetPoint rejects a reference already anchored through self.
+            local function depends(region, target, visited)
+                if region == target then return true end
+                if type(region) ~= 'table' or not region.points or visited[region] then return false end
+                visited[region] = true
+                for _, anchor in ipairs(region.points) do
+                    if depends(anchor[2], target, visited) then return true end
+                end
+                return false
+            end
+            if depends(point[2], self, {}) then error('circular anchor family') end
+            self.points[#self.points + 1] = point
+        end
         return f
     end
     local player, p1, p2, p3, p4 = region('player'), region('party1'), region('party2'), region('party3'), region('party4')
@@ -45,6 +60,17 @@ local function fixture()
         title = {GetHeight = function() return 13 end}, petUnitFrames = {pet1, pet2}, groupType = 'party',
         RefreshMembers = function() end, updateLayoutFunc = function() end}
     local all = {p1, p2, p3, p4, player, border, pet1, pet2}
+    if nativeChain then
+        local previous
+        for _, member in ipairs(frame.memberUnitFrames) do
+            member.points = {{'TOP', previous or frame, previous and 'BOTTOM' or 'TOP', 0, 0}}
+            previous = member
+        end
+        border.points = {{'TOPLEFT', player, 'TOPLEFT', -2, 2}, {'BOTTOMRIGHT', p4, 'BOTTOMRIGHT', 2, -3}}
+        pet1.points = {{'TOP', border, 'BOTTOM', 0, 0}}
+        pet2.points = {{'TOP', pet1, 'BOTTOM', 0, 0}}
+        for _, r in ipairs(all) do r.original = copy(r.points) end
+    end
     env.CompactPartyFrame = frame
     env.EditModeManagerFrame = {ArePartyFramesForcedShown = function() return false end,
         ShouldRaidFrameUseHorizontalRaidGroups = function() return env.horizontal or false end}
@@ -108,7 +134,7 @@ test('rollback border second SetPoint', function()
 end)
 
 test('success keeps exact order, title border and pet offsets with nil-return setters', function()
-    local f = fixture(); f.pet1.visible = false; f:event()
+    local f = fixture(true); f.pet1.visible = false; f:event()
     eq(#f.calls, 0, 'no synchronous native hook writes'); f:tick()
     same(f.p1.points, {{'TOP', f.frame, 'TOP', 0, -13}}, 'first party member')
     for i = 2, 5 do same(f.all[i].points, {{'TOP', f.all[i-1], 'BOTTOM', 0, 0}}, 'member chain') end
@@ -116,6 +142,46 @@ test('success keeps exact order, title border and pet offsets with nil-return se
     same(f.pet1.points, {{'TOP', f.border, 'BOTTOM', 0, 0}}, 'hidden pet')
     same(f.pet2.points, {{'TOP', f.border, 'BOTTOM', 0, 0}}, 'next pet skips hidden predecessor')
 end)
+
+-- Restoring party1 -> player before detaching player -> party4 is a cycle.
+-- A healthy recovery must restore all snapshots in the same deferred pass.
+for _, target in ipairs({'border', 'pet1', 'pet2'}) do
+    test('native dependency chain restores immediately after one-shot ' .. target .. ' failure', function()
+        local f = fixture(true)
+        f[target].fail = 'SetPoint'; f[target].failOnce = true
+        f:event(); f:tick(); f:originals()
+    end)
+end
+for _, method in ipairs({'ClearAllPoints', 'SetPoint'}) do
+    test('native dependency recovery stays bounded after persistent rollback ' .. method .. ' failure', function()
+        local f = fixture(true)
+        f.border.fail = 'SetPoint'; f.border.failOnce = true
+        f.env.onWrite = function(r, write)
+            if f.border.fail == nil and r == f.player and write == method then
+                error('rollback writer unavailable')
+            end
+        end
+        f:event(); f:tick()
+        eq(#f.calls < 80, true, 'failed transaction has bounded writes')
+        for _ = 1, 2 do
+            local writes = #f.calls
+            f:event(); f:tick()
+            eq(#f.calls - writes < 40, true, 'each failed recovery event has bounded writes')
+        end
+        -- Clear failure must not reconnect party1 into the retained custom chain.
+        if method == 'ClearAllPoints' then
+            same(f.player.points, {{'TOP', f.all[4], 'BOTTOM', 0, 0}}, 'failed clear retains current player geometry')
+            eq(#f.p1.points, 0, 'no original edges rebuilt while a dependency could not be detached')
+        else
+            eq(#f.player.points, 0, 'failed restore remains pending')
+            same(f.p1.points, f.p1.original, 'other members restore despite failed player setter')
+            same(f.border.points, f.border.original, 'border restores despite failed player setter')
+            same(f.pet2.points, f.pet2.original, 'pets restore despite failed player setter')
+        end
+        f.env.onWrite = nil
+        f:event(); f:tick(); f:originals()
+    end)
+end
 
 local function brokenRollback()
     local f = fixture(); f.p2.fail = 'SetPoint'

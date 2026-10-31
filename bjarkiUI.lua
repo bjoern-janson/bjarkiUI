@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.260-audit-fixes-test"
+local BJARKI_UI_VERSION = "0.2.261-recovery-test"
 -- Standalone PRD treatment is retained. Unit-frame resource bars stay native.
 local PRD_MANA_R, PRD_MANA_G, PRD_MANA_B = 0.10, 0.25, 1.00
 local WORLD_TEXT_SCREEN_Y = "0.0430"
@@ -804,6 +804,9 @@ function nativeHealthStyle.Restore(bar)
     return ok and restored
 end
 function nativeHealthStyle.Prepare(bar)
+    -- Native writes must remain observable before capturing a baseline or
+    -- taking material/color ownership. A failed install can retry later.
+    if not nativeHealthStyle.colorHooks[bar] then return false end
     local texture = currentHealthTexture(bar)
     if not texture or type(texture.GetAtlas) ~= "function" then return false end
     local ok, atlas = pcall(texture.GetAtlas, texture)
@@ -962,7 +965,7 @@ end
 function nativeHealthStyle.Install(bar, unit)
     if not bar or not hooksecurefunc or readableUnitToken(bar.unit) ~= unit then return end
     if not nativeHealthStyle.colorHooks[bar] and type(bar.SetStatusBarColor) == "function" then
-        nativeHealthStyle.colorHooks[bar] = pcall(hooksecurefunc, bar, "SetStatusBarColor", function(self, r, g, b, a)
+        local ok, result = pcall(hooksecurefunc, bar, "SetStatusBarColor", function(self, r, g, b, a)
             if healthColorWrites[self] then return end
             local state = nativeHealthStyle.states[self]
             if not state then return end
@@ -975,6 +978,7 @@ function nativeHealthStyle.Install(bar, unit)
                 state.nativeColor = {r, g, b, type(a) == "number" and a or 1}
             end
         end)
+        nativeHealthStyle.colorHooks[bar] = ok and result ~= false
     end
     local texture = currentHealthTexture(bar)
     if not texture or nativeHealthStyle.textureHooks[texture] or type(texture.SetAtlas) ~= "function" then return end
@@ -995,6 +999,9 @@ local function installDerivedColorHook(bar, unit)
     if not bar or derivedColorHooks[bar] or type(hooksecurefunc) ~= "function"
         or type(bar.SetStatusBarColor) ~= "function" then return end
     if unit ~= "targettarget" and unit ~= "focustarget" then return end
+    -- Observation must precede synchronous repaint/restoration, including
+    -- after a rejected observer install retries at a later lifecycle pass.
+    if not nativeHealthStyle.colorHooks[bar] then return end
     -- A failed hook must leave this reused bar eligible for another attempt.
     derivedColorHooks[bar] = pcall(hooksecurefunc, bar, "SetStatusBarColor", function(self)
         if not healthColorWrites[self] and self == healthBar(unit) then

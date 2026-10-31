@@ -133,21 +133,36 @@ local function samePoints(a, b)
     return true
 end
 
-local function writePoints(object, points)
-    local ok, result = pcall(object.ClearAllPoints, object)
-    if not ok or result == false then return false end
+local function setPoints(object, points)
     for _, point in ipairs(points) do
-        ok, result = pcall(object.SetPoint, object, unpackPoints(point, 1, 5))
+        local ok, result = pcall(object.SetPoint, object, unpackPoints(point, 1, 5))
         if not ok or result == false then return false end
     end
     return true
 end
 
+local function writePoints(object, points)
+    local ok, result = pcall(object.ClearAllPoints, object)
+    if not ok or result == false then return false end
+    return setPoints(object, points)
+end
+
 local function restorePoints(transaction)
+    -- The custom and native chains can run in opposite directions. Detach the
+    -- whole touched graph before reconnecting any saved edge, in any plan order.
     local complete = true
     for i = 1, transaction.touched do
-        local entry = transaction.plan[i]
-        if not writePoints(entry.object, entry.original) then complete = false end
+        local object = transaction.plan[i].object
+        local ok, result = pcall(object.ClearAllPoints, object)
+        if not ok or result == false then complete = false end
+    end
+    -- A failed clear may retain a custom dependency. Do not rebuild against it;
+    -- retain the observed geometry for a bounded retry on a later safe event.
+    if complete then
+        for i = 1, transaction.touched do
+            local entry = transaction.plan[i]
+            if not setPoints(entry.object, entry.original) then complete = false end
+        end
     end
     if not complete then
         -- Retain only the observed geometry we still own. A native writer or
