@@ -223,7 +223,7 @@ end
 
 -- A failed deferred party scheduler must release its per-frame pending bit.
 do
-    local code = section(party, "local function queueVisualOrder(frame)",
+    local code = section(party, "local function queueVisualOrder(",
         "-- Install each native hook only after success")
     local frame, actualRuns, schedules, callback = {}, 0, 0, nil
     local env = {

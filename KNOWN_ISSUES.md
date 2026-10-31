@@ -1,5 +1,7 @@
 # Known issues and bugs
 
+**Remaining audit repairs (2026-10-31):** `0.2.260-audit-fixes-test` repairs threat/resting hook recovery, partial party positioning, anonymous bag discovery, late theme handoff, stale name-color restoration, contradictory owner-name identity and late MicroMenu offset installation. Focused regressions cover the demonstrated source paths. These are conditional recovery/presentation repairs; historical Battleground reports still require live verification. See architecture section 44.
+
 **Conditional recovery repairs (2026-10-27):** `0.2.259-recovery-test` isolates incoming hit-text setter errors from the remaining lifecycle repairs, and recovers stale Soft Dark Edit Mode state after incomplete callback registration. Both defects were reproduced with modeled API failures against the exact `0.2.258-hit-text-recovery-test` build. Native occurrence, event ordering, protected writes, rendering and taint still need in-game validation. Existing historical reports and other conditional compatibility questions remain open.
 
 **Incoming hit-text lifecycle (2026-10-27):** `0.2.258-hit-text-recovery-test` retries Player incoming-text anchoring at combat exit and refreshes it after UI scale/display changes, using the existing guarded helper and current geometry. Full-module lifecycle regressions compare with `0.2.257-presentation-recovery-test`; live rendering, event ordering and taint still require in-game validation. Unrelated conditional gaps and historical Battleground reports remain open.
@@ -26,7 +28,7 @@
 
 **v16 suite update (2026-10-22):** this addon receives release-version metadata only. Its behavior is byte-identical to v15 apart from that version string. The three timing repairs are in bjarkiCC Model/Observer. The full v16 suite passes 49 regression scripts and 28 runtime syntax checks on both Lua 5.1 and Lua 5.4; live-client findings below retain their existing status. The behavior described in architecture section 31 remains applicable.
 
-Current packaged source baseline (2026-10-27): **bjarkiUI 0.2.259-recovery-test**. The reports below are historical client observations and remain open pending current-client verification. Offline source, syntax and modeled-API checks do not close them. See architecture section 32 for the current layout-neutral behavior.
+Current packaged source baseline (2026-10-31): **bjarkiUI 0.2.260-audit-fixes-test**. The reports below are historical client observations and remain open pending current-client verification. Offline source, syntax and modeled-API checks do not close them. See architecture section 32 for the current layout-neutral behavior.
 
 Original status recorded 2026-10-08 for **bjarkiUI 0.2.90-local**.
 

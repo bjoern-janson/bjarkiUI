@@ -100,13 +100,15 @@ end
 -- Actual PartyOrder visual functions, with native readable/unreadable states.
 do
     local code = section(party, "local function shown(frame)",
-        "local function queueVisualOrder(frame)")
+        "local function queueVisualOrder(")
     local writes = {}
     local function member(name, visible)
         return {
             unit = name,
             visible = visible,
             IsShown = function(self) return self.visible end,
+            GetNumPoints = function() return 1 end,
+            GetPoint = function() return "TOP", nil, "TOP", 0, 0 end,
             ClearAllPoints = function(self) writes[#writes + 1] = "clear:" .. tostring(self.unit) end,
             SetPoint = function(self) writes[#writes + 1] = "set:" .. tostring(self.unit) end,
         }
@@ -131,7 +133,9 @@ do
         if ok and type(result) == "boolean" then return result end
     end
     local env = {
+        CompactPartyFrame = frame,
         EditModeManagerFrame = manager,
+        isSecret = function() return false end,
         safeBool = safeBool,
         readableUnitToken = function(v) return type(v) == "string" and v or nil end,
         safeNumberMethod = function(object, method)
@@ -142,6 +146,7 @@ do
         mayReanchor = function() return true end,
     }
     local _, apply = isolated(code,
+        "local isSecret = _G.isSecret\n" ..
         "local safeBool = _G.safeBool\n" ..
         "local readableUnitToken = _G.readableUnitToken\n" ..
         "local safeNumberMethod = _G.safeNumberMethod\n" ..
