@@ -123,23 +123,23 @@ do
     local rules=fmt.rules
     eq(#rules,5,"five native threshold rules")
     eq(rules[1].threshold,0,"one-decimal breakpoint")
-    eq(rules[1].format,"%.1f","one decimal strictly under five")
-    eq(rules[2].threshold,5,"whole seconds begin exactly at five")
-    eq(rules[2].format,"%.0f","no decimals at five or above")
+    eq(rules[1].format,"%.1f","one decimal strictly under ten")
+    eq(rules[2].threshold,10,"whole seconds begin exactly at ten")
+    eq(rules[2].format,"%.0f","no decimals at ten or above")
     eq(rules[3].threshold,360,"6-minute breakpoint unchanged")
     eq(rules[4].threshold,3600,"hour breakpoint unchanged")
     eq(rules[5].threshold,86400,"day breakpoint unchanged")
     for _,pair in ipairs({
-        {0.1,"0.1"},{1.9,"1.9"},{4.9,"4.9"},{5,"5"},
-        {5.1,"5"},{5.9,"5"},{59.9,"59"},{60,"60"},
+        {0.1,"0.1"},{1.9,"1.9"},{4.9,"4.9"},{5,"5.0"},
+        {5.1,"5.1"},{5.9,"5.9"},{9.9,"9.9"},{10,"10"},{10.1,"10"},{59.9,"59"},{60,"60"},
         {105,"105"},{321,"321"},{359.9,"359"},
         {360,"6m"},{361,"7m"},{900,"15m"},
         {3600,"1h"},{5400,"2h"},{86400,"1d"},
     }) do
         eq(render(fmt,pair[1]),pair[2],"native rule at "..tostring(pair[1]))
     end
-    eq(render(fmt,4.9),"4.9","decimal presentation below five")
-    eq(render(fmt,5),"5","integer presentation at five")
+    eq(render(fmt,9.9),"9.9","decimal presentation below ten")
+    eq(render(fmt,10),"10","integer presentation at ten")
     eq(render(fmt,105),"105","no minutes:seconds representation")
 
     spy.emit("PLAYER_LOGIN")

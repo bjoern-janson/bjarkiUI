@@ -896,3 +896,8 @@ The source has exact v15 runtime parity, matching manifests and embedded/referen
 - Health styling requires a successfully installed per-bar native-color observer before preparing native artwork or applying tint. Missing/rejected registration leaves the current native material and color alone; a later retry captures the then-current baseline. The shared gate covers readable class/NPC colors and native protected-class transport. Derived repaint hooks register only after that observer succeeds, so native-color observation always precedes synchronous repaint or restoration across retries.
 - Regression coverage adds native dependent anchors with cycle rejection and tests failed color tracking, current-baseline acquisition after retry, and subsequent native-color restoration. Successful nil-return native APIs remain supported. These fixtures exercise addon behavior, not the client's protected-value or taint implementation.
 - All existing visual values, successful party order, Player native-color policy, saved layouts, dormant movement text and cooldown thresholds remain unchanged. No new event, polling loop, setting or dependency is introduced.
+
+## 46. Decimals below ten seconds: 0.2.262-ten-second-decimals-test (2026-10-31)
+
+- Action-button countdowns use one decimal strictly below ten seconds (`5 → 5.0`, `9.9 → 9.9`) and whole seconds rounded down from ten (`10 → 10`, `10.1 → 10`). The six-minute, hour and day format rules are unchanged.
+- Only the native formatter breakpoint changes; timing, colors, fonts, swipes and tracked-buff formatting retain their existing behavior. The existing countdown regression covers the revised boundary.
