@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.259-recovery-test"
+local BJARKI_UI_VERSION = "0.2.262-ten-second-decimals-test"
 -- Standalone PRD treatment is retained. Unit-frame resource bars stay native.
 local PRD_MANA_R, PRD_MANA_G, PRD_MANA_B = 0.10, 0.25, 1.00
 local WORLD_TEXT_SCREEN_Y = "0.0430"
@@ -804,6 +804,9 @@ function nativeHealthStyle.Restore(bar)
     return ok and restored
 end
 function nativeHealthStyle.Prepare(bar)
+    -- Native writes must remain observable before capturing a baseline or
+    -- taking material/color ownership. A failed install can retry later.
+    if not nativeHealthStyle.colorHooks[bar] then return false end
     local texture = currentHealthTexture(bar)
     if not texture or type(texture.GetAtlas) ~= "function" then return false end
     local ok, atlas = pcall(texture.GetAtlas, texture)
@@ -962,7 +965,7 @@ end
 function nativeHealthStyle.Install(bar, unit)
     if not bar or not hooksecurefunc or readableUnitToken(bar.unit) ~= unit then return end
     if not nativeHealthStyle.colorHooks[bar] and type(bar.SetStatusBarColor) == "function" then
-        nativeHealthStyle.colorHooks[bar] = pcall(hooksecurefunc, bar, "SetStatusBarColor", function(self, r, g, b, a)
+        local ok, result = pcall(hooksecurefunc, bar, "SetStatusBarColor", function(self, r, g, b, a)
             if healthColorWrites[self] then return end
             local state = nativeHealthStyle.states[self]
             if not state then return end
@@ -975,6 +978,7 @@ function nativeHealthStyle.Install(bar, unit)
                 state.nativeColor = {r, g, b, type(a) == "number" and a or 1}
             end
         end)
+        nativeHealthStyle.colorHooks[bar] = ok and result ~= false
     end
     local texture = currentHealthTexture(bar)
     if not texture or nativeHealthStyle.textureHooks[texture] or type(texture.SetAtlas) ~= "function" then return end
@@ -995,6 +999,9 @@ local function installDerivedColorHook(bar, unit)
     if not bar or derivedColorHooks[bar] or type(hooksecurefunc) ~= "function"
         or type(bar.SetStatusBarColor) ~= "function" then return end
     if unit ~= "targettarget" and unit ~= "focustarget" then return end
+    -- Observation must precede synchronous repaint/restoration, including
+    -- after a rejected observer install retries at a later lifecycle pass.
+    if not nativeHealthStyle.colorHooks[bar] then return end
     -- A failed hook must leave this reused bar eligible for another attempt.
     derivedColorHooks[bar] = pcall(hooksecurefunc, bar, "SetStatusBarColor", function(self)
         if not healthColorWrites[self] and self == healthBar(unit) then
@@ -1088,14 +1095,56 @@ end
 -- Color only the five existing Blizzard unit-frame name FontStrings. The name
 -- itself remains Blizzard's full GetUnitName (including surnames); never
 -- infer class from a native health-bar tint or a previous frame occupant.
--- Cache each label's unmodified font color *before* our first tint so an NPC,
--- pet, unknown class or recycled unit can return to its native appearance.
+-- Follow native color writes while owning only our guarded tint/restore calls.
+-- Weak keys keep label reuse bounded; the hook does not capture its label.
 local classNameColorStates = setmetatable({}, { __mode = "k" })
 
+local function readableNameColor(r, g, b, a)
+    if isSecret(r) or isSecret(g) or isSecret(b) or isSecret(a)
+        or type(r) ~= "number" or type(g) ~= "number" or type(b) ~= "number"
+        or (a ~= nil and type(a) ~= "number") then return nil end
+    return { r, g, b, a or 1 }
+end
+
+local function prepareNameColor(text)
+    local state = classNameColorStates[text]
+    if not state then
+        state = {}
+        classNameColorStates[text] = state
+    end
+    if not state.hooked then
+        if type(hooksecurefunc) ~= "function" then return nil end
+        local ok, result = pcall(hooksecurefunc, text, "SetTextColor", function(self, r, g, b, a)
+            local current = classNameColorStates[self]
+            if not current or current.writing then return end
+            -- A newer native writer revokes our tint ownership, even when its
+            -- color cannot be read. Never resurrect an older native snapshot.
+            current.tinted = false
+            current.observedWrite = true
+            current.native = readableNameColor(r, g, b, a)
+        end)
+        if not ok or result == false then return nil end
+        state.hooked = true
+    end
+    if not state.native and not state.observedWrite then
+        if type(text.GetTextColor) ~= "function" then return nil end
+        local ok, r, g, b, a = pcall(text.GetTextColor, text)
+        if ok then state.native = readableNameColor(r, g, b, a) end
+    end
+    if state.native then return state end
+end
+
+local function writeNameColor(text, state, r, g, b, a)
+    state.writing = true
+    local ok, result = pcall(text.SetTextColor, text, r, g, b, a)
+    state.writing = nil
+    return ok and result ~= false
+end
+
 local function restoreNativeNameColor(text, state)
-    if not state or not state.tinted then return end
+    if not state or not state.tinted or not state.native then return end
     local c = state.native
-    if pcall(text.SetTextColor, text, c[1], c[2], c[3], c[4]) then
+    if writeNameColor(text, state, c[1], c[2], c[3], c[4]) then
         state.tinted = false
     end
 end
@@ -1120,8 +1169,7 @@ local function setOpaquePlayerClassNameColor(text, unit, setColor)
         local r, g, b = getRGB(color)
         -- Unit-frame labels use text color; native nameplates use vertex color.
         local setter = setColor or text.SetTextColor
-        setter(text, r, g, b, 1)
-        return true
+        return setter(text, r, g, b, 1) ~= false
     end)
     return ok and applied == true
 end
@@ -1131,7 +1179,8 @@ end
 -- for restricted opponents: failure leaves the unmodified native name color.
 -- Neither pet names nor creature appearances imply an owner's class.
 local function classColorFromPetOrTotemOwner(unit)
-    if isPlayerUnit(unit) then return nil end
+    local player, readable = playerUnitState(unit)
+    if not readable or player ~= false then return nil end
     if type(UnitOwnerGUID) ~= "function" or type(UnitClassFromGUID) ~= "function" then return nil end
 
     local totem = false
@@ -1165,16 +1214,10 @@ local function applyClassNameColor(unit)
     local text = frame.name or (unit == "player" and _G.PlayerName) or frame.Name
     if not text or isSecret(text) or type(text.SetTextColor) ~= "function" then return end
 
-    local state = classNameColorStates[text]
-    if not state then
-        if type(text.GetTextColor) ~= "function" then return end
-        local ok, r, g, b, a = pcall(text.GetTextColor, text)
-        if not ok or isSecret(r) or isSecret(g) or isSecret(b) or isSecret(a)
-            or type(r) ~= "number" or type(g) ~= "number" or type(b) ~= "number"
-            or (a ~= nil and type(a) ~= "number") then return end
-        state = { native = { r, g, b, a or 1 }, tinted = false }
-        classNameColorStates[text] = state
-    end
+    -- A reliable hook and readable current native baseline are prerequisites
+    -- for taking ownership; rejected hooks remain retryable on native updates.
+    local state = prepareNameColor(text)
+    if not state then return end
 
     if readableBool(UnitExists, unit) ~= true then
         restoreNativeNameColor(text, state)
@@ -1185,12 +1228,14 @@ local function applyClassNameColor(unit)
     -- native color rather than tint an unknown unit using stale evidence.
     local r, g, b = fallbackPlayerHealthColor(unit)
     if r then
-        if pcall(text.SetTextColor, text, r, g, b, 1) then state.tinted = true end
-    elseif setOpaquePlayerClassNameColor(text, unit) then
+        if writeNameColor(text, state, r, g, b, 1) then state.tinted = true end
+    elseif setOpaquePlayerClassNameColor(text, unit, function(_, cr, cg, cb, ca)
+        return writeNameColor(text, state, cr, cg, cb, ca)
+    end) then
         state.tinted = true
     else
         local ownerR, ownerG, ownerB = classColorFromPetOrTotemOwner(unit)
-        if ownerR and pcall(text.SetTextColor, text, ownerR, ownerG, ownerB, 1) then
+        if ownerR and writeNameColor(text, state, ownerR, ownerG, ownerB, 1) then
             state.tinted = true
         else
             restoreNativeNameColor(text, state)
@@ -1557,7 +1602,7 @@ local function queueFocusFlashAnchorRepair()
     if not scheduled then focusFlashRepairQueued = false end
 end
 
-local function retryThreatAlphaHooks()
+local function installThreatAlphaHooks()
     local player, target, focus = _G.PlayerFrame, _G.TargetFrame, _G.FocusFrame
     installVertexAlphaScale(player and player.PlayerFrameContainer and player.PlayerFrameContainer.FrameFlash, HIGHLIGHT_SCALE)
     installVertexAlphaScale(target and target.TargetFrameContainer and target.TargetFrameContainer.Flash, HIGHLIGHT_SCALE)
@@ -1566,35 +1611,30 @@ local function retryThreatAlphaHooks()
     installVertexAlphaScale(_G.PetAttackModeTexture, HIGHLIGHT_SCALE)
 end
 
-local function installThreatScaling()
-    local player, target, focus = _G.PlayerFrame, _G.TargetFrame, _G.FocusFrame
-    local playerFlash = player and player.PlayerFrameContainer and player.PlayerFrameContainer.FrameFlash
+local playerRestFlashes = setmetatable({}, { __mode = "k" })
+local playerStatusHookInstalled, playerArtHookInstalled = false, false
+local playerStatusSyncing = false
+
+local function syncPlayerStatus()
+    if playerStatusSyncing then return end
+    playerStatusSyncing = true
+    local player = _G.PlayerFrame
+    local playerContainer = player and player.PlayerFrameContainer
+    local playerFlash = playerContainer and playerContainer.FrameFlash
     local playerStatus = player and player.PlayerFrameContent
         and player.PlayerFrameContent.PlayerFrameContentMain
         and player.PlayerFrameContent.PlayerFrameContentMain.StatusTexture
-    local targetFlash = target and target.TargetFrameContainer and target.TargetFrameContainer.Flash
-    local focusFlash = focus and focus.TargetFrameContainer and focus.TargetFrameContainer.Flash
-    if focusFlash and not focusFlashHooks[focusFlash] and type(hooksecurefunc) == "function"
-        and type(focusFlash.SetPoint) == "function" then
-        focusFlashHooks[focusFlash] = pcall(hooksecurefunc, focusFlash, "SetPoint", queueFocusFlashAnchorRepair)
-    end
-    repairFocusFlashAnchor()
-
-    -- Player/target/focus now share the same native threat-flash treatment.
-    -- Each frame keeps its own Blizzard atlas/geometry; only intensity is
-    -- normalized. This makes the player warning read like the target warning
-    -- instead of using the unrelated StatusTexture art.
-    retryThreatAlphaHooks()
-
-    -- Blizzard's StatusTexture is a separate red/yellow portrait+name-bar pulse.
-    -- Keep it disabled. Resting instead gets a static yellow copy of the native
-    -- player threat-flash atlas so rested and threat states share one shape.
-    local staticRestFlash
-    local playerContainer = player and player.PlayerFrameContainer
-
-    if playerFlash and playerContainer and playerContainer.CreateTexture then
-        staticRestFlash = playerContainer:CreateTexture(nil, "ARTWORK", nil, 1)
-        staticRestFlash:Hide()
+    -- Retain one static native-atlas copy per actual player frame. Late frame
+    -- creation and replacements are discovered at each existing retry boundary.
+    local staticRestFlash = player and playerRestFlashes[player]
+    if not staticRestFlash and playerFlash and playerContainer
+        and type(playerContainer.CreateTexture) == "function" then
+        local ok, texture = pcall(playerContainer.CreateTexture, playerContainer, nil, "ARTWORK", nil, 1)
+        if ok and texture then
+            staticRestFlash = texture
+            playerRestFlashes[player] = texture
+            pcall(texture.Hide, texture)
+        end
     end
 
     local function copyPlayerFlashGeometry()
@@ -1622,7 +1662,7 @@ local function installThreatScaling()
         end
     end
 
-    local function syncPlayerStatus()
+    local function applyPlayerStatus()
         -- Hiding this also stops Blizzard's PlayerFrame_OnUpdate pulse work
         -- because that loop runs only while StatusTexture:IsShown().
         if playerStatus and playerStatus.Hide then
@@ -1650,15 +1690,38 @@ local function installThreatScaling()
         end
     end
 
-    if hooksecurefunc and type(PlayerFrame_UpdateStatus) == "function" then
-        hooksecurefunc("PlayerFrame_UpdateStatus", syncPlayerStatus)
+    applyPlayerStatus()
+    playerStatusSyncing = false
+end
+
+local function installThreatScaling()
+    local focus = _G.FocusFrame
+    local focusFlash = focus and focus.TargetFrameContainer and focus.TargetFrameContainer.Flash
+    if focusFlash and not focusFlashHooks[focusFlash] and type(hooksecurefunc) == "function"
+        and type(focusFlash.SetPoint) == "function" then
+        focusFlashHooks[focusFlash] = pcall(hooksecurefunc, focusFlash, "SetPoint", queueFocusFlashAnchorRepair)
     end
-    if hooksecurefunc and type(PlayerFrame_UpdateArt) == "function" then
-        hooksecurefunc("PlayerFrame_UpdateArt", syncPlayerStatus)
+    repairFocusFlashAnchor()
+    -- Player/target/focus keep their native atlas/geometry and intensity policy.
+    installThreatAlphaHooks()
+
+    -- Optional native APIs can arrive late or reject a registration. Each
+    -- successful hook is retained independently; failure cannot abort login.
+    if type(hooksecurefunc) == "function" then
+        if not playerStatusHookInstalled and type(PlayerFrame_UpdateStatus) == "function" then
+            playerStatusHookInstalled = pcall(hooksecurefunc, "PlayerFrame_UpdateStatus", syncPlayerStatus)
+        end
+        if not playerArtHookInstalled and type(PlayerFrame_UpdateArt) == "function" then
+            playerArtHookInstalled = pcall(hooksecurefunc, "PlayerFrame_UpdateArt", syncPlayerStatus)
+        end
     end
     syncPlayerStatus()
 end
 
+local function retryThreatAlphaHooks()
+    -- Retry all threat/resting work together, preserving each successful piece.
+    installThreatScaling()
+end
 
 -- BEGIN BJARKI_NATIVE_UPDATE_HOOKS
 -- Native functions can become available after PLAYER_LOGIN. Install each
@@ -1721,7 +1784,7 @@ local function installHooks()
     installNativeUpdateHooks()
     if hooksInstalled then return end
     hooksInstalled = true
-    -- The static threat/resting presentation is installed only once.
+    -- Initial setup; later lifecycle retries retain successful hooks/textures.
     installThreatScaling()
 end
 -- END BJARKI_NATIVE_UPDATE_HOOKS
@@ -2327,11 +2390,12 @@ local function suppressMicroMenuNotificationPips()
     visit(_G.ShopMicroButton)
 end
 
-local microMenuChildOffsetHookInstalled = false
+local microMenuChildOffsetHookInstalled = setmetatable({}, { __mode = "k" })
 local MICRO_MENU_CHILD_Y_OFFSET = -1
 
 local function applyMicroMenuChildOffset()
     suppressMicroMenuNotificationPips()
+    if readableBool(InCombatLockdown) ~= false then return end
 
     local menu = _G.MicroMenu
     local container = _G.MicroMenuContainer
@@ -2365,12 +2429,14 @@ local function installMicroMenuChildOffset()
 
     suppressMicroMenuNotificationPips()
 
-    if not microMenuChildOffsetHookInstalled and hooksecurefunc
+    if readableBool(InCombatLockdown) ~= false then return end
+
+    if not microMenuChildOffsetHookInstalled[menu] and type(hooksecurefunc) == "function"
         and type(menu.AnchorToMenuContainer) == "function"
     then
         -- Blizzard may re-anchor MicroMenu whenever it lays out. Apply the
         -- visual offset after that exact operation; no polling required.
-        microMenuChildOffsetHookInstalled =
+        microMenuChildOffsetHookInstalled[menu] =
             pcall(hooksecurefunc, menu, "AnchorToMenuContainer", applyMicroMenuChildOffset)
     end
 
@@ -2513,6 +2579,7 @@ events:SetScript("OnEvent", function(_, event, unit)
     if event == "ADDON_LOADED" then
         if type(unit) == "string" and unit:match("^Blizzard_") then
             installNativeUpdateHooks()
+            retryThreatAlphaHooks()
         end
         if unit == "Blizzard_ActionBar" then
             hideActionBarMacroLabels()
@@ -2530,7 +2597,7 @@ events:SetScript("OnEvent", function(_, event, unit)
             installMovementSpeedRow()
             installPRDStatusFonts()
         elseif unit == "Blizzard_MicroMenu" then
-            suppressMicroMenuNotificationPips()
+            installMicroMenuChildOffset()
         elseif unit == "Blizzard_PrivateAurasUI"
             or unit == "Blizzard_CompactRaidFrames"
             or unit == "Blizzard_CompactUnitFrame"
@@ -2598,6 +2665,8 @@ events:SetScript("OnEvent", function(_, event, unit)
         installPRDStatusFonts()
         anchorCombatText()
     elseif event == "PLAYER_REGEN_ENABLED" then
+        retryThreatAlphaHooks()
+        installMicroMenuChildOffset()
         repairFocusFlashAnchor()
         installNameplateControlLayout()
         -- Retry only evidence-bound class colors; no unit-frame backings.

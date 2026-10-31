@@ -216,6 +216,91 @@ local function loadedDarkMode()
     return ok and readable(active) and active == true
 end
 
+-- During theme handoff, a saved baseline alone cannot prove ownership.
+-- Compare each readable property with our last successful write; an incoming
+-- theme's changes (or uncertain current state) retire only that property's
+-- snapshot without writing it. Failed still-owned restores remain retryable.
+local function readColor(texture)
+    local getter = child(texture, "GetVertexColor")
+    if type(getter) ~= "function" then return nil end
+    local ok, r, g, b, a = pcall(getter, texture)
+    if not ok or not readable(r) or not readable(g) or not readable(b)
+        or not readable(a) or type(r) ~= "number" or type(g) ~= "number"
+        or type(b) ~= "number" or type(a) ~= "number" then return nil end
+    return {r, g, b, a}
+end
+
+local function readDesaturation(texture, mode)
+    local getter = child(texture, mode == "level" and "GetDesaturation" or "IsDesaturated")
+    if type(getter) ~= "function" then return nil end
+    local ok, value = pcall(getter, texture)
+    if not ok or not readable(value) or type(value) ~= (mode == "level" and "number" or "boolean") then
+        return nil
+    end
+    return {mode = mode, value = value}
+end
+
+local function ownsColor(texture, base)
+    local applied = base.applied
+    local current = applied and readColor(texture)
+    if not current then return false end
+    return current[1] == applied[1] and current[2] == applied[2]
+        and current[3] == applied[3] and current[4] == applied[4]
+end
+
+local function ownsDesaturation(texture, previous)
+    local applied = previous.applied
+    local current = applied and readDesaturation(texture, applied.mode)
+    return current and current.value == applied.value
+end
+
+local function restoreColor(texture, handoff, keepOriginal)
+    local base = originalColor[texture]
+    if not base then return true end
+    if handoff and not ownsColor(texture, base) then
+        originalColor[texture] = nil
+        return true
+    end
+    local setter = handoff and child(texture, "SetVertexColor") or nil
+    if not handoff then setter = texture.SetVertexColor end
+    local restored = pcall(setter, texture, base[1], base[2], base[3], base[4])
+    if restored then
+        if keepOriginal and not handoff then
+            base.applied = readColor(texture)
+        else
+            originalColor[texture] = nil
+        end
+    end
+    return restored
+end
+
+local function restoreDesaturation(texture, handoff, keepOriginal)
+    local previous = originalBagDesaturation[texture]
+    if not previous then return true end
+    if handoff and not ownsDesaturation(texture, previous) then
+        originalBagDesaturation[texture] = nil
+        return true
+    end
+    local restored = false
+    if previous.mode == "level" then
+        local setter = handoff and child(texture, "SetDesaturation") or nil
+        if not handoff then setter = texture.SetDesaturation end
+        restored = pcall(setter, texture, previous.value)
+    elseif previous.mode == "bool" then
+        local setter = handoff and child(texture, "SetDesaturated") or nil
+        if not handoff then setter = texture.SetDesaturated end
+        restored = pcall(setter, texture, previous.value)
+    end
+    if restored then
+        if keepOriginal and not handoff then
+            previous.applied = readDesaturation(texture, previous.mode)
+        else
+            originalBagDesaturation[texture] = nil
+        end
+    end
+    return restored
+end
+
 -- Candidate selection deliberately fails closed if the observed Forever bag
 -- hierarchy changes. Other clients/addons may add functional children.
 local function bagSiblingArtCandidates()
@@ -258,21 +343,9 @@ local function restoreBagSiblingArt()
     -- without undoing the rest of the Soft Dark presentation.
     for texture in pairs(bagSiblingStyledTextures) do
         if readable(texture) then
-            local colorRestored, saturationRestored = true, true
-            local base = originalColor[texture]
-            if base then
-                colorRestored = pcall(texture.SetVertexColor, texture,
-                    base[1], base[2], base[3], base[4])
-            end
-            local previous = originalBagDesaturation[texture]
-            if previous then
-                saturationRestored = false
-                if previous.mode == "level" then
-                    saturationRestored = pcall(texture.SetDesaturation, texture, previous.value)
-                elseif previous.mode == "bool" then
-                    saturationRestored = pcall(texture.SetDesaturated, texture, previous.value)
-                end
-            end
+            local handoff = loadedDarkMode()
+            local colorRestored = restoreColor(texture, handoff, true)
+            local saturationRestored = restoreDesaturation(texture, handoff, true)
             -- Keep failed siblings eligible for the next Edit Mode/layout retry.
             -- Originals remain available while the rest of the theme is active.
             if colorRestored and saturationRestored then
@@ -353,34 +426,22 @@ local function styleBagSiblingArt(tint)
     return count
 end
 
-local function restore()
+local function restore(handoff)
     -- The global pass includes siblings: attempt each property only once.
     -- Retire only successful writes; failures keep their weak-key originals
     -- for an explicit/lifecycle retry or a noncompounding direct re-enable.
-    for texture, base in pairs(originalColor) do
-        if readable(texture) and pcall(texture.SetVertexColor, texture,
-            base[1], base[2], base[3], base[4]) then
-            originalColor[texture] = nil
+    for texture in pairs(originalColor) do
+        if readable(texture) and restoreColor(texture, handoff) then
             if not originalBagDesaturation[texture] then
                 bagSiblingStyledTextures[texture] = nil
             end
         end
     end
-    -- Restore saturation independently of the vertex tint (the two shader
-    -- properties can be changed without replacing any Blizzard textures).
-    for texture, previous in pairs(originalBagDesaturation) do
-        if readable(texture) then
-            local restored = false
-            if previous.mode == "level" then
-                restored = pcall(texture.SetDesaturation, texture, previous.value)
-            elseif previous.mode == "bool" then
-                restored = pcall(texture.SetDesaturated, texture, previous.value)
-            end
-            if restored then
-                originalBagDesaturation[texture] = nil
-                if not originalColor[texture] then
-                    bagSiblingStyledTextures[texture] = nil
-                end
+    -- Color and desaturation can be owned by different themes.
+    for texture in pairs(originalBagDesaturation) do
+        if readable(texture) and restoreDesaturation(texture, handoff) then
+            if not originalColor[texture] then
+                bagSiblingStyledTextures[texture] = nil
             end
         end
     end
@@ -412,9 +473,14 @@ local function tintTexture(texture, relativeBrightness, warmBagChrome)
     if warmBagChrome then
         red, green, blue = BAG_WARM_RED, BAG_WARM_GREEN, BAG_WARM_BLUE
     end
-    return pcall(texture.SetVertexColor, texture,
-        base[1] * factor * red, base[2] * factor * green,
-        base[3] * factor * blue, base[4])
+    local applied = {base[1] * factor * red, base[2] * factor * green,
+        base[3] * factor * blue, base[4]}
+    local ok = pcall(texture.SetVertexColor, texture,
+        applied[1], applied[2], applied[3], applied[4])
+    -- Native setters may retain lower-precision values than the Lua inputs.
+    -- Failed/secret readback leaves no evidence authorizing a later handoff.
+    if ok then base.applied = readColor(texture) end
+    return ok
 end
 
 -- Safe, reversible desaturation for BAG CHROME ONLY. Do not use on spell,
@@ -445,7 +511,9 @@ tintBagChromeTexture = function(texture, relativeBrightness)
     -- the fixed warm vertex tint instead of forcing full grayscale again.
     if originalBagDesaturation[texture] then
         if type(child(texture, "SetDesaturation")) == "function" then
-            pcall(texture.SetDesaturation, texture, BAG_DESATURATION)
+            if pcall(texture.SetDesaturation, texture, BAG_DESATURATION) then
+                originalBagDesaturation[texture].applied = readDesaturation(texture, "level")
+            end
         end
     end
     return true
@@ -456,6 +524,10 @@ local function atlasName(texture)
     local ok, atlas = pcall(texture.GetAtlas, texture)
     if not ok or not readable(atlas) or type(atlas) ~= "string" then return nil end
     return atlas
+end
+
+local function isNativeBagBorderAtlas(atlas)
+    return type(atlas) == "string" and atlas:lower() == "ui-hud-actionbar-iconframe-bags"
 end
 
 -- Native bag slots draw their gold chrome in their Normal/PushedTexture,
@@ -474,7 +546,7 @@ local function isBagButtonBorder(button, texture)
         -- A blanket "icon" rejection incorrectly skipped all six bag slots.
         -- This exact observed atlas is safe only on the known bag button's
         -- Normal/PushedTexture (the independent Icon region was excluded above).
-        if name == "ui-hud-actionbar-iconframe-bags" then
+        if isNativeBagBorderAtlas(atlas) then
             return true
         end
         -- Forever's reagent bag uses an IconFrame variant rather than the
@@ -528,18 +600,25 @@ local function forEachBagButton(visitor)
             local ok, value = pcall(nameGetter, frame)
             if ok and readable(value) and type(value) == "string" then name = value end
         end
-        local atlas
+        local atlas, nativeBorder
         if type(normalGetter) == "function" then
             local ok, texture = pcall(normalGetter, frame)
-            if ok then atlas = atlasName(texture) end
+            if ok then
+                atlas = atlasName(texture)
+                nativeBorder = isNativeBagBorderAtlas(atlas) and isBagButtonBorder(frame, texture)
+            end
         end
         local lowerAtlas = type(atlas) == "string" and atlas:lower() or ""
         local belongsToBag = name:find("Bag") or name:find("bag")
             or name:find("Reagent") or name:find("Slot")
+            or nativeBorder
             or lowerAtlas:find("bag%-border")
             or lowerAtlas:find("bag%-main")
             or lowerAtlas:find("bag%-reagent")
-        if belongsToBag and name ~= "BagBarExpandToggle" then visit(frame, "nested") end
+        if belongsToBag and name ~= "BagBarExpandToggle"
+            and name ~= "KeyRingButton" and frame ~= resolve("KeyRingButton") then
+            visit(frame, "nested")
+        end
         if depth == 3 then return end
         local childrenGetter = child(frame, "GetChildren")
         if type(childrenGetter) ~= "function" then return end
@@ -780,12 +859,8 @@ local function applyTheme()
         return
     end
     pending = false
-    if settings.softDarkEnabled ~= true then
-        restore()
-        return
-    end
     if loadedDarkMode() then
-        restore()
+        restore(true)
         if not warnedConflict then
             out("the full DarkMode addon is loaded; Soft Dark is inactive to avoid conflicting recolors")
             warnedConflict = true
@@ -793,6 +868,10 @@ local function applyTheme()
         return
     end
     warnedConflict = false
+    if settings.softDarkEnabled ~= true then
+        restore()
+        return
+    end
 
     local visited = {}
     local stats = { chrome = 0, windows = 0, buttons = 0, textures = 0, dividers = 0, bagArt = 0, bagBorders = 0, bagDetails = 0, bagDividers = 0, compactBackdrops = 0 }
@@ -1248,18 +1327,19 @@ lifecycle:SetScript("OnEvent", function(_, event, addon)
         return
     end
     if event == "ADDON_LOADED" and type(addon) == "string"
-        and addon ~= "bjarkiUI" and not addon:match("^Blizzard_") then
+        and addon ~= "bjarkiUI" and addon ~= "DarkMode" and not addon:match("^Blizzard_") then
         return
     end
     -- Paint the first load immediately, then let one next-tick pass collect
     -- the rest of this load burst and any art created after event dispatch.
-    if event == "ADDON_LOADED" and deferredThemeQueued then return end
+    if event == "ADDON_LOADED" and deferredThemeQueued and addon ~= "DarkMode" then return end
     installDividerHook()
     installBagBorderHooks()
     installBagSiblingLayoutHook()
     installBagSiblingEditModeHooks()
     applyTheme()
-    if event == "ADDON_LOADED" and C_Timer and type(C_Timer.After) == "function" then
+    if event == "ADDON_LOADED" and addon ~= "DarkMode"
+        and C_Timer and type(C_Timer.After) == "function" then
         deferredThemeQueued = true
         C_Timer.After(0, function()
             deferredThemeQueued = false

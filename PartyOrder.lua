@@ -101,33 +101,91 @@ local function visualMembers(frame)
     return ordered
 end
 
-local function reanchorPets(frame, ordered)
-    local pets = frame and frame.petUnitFrames
-    if type(pets) ~= "table" or #ordered == 0 then return end
-    local border = frame.borderFrame
-    local anchor = border and shown(border) and border or ordered[#ordered]
-    local previousShown
-    for _, pet in ipairs(pets) do
-        pet:ClearAllPoints()
-        pet:SetPoint("TOP", previousShown or anchor, "BOTTOM")
-        if shown(pet) then previousShown = pet end
+-- One bounded failed transaction for the current party; retry on existing events.
+local pendingRestore
+local unpackPoints = unpack or table.unpack
+
+local function readPoints(object)
+    if type(object.GetNumPoints) ~= "function" or type(object.GetPoint) ~= "function" then return nil end
+    local count = safeNumberMethod(object, object.GetNumPoints)
+    if not count or count < 0 or count > 32 or count % 1 ~= 0 then return nil end
+    local points = {}
+    for i = 1, count do
+        local ok, point, relative, relativePoint, x, y = pcall(object.GetPoint, object, i)
+        if not ok or isSecret(point) or isSecret(relative) or isSecret(relativePoint)
+            or isSecret(x) or isSecret(y) then return nil end
+        if type(point) ~= "string" or type(relativePoint) ~= "string"
+            or (relative ~= nil and type(relative) ~= "table" and type(relative) ~= "userdata")
+            or type(x) ~= "number" or type(y) ~= "number"
+            or x ~= x or y ~= y or math.abs(x) == math.huge or math.abs(y) == math.huge then return nil end
+        points[i] = {point, relative, relativePoint, x, y}
     end
+    return points
 end
 
-local function applyVisualOrder(frame)
+local function samePoints(a, b)
+    if not a or not b or #a ~= #b then return false end
+    for i, point in ipairs(a) do
+        for j = 1, 5 do
+            if point[j] ~= b[i][j] then return false end
+        end
+    end
+    return true
+end
+
+local function setPoints(object, points)
+    for _, point in ipairs(points) do
+        local ok, result = pcall(object.SetPoint, object, unpackPoints(point, 1, 5))
+        if not ok or result == false then return false end
+    end
+    return true
+end
+
+local function writePoints(object, points)
+    local ok, result = pcall(object.ClearAllPoints, object)
+    if not ok or result == false then return false end
+    return setPoints(object, points)
+end
+
+local function restorePoints(transaction)
+    -- The custom and native chains can run in opposite directions. Detach the
+    -- whole touched graph before reconnecting any saved edge, in any plan order.
+    local complete = true
+    for i = 1, transaction.touched do
+        local object = transaction.plan[i].object
+        local ok, result = pcall(object.ClearAllPoints, object)
+        if not ok or result == false then complete = false end
+    end
+    -- A failed clear may retain a custom dependency. Do not rebuild against it;
+    -- retain the observed geometry for a bounded retry on a later safe event.
+    if complete then
+        for i = 1, transaction.touched do
+            local entry = transaction.plan[i]
+            if not setPoints(entry.object, entry.original) then complete = false end
+        end
+    end
+    if not complete then
+        -- Retain only the observed geometry we still own. A native writer or
+        -- unreadable point invalidates permission to replay an old snapshot.
+        for _, entry in ipairs(transaction.plan) do entry.current = readPoints(entry.object) end
+    end
+    return complete
+end
+
+local function applyVisualOrder(frame, nativeLayout)
     frame = frame or _G.CompactPartyFrame
-    if not frame or not mayReanchor() then return end
+    if pendingRestore and pendingRestore.frame ~= _G.CompactPartyFrame then pendingRestore = nil end
+    if not frame or frame ~= _G.CompactPartyFrame then return end
+    -- A completed native layout supersedes old recovery, even if its final
+    -- anchors happen to match our last observed partially restored geometry.
+    if nativeLayout then pendingRestore = nil end
+    if not mayReanchor() then return end
 
     local edit = _G.EditModeManagerFrame
     local horizontal = edit and safeBool(edit.ShouldRaidFrameUseHorizontalRaidGroups, edit, frame.groupType)
-    -- Never touch horizontal native member/pet/border anchors. UNKNOWN also
-    -- never licenses a vertical relayout.
     if horizontal ~= false then return end
-
     local ordered = visualMembers(frame)
     if not ordered or #ordered == 0 then return end
-    -- Resolve every required visual input before changing even the first
-    -- native anchor; a partial order would be worse than leaving it native.
     local titleHeight = 0
     if frame.title then
         titleHeight = safeNumberMethod(frame.title, frame.title.GetHeight)
@@ -135,48 +193,82 @@ local function applyVisualOrder(frame)
             or titleHeight < 0 or titleHeight == math.huge then return end
     end
     local border = frame.borderFrame
-    if border and shown(border) == nil then return end
+    local borderShown = border and shown(border)
+    if border and borderShown == nil then return end
     local pets = frame.petUnitFrames
-    if pets ~= nil then
-        if type(pets) ~= "table" then return end
-        for _, pet in ipairs(pets) do
-            if shown(pet) == nil then return end
-            if type(pet.ClearAllPoints) ~= "function"
-                or type(pet.SetPoint) ~= "function" then return end
-        end
+    if pets ~= nil and type(pets) ~= "table" then return end
+
+    -- Build and snapshot every intended writer before the first ClearAllPoints.
+    local plan, seen = {}, {}
+    local function add(object, points)
+        if not object or seen[object] or type(object.ClearAllPoints) ~= "function"
+            or type(object.SetPoint) ~= "function" or isSecret(object.unit) then return false end
+        local original = readPoints(object)
+        if not original then return false end
+        seen[object] = true
+        plan[#plan + 1] = {object = object, unit = object.unit, points = points, original = original}
+        return true
     end
+    local first, previous = ordered[1], nil
     for _, member in ipairs(ordered) do
-        if type(member.ClearAllPoints) ~= "function"
-            or type(member.SetPoint) ~= "function" then return end
-    end
-    if border and (type(border.ClearAllPoints) ~= "function"
-        or type(border.SetPoint) ~= "function") then return end
-    local first = ordered[1]
-    first:ClearAllPoints()
-    first:SetPoint("TOP", frame, "TOP", 0, -titleHeight)
-    local previous = first
-    for i = 2, #ordered do
-        local member = ordered[i]
-        member:ClearAllPoints()
-        member:SetPoint("TOP", previous, "BOTTOM", 0, 0)
+        local point = previous and {"TOP", previous, "BOTTOM", 0, 0}
+            or {"TOP", frame, "TOP", 0, -titleHeight}
+        if not add(member, {point}) then return end
         previous = member
     end
-    if border and shown(border) then
-        border:ClearAllPoints()
-        border:SetPoint("TOPLEFT", first, "TOPLEFT", -2, 2)
-        border:SetPoint("BOTTOMRIGHT", previous, "BOTTOMRIGHT", 2, -3)
+    if borderShown and not add(border, {
+        {"TOPLEFT", first, "TOPLEFT", -2, 2},
+        {"BOTTOMRIGHT", previous, "BOTTOMRIGHT", 2, -3},
+    }) then return end
+    local anchor, previousShown = borderShown and border or previous, nil
+    for _, pet in ipairs(pets or {}) do
+        local visible = shown(pet)
+        if visible == nil or not add(pet, {{"TOP", previousShown or anchor, "BOTTOM", 0, 0}}) then return end
+        if visible then previousShown = pet end
     end
-    reanchorPets(frame, ordered)
+
+    local recovery = pendingRestore
+    if recovery then
+        local owned = #recovery.plan == #plan
+        for i, entry in ipairs(recovery.plan) do
+            local current = plan[i]
+            if not current or current.object ~= entry.object or current.unit ~= entry.unit
+                or not samePoints(current.points, entry.points)
+                or not samePoints(current.original, entry.current) then owned = false; break end
+        end
+        pendingRestore = nil
+        if owned then
+            if not restorePoints(recovery) then pendingRestore = recovery end
+            return
+        end
+    end
+
+    local transaction = {frame = frame, plan = plan, touched = 0}
+    for i, entry in ipairs(plan) do
+        transaction.touched = i
+        if not writePoints(entry.object, entry.points) then
+            if not restorePoints(transaction) then pendingRestore = transaction end
+            return
+        end
+    end
 end
 
-local function queueVisualOrder(frame)
+local function queueVisualOrder(frame, nativeLayout)
     frame = frame or _G.CompactPartyFrame
-    if not frame or queuedFrames[frame] then return end
-    queuedFrames[frame] = true
+    if not frame then return end
+    -- Native completion supersedes recovery even if scheduling is unavailable.
+    -- This only drops metadata; all geometry writes remain deferred.
+    if nativeLayout and pendingRestore and pendingRestore.frame == frame then pendingRestore = nil end
+    if queuedFrames[frame] then
+        if nativeLayout then queuedFrames[frame] = "native" end
+        return
+    end
+    queuedFrames[frame] = nativeLayout and "native" or true
 
     local function run()
+        local native = queuedFrames[frame] == "native"
         queuedFrames[frame] = nil
-        applyVisualOrder(frame)
+        applyVisualOrder(frame, native)
     end
 
     -- Native compact-frame writers can consume protected values. Never perform
@@ -223,7 +315,7 @@ local function install()
         end
         if not state.refreshMembers and type(frame.RefreshMembers) == "function" then
             state.refreshMembers = pcall(hooksecurefunc, frame, "RefreshMembers", function(self)
-                if self == frame then queueVisualOrder(self) end
+                if self == frame then queueVisualOrder(self, true) end
             end)
         end
         -- Blizzard can invoke the cached method without calling UpdateLayout.
@@ -231,13 +323,13 @@ local function install()
         -- was already installed while the native frame initialized.
         if not state.cachedLayout and type(frame.updateLayoutFunc) == "function" then
             state.cachedLayout = pcall(hooksecurefunc, frame, "updateLayoutFunc", function(self)
-                if self == frame then queueVisualOrder(self) end
+                if self == frame then queueVisualOrder(self, true) end
             end)
         end
         if not state.cachedLayout and not state.directLayout
             and type(frame.UpdateLayout) == "function" then
             state.directLayout = pcall(hooksecurefunc, frame, "UpdateLayout", function(self)
-                if self == frame then queueVisualOrder(self) end
+                if self == frame then queueVisualOrder(self, true) end
             end)
         end
     end

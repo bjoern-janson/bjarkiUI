@@ -1,8 +1,8 @@
--- Native action-button countdown format: decimals below five seconds,
+-- Native action-button countdown format: decimals below ten seconds,
 -- whole seconds up to six minutes.
 -- Blizzard owns duration values, cooldown timing, text colors, swipes and fonts.
 -- No GetCooldownTimes, custom FontStrings, combat log, or OnUpdate polling.
-local DECIMAL_CUTOFF = 5
+local DECIMAL_CUTOFF = 10
 local SECONDS_CUTOFF = 360
 
 local BUTTON_GROUPS = {
@@ -53,10 +53,10 @@ local function getFormatter()
 
     -- A countdown can pass its *secret* seconds directly through this native
     -- formatter; Lua never branches on duration or remaining time.
-    -- 4.9 -> 4.9; 5.0 -> 5; 321 -> 321; 360 -> 6m.
+    -- 9.9 -> 9.9; 10.0 -> 10; 321 -> 321; 360 -> 6m.
     -- The native formatter owns protected-value comparisons and rendering.
-    -- Below five seconds, use the same one-decimal format as portrait auras.
-    -- From five seconds onward, keep the established round-down behavior.
+    -- Below ten seconds, use the same one-decimal format as portrait auras.
+    -- From ten seconds onward, keep the established round-down behavior.
     local rules = {
         { threshold = 0, format = "%.1f" },
         { threshold = DECIMAL_CUTOFF, step = 1, rounding = rounding.Down,

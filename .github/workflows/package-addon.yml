@@ -3,6 +3,8 @@ name: Package addon
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -18,20 +20,12 @@ jobs:
         run: |
           set -euo pipefail
           for version in 5.1 5.4; do
-            for file in bjarkiUI.lua PartyOrder.lua SoftDark.lua TrackedBuffSeconds.lua CooldownSeconds.lua tests/hardening.lua tests/lifecycle.lua tests/presentation.lua tests/status-combat.lua tests/status-style.lua tests/cooldown-seconds.lua tests/status-scale.lua tests/softdark-restore.lua tests/hit-text-lifecycle.lua tests/hit-text-write-recovery.lua tests/softdark-callback-recovery.lua; do
+            for file in bjarkiUI.lua PartyOrder.lua SoftDark.lua TrackedBuffSeconds.lua CooldownSeconds.lua tests/*.lua; do
               "luac${version}" -p "$file"
             done
-            "lua${version}" tests/hardening.lua
-            "lua${version}" tests/lifecycle.lua
-            "lua${version}" tests/presentation.lua
-            "lua${version}" tests/status-combat.lua
-            "lua${version}" tests/status-style.lua
-            "lua${version}" tests/cooldown-seconds.lua
-            "lua${version}" tests/status-scale.lua
-            "lua${version}" tests/softdark-restore.lua
-            "lua${version}" tests/hit-text-lifecycle.lua
-            "lua${version}" tests/hit-text-write-recovery.lua
-            "lua${version}" tests/softdark-callback-recovery.lua
+            for test in tests/*.lua; do
+              "lua${version}" "$test"
+            done
           done
       - name: Validate manifests and stage addon
         run: |
