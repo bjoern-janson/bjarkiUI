@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.262-ten-second-decimals-test"
+local BJARKI_UI_VERSION = "0.2.264-audit-fixes-test"
 -- Standalone PRD treatment is retained. Unit-frame resource bars stay native.
 local PRD_MANA_R, PRD_MANA_G, PRD_MANA_B = 0.10, 0.25, 1.00
 local WORLD_TEXT_SCREEN_Y = "0.0430"
@@ -82,16 +82,16 @@ local function healthBar(unit)
             and f.PlayerFrameContent.PlayerFrameContentMain.HealthBarsContainer.HealthBar)
             or _G.PlayerFrameHealthBar or (f and f.healthbar)
     elseif unit == "target" or unit == "focus" then
-        local f = unit == "target" and _G.TargetFrame or _G.FocusFrame
+        local f = unitFrame(unit)
         return (f and f.TargetFrameContent and f.TargetFrameContent.TargetFrameContentMain
             and f.TargetFrameContent.TargetFrameContentMain.HealthBarsContainer
             and f.TargetFrameContent.TargetFrameContentMain.HealthBarsContainer.HealthBar)
-            or (unit == "target" and _G.TargetFrameHealthBar or _G.FocusFrameHealthBar)
+            or _G[unit == "target" and "TargetFrameHealthBar" or "FocusFrameHealthBar"]
             or (f and f.healthbar)
     elseif unit == "targettarget" or unit == "focustarget" then
         local f = smallFrame(unit)
         return (f and (f.HealthBar or f.healthbar))
-            or (unit == "targettarget" and _G.TargetFrameToTHealthBar or _G.FocusFrameToTHealthBar)
+            or _G[unit == "targettarget" and "TargetFrameToTHealthBar" or "FocusFrameToTHealthBar"]
     elseif unit == "pet" then
         return _G.PetFrameHealthBar or (_G.PetFrame and _G.PetFrame.healthbar)
     end
@@ -491,11 +491,6 @@ local function petUnitState(unit)
         return false, true
     end
     return nil, false
-end
-
-local function isPetUnit(unit)
-    local value, readable = petUnitState(unit)
-    return readable and value or false
 end
 
 local function playerUnitState(unit)

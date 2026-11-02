@@ -85,6 +85,7 @@ local function visualMembers(frame)
             if not unit then return nil end
             if unit == "player" or unit == "party1" or unit == "party2"
                 or unit == "party3" or unit == "party4" then
+                if byToken[unit] then return nil end
                 byToken[unit] = member
             else
                 extras[#extras + 1] = member
