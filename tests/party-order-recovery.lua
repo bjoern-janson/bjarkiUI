@@ -125,6 +125,17 @@ for index = 1, 8 do
         end)
     end
 end
+test('duplicate visible token waits for a coherent party roster', function()
+    local f = fixture(true)
+    f.p2.unit = 'party1'
+    f:event(); f:tick()
+    eq(#f.calls, 0, 'no geometry writes for ambiguous identity')
+    f:originals()
+    f.p2.unit = 'party2'
+    f:native(); f:tick()
+    same(f.p2.points, {{'TOP', f.p1, 'BOTTOM', 0, 0}}, 'resolved roster recovers')
+end)
+
 test('rollback border second SetPoint', function()
     local f, n = fixture(), 0
     f.env.onWrite = function(r, method)

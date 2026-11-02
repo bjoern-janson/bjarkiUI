@@ -198,5 +198,36 @@ test('combat late menu defers writes and recovers latest menu on regeneration', 
     replacement:AnchorToMenuContainer(); eq(replacement.y, -1, 'each menu object owns independent successful hook')
 end)
 
+test('target frame-local health bar cannot borrow a focus bar', function()
+    local e = fixture()
+    e.UnitExists = function() return true end
+    e.UnitIsPlayer = function() return true end
+    e.UnitGUID = function(unit) return 'Player-' .. unit end
+    e.UnitClassBase = function() return 'MAGE' end
+    e.RAID_CLASS_COLORS = {MAGE={r=.25, g=.78, b=.92}}
+    e.C_Texture = {GetAtlasInfo=function() return {} end}
+    local function bar(unit)
+        local texture = e.texture()
+        texture.atlas = 'UI-HUD-UnitFrame-Target-PortraitOn-Bar-Health'
+        local b = {unit=unit, r=0, g=1, b=0}
+        function b:GetStatusBarTexture() return texture end
+        function b:GetStatusBarColor() return self.r, self.g, self.b, 1 end
+        function b:SetStatusBarColor(r,g,blue) self.r, self.g, self.b = r,g,blue end
+        return b
+    end
+    local target, focus = bar('target'), bar('focus')
+    e.TargetFrame = {unit='target', healthbar=target}
+    e.FocusFrame = {unit='focus', healthbar=focus}
+    e.FocusFrameHealthBar = focus
+    e.event('PLAYER_FOCUS_CHANGED')
+    eq(focus.b, .92, 'focus class color before target event')
+    e.event('PLAYER_TARGET_CHANGED')
+    eq(target.b, .92, 'target frame-local health bar receives class tint')
+    eq(focus.b, .92, 'target event preserves focus tint')
+    e.TargetFrame = nil
+    e.event('PLAYER_TARGET_CHANGED')
+    eq(focus.b, .92, 'unavailable target frame cannot borrow focus')
+end)
+
 if failures > 0 then error(failures .. '/' .. scenarios .. ' initialization recovery scenarios failed') end
 print('bjarkiUI initialization recovery: ' .. scenarios .. ' scenarios, ' .. assertions .. ' full-module assertions passed')
