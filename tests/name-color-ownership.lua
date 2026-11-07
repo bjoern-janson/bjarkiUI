@@ -151,9 +151,9 @@ test("frame reuse and disappearance restore only this label's owned tint",functi
     f.exists=false; f.apply("focus"); color(f.text,1,.82,0)
     f.text:SetTextColor(.7,.6,.5); f.apply("focus"); color(f.text,.7,.6,.5)
 end)
-test("Player remains excluded",function()
-    local f=fixture(); f.apply("player"); color(f.text,1,.82,0)
-    expect(f.hooks==0,"Player label acquired a color hook")
+test("Player class name color follows readable fallback",function()
+    local f=fixture(); f.apply("player"); color(f.text,.25,.78,.92)
+    expect(f.hooks==1,"Player label missed guarded color observer")
 end)
 for _, caller in ipairs({"unit-frame","nameplate"}) do
     for _, owner in ipairs({"HUNTER","WARLOCK","SHAMAN"}) do

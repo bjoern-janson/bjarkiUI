@@ -159,7 +159,7 @@ for _,event in ipairs({'PLAYER_REGEN_ENABLED','UI_SCALE_CHANGED','DISPLAY_SIZE_C
    e.hit.ClearAllPoints=originalClear;e.hit.SetPoint=originalPoint
    e.geometry={frameX=90,barX=160,frameScale=0.5,barScale=0.75,textScale=0.25}
    e.event('PLAYER_REGEN_ENABLED')
-   eq(e.hit.x,300,'retry uses current geometry');eq(e.hit.y,8,'retry restores two physical pixels')
+   eq(e.hit.x,300,'retry uses current geometry');eq(e.hit.y,-44,'retry uses two pixels plus the native-frame inset')
   end)
  end
 end
@@ -173,7 +173,7 @@ test('repeated refusal then live object replacement',function()
  local replacement=e.newHit();e.PlayerFrame.feedbackText=replacement
  e.geometry={frameX=100,barX=140,frameScale=1,barScale=1,textScale=1}
  e.event('DISPLAY_SIZE_CHANGED')
- eq(replacement.x,40,'replacement uses current native health center');eq(replacement.y,2,'replacement gets native screen gap')
+ eq(replacement.x,40,'replacement uses current native health center');eq(replacement.y,-24,'replacement gets native inset and two-pixel clearance')
  eq(attempts,100,'detached object receives no retry')
 end)
 -- Break caught: error containment must not replace existing positive permission

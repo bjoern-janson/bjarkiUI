@@ -69,6 +69,7 @@ local function fixture()
     env.CreateFrame = function()
         local frame = {registered = {}}
         function frame:RegisterEvent(event) self.registered[event] = true end
+        function frame:RegisterUnitEvent(event, ...) self.registered[event] = true end
         function frame:SetScript(script, callback) eq(script, "OnEvent", "event callback"); self.callback = callback end
         frames[#frames + 1] = frame
         return frame

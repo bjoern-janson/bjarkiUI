@@ -124,14 +124,14 @@ end
 for _,name in ipairs({'UI_SCALE_CHANGED','DISPLAY_SIZE_CHANGED'}) do
  local e=fixture()
  eq(#e.texts,39,'all native numeric font slots modeled')
- eq(e.hit.y,4,'half-scale initial anchor units')
+ eq(e.hit.y,-22,'half-scale initial anchor after 26-unit native inset')
  eq(e.hit.x,20,'initial health-bar center')
  e.scale=1
  e.geometry={frameX=100,barX=140,frameScale=1,barScale=1,textScale=1}
  local writes=e.hit.clears
  e.event(name)
  eq(e.hit.clears,writes+1,name..' refreshes anchor')
- eq(e.hit.y,2,name..' restores 2 screen pixel gap')
+ eq(e.hit.y,-24,name..' restores native inset plus 2px clearance')
  eq(e.hit.x,40,name..' uses current horizontal center')
  local point=e.hit.anchors[#e.hit.anchors]
  eq(point[1],'BOTTOM',name..' anchors text bottom')
@@ -157,7 +157,7 @@ do
  e.combat=false;e.event('PLAYER_REGEN_ENABLED')
  eq(e.hit.clears,1,'combat reload recovers at first safe regeneration')
  eq(e.hit.x,20,'reload recovery centers on current health bar')
- eq(e.hit.y,4,'reload recovery gives 2px at half scale')
+ eq(e.hit.y,-22,'reload recovery uses latest native-frame inset')
  for _,t in ipairs(e.texts) do eq(t.x,2,'reload status shadow recovery '..t.label) end
  local safe=fixture({noEntry=true});safe.event('PLAYER_LOGIN')
  eq(safe.hit.clears,1,'ordinary out-of-combat login still anchors')
@@ -171,7 +171,7 @@ do
  e.event('EDIT_MODE_LAYOUTS_UPDATED');e.event('UI_SCALE_CHANGED');e.event('DISPLAY_SIZE_CHANGED')
  eq(e.hit.clears,writes,'combat events do not clear valid anchors')
  eq(e.hit.x,20,'combat events retain previous center')
- eq(e.hit.y,4,'combat events retain previous offset')
+ eq(e.hit.y,-22,'combat events retain previous offset')
  e.geometry={frameX=90,barX=160,frameScale=0.5,barScale=0.75,textScale=0.25}
  local hp=e.PlayerFrameHealthBar.TextString
  hp:SetFont('Fonts/ARIALN.TTF',15,'THICKOUTLINE,MONOCHROME')
@@ -180,7 +180,7 @@ do
  eq(e.hit.clears,writes+1,'deferred events retry once on regeneration')
  -- Hand checked: (160 * .75 - 90 * .5) / .25 = 300; 2 / .25 = 8.
  eq(e.hit.x,300,'regeneration reads latest geometry with independent effective scales')
- eq(e.hit.y,8,'regeneration restores 2px at latest text scale')
+ eq(e.hit.y,-44,'regeneration retains the 26-unit native-frame inset')
  eq(hp.x,1,'regeneration preserves current-scale shadow repair')
  eq(hp.face,'Fonts/ARIALN.TTF','regeneration preserves native replacement face')
  eq(hp.size,15,'regeneration preserves native replacement size')
@@ -205,7 +205,7 @@ do
  e.combat=false;e.event('PLAYER_REGEN_ENABLED')
  eq(newHit.clears,1,'regeneration discovers replacement hit-text')
  eq(newHit.x,240,'replacement native health bar supplies current center')
- eq(newHit.y,8,'replacement native hit-text supplies current scale')
+ eq(newHit.y,-44,'replacement native hit-text supplies current scale')
  eq(newHit.anchors[1][2],newFrame,'replacement frame is anchor parent')
  eq(oldHit.clears,oldWrites,'detached hit-text receives no retry writes')
  eq(oldFrame.feedbackText,oldHit,'old frame still retains its original hit-text')

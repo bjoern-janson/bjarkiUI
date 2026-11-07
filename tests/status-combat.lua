@@ -180,7 +180,7 @@ do
     check(pos[2] == frame, "vertical reference is the native player frame")
     eq(pos[3], "TOP", "above the top of the player frame")
     eq(pos[4], 40, "keep bar center horizontally: 40 UI units / 32 screen px")
-    eq(pos[5], 2.5, "two screen pixel gap at 80% text scale")
+    eq(pos[5], -23.5, "two screen pixels plus 26 native-frame inset at 80% scale")
     -- Reposition relative to the new frame center on an Edit Mode move.
     frame.GetCenter = function() return 300, 500 end
     bar.GetCenter = function() return 340, 480 end

@@ -76,7 +76,7 @@ do
     callbacks.OnEvent(frame, "PLAYER_LOGIN")
     equal(#registrations, 1, "viewer hooked exactly once")
     equal(#written, 2, "standard iterator/state enumerate both icons")
-    for _, entry in ipairs(written) do equal(entry.threshold, 0, "whole-second threshold") end
+    for _, entry in ipairs(written) do equal(entry.threshold, 10, "tracked-buff tenths threshold") end
     pool.activeObjects[a], pool.activeObjects[c] = nil, true
     registrations[1](viewer)
     equal(#written, 4, "refreshed/recycled pool icons handled")

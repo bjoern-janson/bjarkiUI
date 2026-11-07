@@ -161,9 +161,8 @@ installUnit("player")
 equal(secretText.sets,0,"secret font does not receive style writes")
 bars.player.TextString=hp
 
--- Extract the Player health writer: it must return before invoking *any*
--- class-color source or mutating the Player status bar. Other units still
--- use the existing color election.
+-- The current player-health policy permits guarded class tinting once
+-- identity and native color-hook ownership are established.
 do
     local mockBar={unit="player",SetStatusBarColor=function() error("Player recolor") end}
     local writes=0
@@ -186,11 +185,11 @@ do
         "local fallbackPlayerHealthColor=_G.fallbackPlayerHealthColor\n" ..
         "local setHealthColor=_G.setHealthColor\nlocal nativeHealthStyle=_G.nativeHealthStyle",
         "applyHealthColor",envColor)
-    equal(apply(mockBar,"player"),false,"Player health color unchanged")
-    equal(writes,0,"Player class tint never called")
+    equal(apply(mockBar,"player"),true,"Player class tint now enabled")
+    equal(writes,1,"Player class tint uses guarded writer")
     mockBar.unit="target"
     equal(apply(mockBar,"target"),true,"Target class color behavior retained")
-    equal(writes,1,"Target class tint still applied")
+    equal(writes,2,"Target class tint still applied")
 end
 
 -- Player name coloring is disabled, not global Target/Focus class coloring.
