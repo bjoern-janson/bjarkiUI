@@ -82,6 +82,7 @@ local function fixture()
         "hideMinimapDayNightIndicator", "installMicroMenuChildOffset"}) do
         env[name] = unrelated
     end
+    env.raiseFramerateCounter = function() end
     env.anchorCombatText = function() env.anchorCalls = env.anchorCalls + 1 end
     env.primaryClassColorRepair = {Install = unrelated, Queue = unrelated}
     local code = "local isSecret=_G.isSecret\nlocal readableBool=_G.readableBool\n" ..

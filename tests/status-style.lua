@@ -192,20 +192,23 @@ do
     equal(writes,2,"Target class tint still applied")
 end
 
--- Player name coloring is disabled, not global Target/Focus class coloring.
+-- Player name now uses the same guarded class-color path as other unit names.
+-- If a usable native frame is absent, the attempt must remain harmless.
 do
+    local lookedUp=0
     local envName={CLASS_HEALTH_UNITS={player=true,target=true},unitFrame=function()
-        error("Player name lookup should not run")
+        lookedUp=lookedUp+1
+        return nil
     end}
     local apply=evaluate(between("local function applyClassNameColor(unit)","-- END BJARKI_CLASS_NAME_COLORS"),
         "local CLASS_HEALTH_UNITS=_G.CLASS_HEALTH_UNITS\nlocal unitFrame=_G.unitFrame",
         "applyClassNameColor",envName)
-    expect(pcall(apply,"player"),"Player name color returns without touching text")
-    equal(apply("player"),nil,"Player name keeps native presentation")
+    equal(apply("player"),nil,"Player name without a native frame is unchanged")
+    equal(lookedUp,1,"Player class-name styling includes frame lookup")
 end
 
--- Whole per-unit presentation must still repair a Player full name and
--- install status fonts, while skipping the Player's class-color subsystem.
+-- Whole per-unit presentation now invokes the same guarded styling
+-- pipeline for Player, Target and Focus.
 do
     local events={}
     local envUnit={
@@ -227,8 +230,8 @@ do
         "local healthBar=_G.healthBar",
         "applyUnit",envUnit)
     apply("player")
-    equal(table.concat(events,","),"status:player,name:player",
-        "Player style/name repair but no class-colored Player frame")
+    equal(table.concat(events,","),"status:player,name:player,class:player,backdrop:player",
+        "Player status, name and guarded class-color pipeline")
     events={}
     apply("target")
     equal(table.concat(events,","),"status:target,name:target,class:target,backdrop:target",

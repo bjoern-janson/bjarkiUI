@@ -238,13 +238,13 @@ for _,key in ipairs({'frameX','barX','frameScale','barScale','textScale'}) do
   eq(e.hit.clears,writes,label..' never clears existing native anchor')
   eq(#e.hit.anchors,anchors,label..' never writes a replacement anchor')
   eq(e.hit.x,20,label..' retains previous X')
-  eq(e.hit.y,4,label..' retains previous Y')
+  eq(e.hit.y,-22,label..' retains previous Y')
   e.readErrors[key]=nil
   e.geometry={frameX=100,barX=140,frameScale=1,barScale=1,textScale=1}
   e.event('DISPLAY_SIZE_CHANGED')
   eq(e.hit.clears,writes+1,label..' later readable event recovers')
   eq(e.hit.x,40,label..' recovery uses latest center')
-  eq(e.hit.y,2,label..' recovery uses latest scale')
+  eq(e.hit.y,-24,label..' recovery uses latest scale and frame inset')
  end
 end
 
@@ -261,6 +261,6 @@ for _,kind in ipairs({'nil','secret','read error'}) do
  e.event('PLAYER_REGEN_ENABLED')
  eq(e.hit.clears,writes+1,'readable combat recovery '..kind)
  eq(e.hit.x,40,'readable combat recovers latest center '..kind)
- eq(e.hit.y,2,'readable combat recovers latest scale '..kind)
+ eq(e.hit.y,-24,'readable combat recovers latest scale and inset '..kind)
 end
 print('bjarkiUI hit-text lifecycle: '..count..' full-module assertions passed')
