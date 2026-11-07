@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.264-audit-fixes-test"
+local BJARKI_UI_VERSION = "0.2.286-combat-icon-clearance-test"
 -- Standalone PRD treatment is retained. Unit-frame resource bars stay native.
 local PRD_MANA_R, PRD_MANA_G, PRD_MANA_B = 0.10, 0.25, 1.00
 local WORLD_TEXT_SCREEN_Y = "0.0430"
@@ -98,8 +98,8 @@ local function healthBar(unit)
 end
 
 -- BEGIN BJARKI_STATUS_TEXT_SHADOWS
--- Only numeric health/resource FontStrings on the five native unit frames and
--- the personal resource display. Never restyle name, level, aura, cast or timer
+-- Only numeric health/resource FontStrings on the native unit frames (including
+-- the pet) and the personal resource display. Never restyle name, level, aura, cast or timer
 -- text; font face, size, color and alignment remain Blizzard-owned.
 local STATUS_SHADOW_ALPHA = 0.78
 local statusTextFonts = setmetatable({}, { __mode = "k" })
@@ -190,8 +190,20 @@ local function installStatusBarFonts(bar)
 end
 
 local function installUnitStatusFonts(unit)
-    local frame = unitFrame(unit)
+    -- Pet joins presentation only, not the class-colour/name/percentage paths.
+    local frame = unit == "pet" and _G.PetFrame or unitFrame(unit)
     installStatusBarFonts(healthBar(unit))
+    if unit == "pet" then
+        installStatusBarFonts(_G.PetFrameManaBar)
+        -- PetFrame uses named regions; these also cover the short interval
+        -- before UnitFrame_Initialize binds TextString/LeftText/RightText.
+        for _, name in ipairs({
+            "PetFrameHealthBarText", "PetFrameHealthBarTextLeft", "PetFrameHealthBarTextRight",
+            "PetFrameManaBarText", "PetFrameManaBarTextLeft", "PetFrameManaBarTextRight",
+        }) do
+            installStatusFont(_G[name])
+        end
+    end
     if isSecret(frame) or not frame then return end
     local ok, power = pcall(function()
         return frame.manabar or frame.ManaBar or frame.PowerBar or frame.powerbar
@@ -930,9 +942,6 @@ local function npcHealthColor(unit)
 end
 
 local function applyHealthColor(bar, unit)
-    -- Player health uses Blizzard's native fill and tint. Never apply class
-    -- coloring to the player's own frame, including delayed native post-hooks.
-    if unit == "player" then return false end
     if isSecret(unit) or type(unit) ~= "string" or not CLASS_HEALTH_UNITS[unit]
         or isSecret(bar) or not bar or type(bar.SetStatusBarColor) ~= "function"
         or bar ~= healthBar(unit) or readableUnitToken(bar.unit) ~= unit
@@ -1055,7 +1064,7 @@ function primaryClassColorRepair.Queue(bar, unit)
 end
 
 function primaryClassColorRepair.Install(bar, unit)
-    if unit ~= "target" and unit ~= "focus" then return end
+    if unit ~= "player" and unit ~= "target" and unit ~= "focus" then return end
     if not bar or isSecret(bar) or primaryClassColorRepair.states[bar]
         or type(hooksecurefunc) ~= "function" or type(bar.SetStatusBarColor) ~= "function"
     then return end
@@ -1201,9 +1210,7 @@ local function classColorFromPetOrTotemOwner(unit)
 end
 
 local function applyClassNameColor(unit)
-    -- Keep the Player name at its native text color; target-like names retain
-    -- their existing class-color behavior.
-    if unit == "player" or not CLASS_HEALTH_UNITS[unit] then return end
+    if not CLASS_HEALTH_UNITS[unit] then return end
     local frame = unitFrame(unit)
     if not frame or readableUnitToken(frame.unit) ~= unit then return end
     local text = frame.name or (unit == "player" and _G.PlayerName) or frame.Name
@@ -1318,9 +1325,6 @@ local function applyUnit(unit, nativeFrameUpdate)
     if not unit or not CLASS_HEALTH_UNITS[unit] then return end
     installUnitStatusFonts(unit)
     repairMissingUnitName(unit)
-    -- Player stays wholly native for health and name color. We still retain
-    -- full-name repair and the numeric status-font treatment above.
-    if unit == "player" then return end
     applyClassNameColor(unit)
     hideNameBackdrop(unit)
     local health = healthBar(unit)
@@ -1485,6 +1489,7 @@ SlashCmdList.BJARKIUI = function(message)
 end
 
 local INCOMING_TEXT_GAP_PX = 2
+local INCOMING_TEXT_FRAME_INSET_UI = 26
 local function anchorCombatText()
     local frame = _G.PlayerFrame
     local indicator = frame and frame.PlayerFrameContent and frame.PlayerFrameContent.PlayerFrameContentMain
@@ -1500,9 +1505,10 @@ local function anchorCombatText()
         or readableBool(InCombatLockdown) ~= false then return end
 
     -- Horizontal alignment stays at the native health bar's CENTER.
-    -- Vertical alignment follows PlayerFrame's TOP, with a two SCREEN-pixel
-    -- gap from the incoming text's bottom. Scale the measured X coordinates
-    -- into the same screen space before converting to text anchor units.
+    -- The launch artwork's visible name-bar border sits below PlayerFrame's
+    -- transparent upper bounds. Apply the calibrated inset in frame UI units,
+    -- then keep a two SCREEN-pixel gap from the incoming text's bottom.
+    -- Convert both axes to text anchor units only after using screen space.
     local frameOK, frameX = pcall(frame.GetCenter, frame)
     local barOK, barX = pcall(bar.GetCenter, bar)
     local fsOK, frameScale = pcall(frame.GetEffectiveScale, frame)
@@ -1518,7 +1524,7 @@ local function anchorCombatText()
         and frameScale > 0 and barScale > 0 and textScale > 0) then return end
 
     local offsetX = (barX * barScale - frameX * frameScale) / textScale
-    local offsetY = INCOMING_TEXT_GAP_PX / textScale
+    local offsetY = (INCOMING_TEXT_GAP_PX - INCOMING_TEXT_FRAME_INSET_UI * frameScale) / textScale
     if not usable(offsetX) or not usable(offsetY) then return end
     -- Optional native positioning must not interrupt the remaining lifecycle
     -- repairs. Skip the dependent write if clearing fails; a later event retries
@@ -2556,10 +2562,27 @@ local function hideActionBarMacroLabels()
 end
 -- END BJARKI_MACRO_LABELS
 
+-- Forever uses the compact Mainline FPS frame but excludes its MicroMenu
+-- positioning override. Retain the native right inset and WorldFrame parent;
+-- leave room for the bottom-right bags/menu stack shown in the launch layout.
+local FRAMERATE_BOTTOM_OFFSET = 75
+local function raiseFramerateCounter()
+    if readableBool(InCombatLockdown) ~= false then return end
+    local frame = _G.FramerateFrame
+    -- Classic's same-named frame covers the entire screen; only move the
+    -- compact variant with its two native text children.
+    if not frame or not frame.Label or not frame.FramerateText
+        or not _G.WorldFrame or type(frame.SetPoint) ~= "function" then return end
+    -- Replace the existing BOTTOMRIGHT anchor without clearing native layout.
+    pcall(frame.SetPoint, frame, "BOTTOMRIGHT", _G.WorldFrame, "BOTTOMRIGHT",
+        -2, FRAMERATE_BOTTOM_OFFSET)
+end
+
 local function applyAll()
     for _, unit in ipairs({ "player", "target", "focus", "targettarget", "focustarget" }) do
         applyUnit(unit)
     end
+    installUnitStatusFonts("pet")
     installPRDStatusFonts()
 end
 
@@ -2567,8 +2590,11 @@ local events = CreateFrame("Frame")
 for _, event in ipairs({
     "PLAYER_LOGIN", "PLAYER_ENTERING_WORLD", "PLAYER_TARGET_CHANGED", "PLAYER_FOCUS_CHANGED",
     "EDIT_MODE_LAYOUTS_UPDATED", "ADDON_LOADED", "PLAYER_REGEN_ENABLED",
-    "UI_SCALE_CHANGED", "DISPLAY_SIZE_CHANGED",
+    "UI_SCALE_CHANGED", "DISPLAY_SIZE_CHANGED", "PET_UI_UPDATE",
 }) do events:RegisterEvent(event) end
+-- Summoning/dismissing and resource changes can bind pet text after login.
+events:RegisterUnitEvent("UNIT_PET", "player")
+events:RegisterUnitEvent("UNIT_DISPLAYPOWER", "pet")
 
 events:SetScript("OnEvent", function(_, event, unit)
     if event == "ADDON_LOADED" then
@@ -2593,6 +2619,8 @@ events:SetScript("OnEvent", function(_, event, unit)
             installPRDStatusFonts()
         elseif unit == "Blizzard_MicroMenu" then
             installMicroMenuChildOffset()
+        elseif unit == "Blizzard_FramerateFrame" then
+            raiseFramerateCounter()
         elseif unit == "Blizzard_PrivateAurasUI"
             or unit == "Blizzard_CompactRaidFrames"
             or unit == "Blizzard_CompactUnitFrame"
@@ -2609,6 +2637,7 @@ events:SetScript("OnEvent", function(_, event, unit)
         end
         return
     elseif event == "PLAYER_LOGIN" then
+        raiseFramerateCounter()
         installNameplateClassNameColors()
         hideActionBarMacroLabels()
         hideMinimapDayNightIndicator()
@@ -2625,6 +2654,7 @@ events:SetScript("OnEvent", function(_, event, unit)
         anchorCombatText()
         applyAll()
     elseif event == "PLAYER_ENTERING_WORLD" then
+        raiseFramerateCounter()
         installNativeUpdateHooks()
         retryThreatAlphaHooks()
         installNameplateClassNameColors()
@@ -2654,18 +2684,21 @@ events:SetScript("OnEvent", function(_, event, unit)
     elseif event == "UI_SCALE_CHANGED" or event == "DISPLAY_SIZE_CHANGED" then
         -- Refresh scale-dependent status fonts and incoming hit-text anchors.
         -- Combat deferrals retry on regeneration.
-        for _, token in ipairs({ "player", "target", "focus", "targettarget", "focustarget" }) do
+        for _, token in ipairs({ "player", "target", "focus", "targettarget", "focustarget", "pet" }) do
             installUnitStatusFonts(token)
         end
         installPRDStatusFonts()
         anchorCombatText()
+    elseif event == "UNIT_PET" or event == "PET_UI_UPDATE" or event == "UNIT_DISPLAYPOWER" then
+        installUnitStatusFonts("pet")
     elseif event == "PLAYER_REGEN_ENABLED" then
+        raiseFramerateCounter()
         retryThreatAlphaHooks()
         installMicroMenuChildOffset()
         repairFocusFlashAnchor()
         installNameplateControlLayout()
         -- Retry only evidence-bound class colors; no unit-frame backings.
-        for _, token in ipairs({ "target", "focus" }) do
+        for _, token in ipairs({ "player", "target", "focus" }) do
             local bar = healthBar(token)
             primaryClassColorRepair.Install(bar, token)
             primaryClassColorRepair.Queue(bar, token)

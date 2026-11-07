@@ -1,5 +1,17 @@
 # Known issues and bugs
 
+## Current live-client follow-ups — 0.2.286 (2026-11-07)
+
+- **Player buff/debuff decorative borders remain intermittent.** Missing or inconsistent nameplate-style rims were reported even after the 0.2.277 and 0.2.281 lifecycle fixes. A screenshot alone does not distinguish an unstyled/private aura slot from a previously styled border becoming hidden. Run `/buiborders` while the problem is visible, **before** `/buiicons` or `/reload`. The diagnostic only counts public icons that the skin reached; a zero missing count does not establish that every visible icon was styled.
+- **Sub-ten-second buff/debuff decimals are not universally reliable in-game.** 0.2.280 addresses modeled visibility and retry failure paths, but a few visible buffs (including an Escape Artist report) still showed whole seconds. Run `/buitimers` after the occurrence; private/forbidden timers intentionally retain native formatting rather than guessed values.
+- **Target/focus native aura buttons are unstyled.** `RestrictedAuraAPI=true` on the tested client selects forbidden buttons. The custom replacement experiment in 0.2.272–0.2.273 did not activate reliably and a protected-action block was reported. It was retired in 0.2.274; `UnitAuraStyling.lua` remains an inert stub. Do not treat more frame enumeration or script hooks as a safe fix.
+- **Player combat icon alignment needs a new screenshot check.** `/buicombat` confirmed that the former position `TOPLEFT (68,-63)` was applied, despite inadequate optical clearance. The new 0.2.286 target is `(76,-63)`, not yet confirmed visually. This is a presentation offset, not a guarantee of exact separation at every UI scale.
+- **Protected-action and taint safety remain live verification requirements.** Offline mocks cannot establish full client compatibility. If a protected-action error returns, disable the test addon and record the exact blocked function before changing native hooks again.
+
+## Capture order
+
+For disappearing borders or missing decimals, use `/buiborders` and `/buitimers` **before** `/buiicons` or a reload. `/buiicons` may reapply styling. For the combat icon, `/buicombat` is read-only. Keep default Blizzard icon artwork and native target/focus aura rows until a supported replacement is demonstrated in-game.
+
 **Ten-second decimal cutoff (2026-10-31):** `0.2.262-ten-second-decimals-test` displays one decimal on native action-button countdowns strictly below ten seconds, with whole seconds starting at ten. The six-minute and longer formats remain unchanged. See architecture section 46.
 
 **Dependency and ownership recovery (2026-10-31):** `0.2.261-recovery-test` addresses the two exact-ZIP re-audit findings: circular party-anchor rollback after a late write failure, and health tint ownership acquired without a successful native-color observer. Regression tests model native anchor dependencies and rejected/missing tracking hooks. Ordinary visual values remain unchanged; native failure occurrence, protected execution and rendering remain live-client checks. See architecture section 45.

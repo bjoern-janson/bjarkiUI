@@ -16,15 +16,27 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y lua5.1 lua5.4
-      - name: Compile Lua and run hardening regressions
+      - name: Compile manifest modules and run regressions
         run: |
           set -euo pipefail
+          mapfile -t addon_modules < <(awk '/\.lua[[:space:]]*$/ && $0 !~ /^[[:space:]]*#/ {print $1}' bjarkiUI.toc)
+          test "${#addon_modules[@]}" -eq 9
           for version in 5.1 5.4; do
-            for file in bjarkiUI.lua PartyOrder.lua SoftDark.lua TrackedBuffSeconds.lua CooldownSeconds.lua tests/*.lua; do
+            for file in "${addon_modules[@]}" tests/*.lua; do
               "luac${version}" -p "$file"
             done
             for test in tests/*.lua; do
-              "lua${version}" "$test"
+              case "$test" in
+                tests/aura-presentation.lua|tests/frame-label-tweaks.lua|tests/icon-skin.lua|tests/pet-status-text.lua|tests/unit-aura-retirement.lua|tests/syntax.lua)
+                  # New frame doubles use Lua 5.4 test-harness features.
+                  if [ "$version" = 5.4 ]; then
+                    "lua${version}" "$test" .
+                  fi
+                  ;;
+                *)
+                  "lua${version}" "$test"
+                  ;;
+              esac
             done
           done
       - name: Validate manifests and stage addon
