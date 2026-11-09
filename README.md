@@ -1,47 +1,32 @@
-# bjarkiUI
+# bjarkiUI — 0.2.309 read-only Codex audit branch
 
-Minimal WoW: Forever interface presentation addon. It keeps Blizzard's unit frames, bars, action buttons, and icons in charge of their own gameplay behavior while adjusting cosmetics, labels, positioning, and selected countdown formats. **Latest synced test build: `0.2.286-combat-icon-clearance-test` (2026-11-07).**
+**You are on `audit/codex-0.2.309-readonly`, not the release branch.** This checkout is an **exact, frozen snapshot** of `0.2.309-native-spacing-castbar` (2026-11-09), assembled to let Codex perform an extensive **read-only** bug audit. It is *not* a merge request or a new stable release. GitHub `main` stays on `0.2.286`.
 
-## Install
+## Start here if you are Codex
 
-Copy the repository's addon Lua files and both `.toc` files into `World of Warcraft/.../Interface/AddOns/bjarkiUI/` (one `bjarkiUI` directory, not a directory inside another `bjarkiUI` directory). Restart the game. The manifest loads the nine Lua files in their declared order. Keep `WTF` and saved variables when replacing a version.
+1. Read [AGENTS.md](AGENTS.md) — **do not change any files or create commits**.
+2. Read [the deep audit instructions](docs/CODEX_DEEP_AUDIT.md) and [source/verification baseline](docs/AUDIT_BASELINE.md).
+3. Run `python3 tools/audit/check_frozen_source.py`, then `bash tools/audit/run_snapshot_tests.sh` with Lua 5.4 available (CI installs it). Both are read-only.
+4. Audit the exact code and deliver a severity-ranked report in chat, following [the findings template](docs/AUDIT_FINDINGS_TEMPLATE.md). Do not apply fixes.
 
-The GitHub Actions **Package addon** workflow builds an installable `bjarkiUI` artifact from the active `.toc` lists. No other bjarki addon is required, and installing it does **not** install or change an Edit Mode layout.
+**Suggested task text:** [Codex start prompt](docs/CODEX_START_PROMPT.md).
 
-## Current presentation
+## Contents and provenance
 
-- Native class-coloured Target/Focus and compact unit-frame health presentation, restrained status text, player/pet numbers, tooltip and frame styling; no wholesale unit-frame replacement.
-- Nameplate-inspired mask and overlay for *accessible* player buff/debuff icons, cast icons and ToT/ToF debuffs; original Blizzard icon artwork retained. Debuff-type indicators stay native when the display cannot be read safely.
-- Buff and debuff warning fading suppression, expanded player buff rows, and tenths below 10 seconds where the native timer API permits. Cooldown counts on native action buttons use compact formatting above the seconds range.
-- Numeric level labels moved four UI units outward on player/target/focus; player crossed-swords combat icon currently requests `TOPLEFT (76, -63)` relative to its native contextual frame (12 right and 1 down from the Blizzard XML position).
-- Free bag slot and quiver/ammunition numerals enlarged three points from their native fonts; their actual values, buttons, and layout remain native.
-- Existing Soft Dark styling, party order presentation, incoming damage text and speed text features retain their separate implementation boundaries.
+- Eleven load-ordered Lua modules, including `NativeDigitCells.lua` and `CastBarDigits.lua`, and the two matching `.toc` manifests.
+- `tests/snapshot-0.2.309/`: the nine **original version-matched behavioral regression scripts** plus a syntax manifest test, imported byte-for-byte from the 0.2.309 test archive.
+- `tests/*.lua`: retained older historical regression scripts from the `.286` repository. These may contain stale expectations. Do not silently use their failure or success as evidence for `.309`.
+- `tools/audit/`: read-only baseline checksum, portable suite runner, external-output package script, and archived historical runner/packager.
+- `.github/workflows/audit-0.2.309.yml`: separate source-frozen audit CI with no write permission. The older `package-addon.yml` workflow targets `main` and its nine-module baseline; do not treat it as `.309` audit validation.
 
-The latest 0.2.286 build is **not fully in-game validated**. In particular, players have observed intermittent missing decorative aura borders and whole-second buff timers. See [Known issues](KNOWN_ISSUES.md) and [Architecture](ARCHITECTURE.md) before treating a test ZIP as a stable release.
+### Functional scope under audit
 
-## Commands and diagnostics
+This addon refines Blizzard's original UI (unit frames, names, status text, buffs, icons, cooldown labels, party ordering, Soft Dark appearance, bags and combat icon). Its newest work uses **native duration bindings and individually anchored characters** to stabilize timer numbers while keeping default Blizzard fonts and icons. The cast timer geometry in `.309` remains an unverified in-game experiment.
 
-| Command | Use |
-| --- | --- |
-| `/bui levels on` / `/bui levels off` | Toggle the level-number setting |
-| `/bui audit`, `/bui colors`, `/bui tracked`, `/bui compact` | Existing targeted UI diagnostics |
-| `/bui dark off` | Return Soft Dark's owned visual changes where restoration is possible |
-| `/buiborders` | **Read-only:** capture decorative border state before a reload |
-| `/buitimers` | Report recent native aura timer formatting paths |
-| `/buiicons` | Report icon styling; **may reapply styling**, so capture `/buiborders` first |
-| `/buicombat` | **Read-only:** show the combat-icon anchor and requested target |
-| `/buiauras` | Reports that the experimental target/focus aura replacement is retired; it does not enable it |
+**No-change invariants:** no font swaps, no new slash commands, no polling, no Edit Mode layout writes, no gameplay action changes, and no target/focus restricted-aura replacements. The user previously reported combat stutter from timer-typography hooks and a protected-action error from custom target/focus aura handling. These are audit priorities, not invitations to recreate the unsafe designs.
 
-If an aura border or decimal disappears, capture `/buiborders` and `/buitimers` *before* `/buiicons` or a reload. For a combat icon that appears unmoved, use `/buicombat` while the crossed swords are visible.
+## Install/package distinction
 
-## Architecture and safety constraints
+Use a verified release ZIP for gameplay; this branch is an audit snapshot. The read-only workflow can create an installable 11-module ZIP outside the checkout as an artifact, but **a passing CI result is not live-client verification**. Do not merge the audit branch into `main` solely because its offline tests pass.
 
-The native target/focus aura rows use `RestrictedAuraAPI` and can be backed by forbidden objects. bjarkiUI **does not** currently replace or reskin those buttons: the experimental approach was retired after a protected-action incident. The addon must not inspect secret aura data, drive restricted buttons, adjust gameplay state, replace native bindings, or write Edit Mode presets to achieve a cosmetic effect.
-
-- [Architecture and historical decisions](ARCHITECTURE.md)
-- [Open problems and in-game verification limits](KNOWN_ISSUES.md)
-- [Test-build change history](CHANGELOG.md)
-
-## Validation
-
-The 0.2.286 ZIP was checked offline: nine loaded Lua modules compile, and the existing focused simulated-client tests pass. Those tests do not validate Blizzard's real protected APIs, frame rendering, taint behavior, or every character configuration. The repository CI runs syntax checks and regressions; a successful CI result must not be interpreted as in-game clearance.
+Historical context remains in [ARCHITECTURE.md](ARCHITECTURE.md), [KNOWN_ISSUES.md](KNOWN_ISSUES.md) and [CHANGELOG.md](CHANGELOG.md). Some of their dated sections describe earlier `.286` and below rather than this frozen `.309` experiment.

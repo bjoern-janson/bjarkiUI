@@ -1,0 +1,40 @@
+name: Read-only audit baseline 0.2.309
+
+on:
+  push:
+    branches:
+      - audit/codex-0.2.309-readonly
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frozen-snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lua 5.1 and 5.4
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.1 lua5.4
+      - name: Enforce unchanged game source
+        run: python3 tools/audit/check_frozen_source.py
+      - name: Compile all runtime modules in Lua 5.1 and 5.4
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(awk '/\.lua[[:space:]]*$/ && $0 !~ /^[[:space:]]*#/ {print $1}' bjarkiUI.toc)
+          test "${#files[@]}" -eq 11
+          for version in 5.1 5.4; do
+            for file in "${files[@]}"; do luac"$version" -p "$file"; done
+          done
+      - name: Run exact 0.2.309 offline regression suite
+        run: bash tools/audit/run_snapshot_tests.sh
+      - name: Stage exact installable package outside checkout
+        run: python3 tools/audit/package_snapshot.py --output "$RUNNER_TEMP/bjarkiUI-0.2.309-audit.zip"
+      - name: Upload read-only audit package
+        uses: actions/upload-artifact@v4
+        with:
+          name: bjarkiUI-0.2.309-audit
+          path: ${{ runner.temp }}/bjarkiUI-0.2.309-audit.zip
+          if-no-files-found: error
