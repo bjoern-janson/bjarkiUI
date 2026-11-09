@@ -2,7 +2,7 @@
 ## Title: bjarkiUI
 ## Notes: Ultralight unit-frame presentation for WoW: Forever
 ## Author: Bjarki / OpenAI
-## Version: 0.2.286-combat-icon-clearance-test
+## Version: 0.2.309-native-spacing-castbar
 ## SavedVariablesPerCharacter: bjarkiUISettings
 
 bjarkiUI.lua
@@ -10,6 +10,8 @@ PartyOrder.lua
 SoftDark.lua
 TrackedBuffSeconds.lua
 CooldownSeconds.lua
+NativeDigitCells.lua
+CastBarDigits.lua
 IconSkin.lua
 UnitAuraStyling.lua
 BuffPresentation.lua

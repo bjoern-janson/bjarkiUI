@@ -2,11 +2,14 @@
 -- Do not alter FontString text,
 -- visibility, button behavior, shared Font objects, or surrounding frame layout.
 local LEVEL_OUTWARD, LEVEL_DOWN, BAG_FONT_INCREASE = 4, 1, 3
--- The combat atlas has visual padding; its clearance is independent of the level labels.
-local COMBAT_OUTWARD = 12
+-- Mirror the combat glyph's *center* across the portrait from PlayerLevelText.
+-- Keep the icon's native TOPLEFT anchor type: changing it to CENTER would
+-- require clearing the original anchor and risk disrupting native layout.
+-- No independent visual-offset guesses or anchor stacking.
 local levels = setmetatable({}, { __mode = "k" })
 local combatIcons = setmetatable({}, { __mode = "k" })
 local counts = setmetatable({}, { __mode = "k" })
+local refreshCombatIcon
 
 local function readable(value)
     if type(issecretvalue) ~= "function" then return true end
@@ -99,64 +102,133 @@ local function installLevel(text, dx)
     local state = levels[text]
     if not state then state = { dx = dx }; levels[text] = state end
     moveLevel(text, state)
-    hookOnce(text, state, "SetPoint", function(self) moveLevel(self, state) end)
+    hookOnce(text, state, "SetPoint", function(self)
+        if state.applying then return end
+        moveLevel(self, state)
+        -- The mirrored icon must follow a later native level-label reanchor,
+        -- including the additional outward level adjustment above.
+        if state.dx == -LEVEL_OUTWARD and refreshCombatIcon then
+            refreshCombatIcon()
+        end
+    end)
 end
 
--- Blizzard's PlayerFrameContentContextual.AttackIcon has a fixed XML anchor:
--- TOPLEFT of its contextual frame, (64, -62). The cosmetic offset is absolute
--- (not cumulative), and only the named icon is ever considered for this
--- fallback. This avoids relying on GetPoint when that getter is inaccessible.
+-- Convert readable level/portrait positions to the icon's own anchor units.
+-- GetCenter() values are in each region's UI space; multiply by that region's
+-- effective scale before reflecting. Icon width/height are needed to convert
+-- the desired icon center to its existing TOPLEFT point.
+local function mirroredCombatAnchor(level, portrait, icon)
+    if not accessible(level) then return nil end
+    local centerGetter = field(level, "GetCenter")
+    local levelScaleGetter = field(level, "GetEffectiveScale")
+    local portraitCenterGetter = field(portrait, "GetCenter")
+    local portraitScaleGetter = field(portrait, "GetEffectiveScale")
+    local iconScaleGetter = field(icon, "GetEffectiveScale")
+    local widthGetter, heightGetter = field(icon, "GetWidth"), field(icon, "GetHeight")
+    if type(centerGetter) ~= "function" or type(levelScaleGetter) ~= "function"
+        or type(portraitCenterGetter) ~= "function" or type(portraitScaleGetter) ~= "function"
+        or type(iconScaleGetter) ~= "function"
+        or type(widthGetter) ~= "function" or type(heightGetter) ~= "function" then return nil end
+    local lok, lx, ly = pcall(centerGetter, level)
+    local pok, px, py = pcall(portraitCenterGetter, portrait)
+    local lsok, ls = pcall(levelScaleGetter, level)
+    local psok, ps = pcall(portraitScaleGetter, portrait)
+    local tsok, ts = pcall(iconScaleGetter, icon)
+    local wok, width = pcall(widthGetter, icon)
+    local hok, height = pcall(heightGetter, icon)
+    if not (lok and pok and lsok and psok and tsok and wok and hok
+        and finite(lx) and finite(ly) and finite(px) and finite(py)
+        and finite(ls) and finite(ps) and finite(ts) and finite(width) and finite(height)
+        and ls > 0 and ps > 0 and ts > 0 and width > 0 and height > 0) then return nil end
+    local x = (px * ps - lx * ls) / ts - width * 0.5
+    local y = (ly * ls - py * ps) / ts + height * 0.5
+    if not finite(x) or not finite(y) then return nil end
+    -- The native renderer can report microscopic rounding differences after
+    -- scale transitions. Quantize to a hundredth of a UI unit to avoid churn.
+    return math.floor(x * 100 + 0.5) / 100, math.floor(y * 100 + 0.5) / 100
+end
+
+-- Keep the combat glyph tied to the same portrait as PlayerLevelText, even if
+-- native code changes the icon's original relative anchor on a later refresh.
 local function moveCombatIcon(texture, state)
     if state.applying or not outsideCombat() or not accessibleCombatIcon(texture) then return end
-    local point = pointOf(texture)
-    local shifted
-    if point then
-        if samePoint(point, state.applied) then return end
-        shifted = { point[1], point[2], point[3], point[4] + COMBAT_OUTWARD, point[5] - LEVEL_DOWN }
-        state.fallbackApplied = false
-    else
-        -- The read-only introspection itself may fail. Do not substitute a
-        -- guessed anchor for a secret value, an unusual layout, or an icon
-        -- that already has multiple points.
-        local numPoints, getter = field(texture, "GetNumPoints"), field(texture, "GetPoint")
-        if type(numPoints) ~= "function" then state.lastResult = "no point count"; return end
-        local ok, n = pcall(numPoints, texture)
-        if not ok or not readable(n) or n ~= 1 then state.lastResult = "point count restricted"; return end
-        if type(getter) == "function" then
-            local got = pcall(getter, texture, 1)
-            if got then state.lastResult = "point values restricted"; return end
+    local portrait = state.portrait
+    if not readable(portrait) or not portrait then
+        state.lastResult = "portrait unavailable"; return
+    end
+    local forbidden = field(portrait, "IsForbidden")
+    if type(forbidden) == "function" then
+        local ok, isForbidden = pcall(forbidden, portrait)
+        if not ok or not readable(isForbidden) or isForbidden ~= false then
+            state.lastResult = "portrait restricted"; return
         end
-        if not readable(state.nativeParent) or not state.nativeParent then
-            state.lastResult = "native parent unavailable"; return
+    end
+    local numPoints = field(texture, "GetNumPoints")
+    if type(numPoints) ~= "function" then state.lastResult = "point count unavailable"; return end
+    local ok, n = pcall(numPoints, texture)
+    if not ok or not readable(n) or n ~= 1 then
+        state.lastResult = "point count restricted"; return
+    end
+    local point = pointOf(texture)
+    if point then
+        -- The combat atlas is a one-point TOPLEFT element in Blizzard XML.
+        -- Never add another anchor to an unexpectedly reconfigured texture.
+        if point[1] ~= "TOPLEFT" then
+            state.lastResult = "non-native anchor; skipped"; return
+        end
+    else
+        local getter = field(texture, "GetPoint")
+        if type(getter) == "function" then
+            local readableResult = pcall(getter, texture, 1)
+            if readableResult then
+                state.lastResult = "point metadata restricted"; return
+            end
         end
         if state.fallbackApplied and state.SetPoint then return end
-        shifted = { "TOPLEFT", state.nativeParent, "TOPLEFT", 64 + COMBAT_OUTWARD, -62 - LEVEL_DOWN }
+    end
+
+    local x, y = mirroredCombatAnchor(state.level, portrait, texture)
+    if not x then state.lastResult = "level geometry unreadable"; return end
+    local desired = { "TOPLEFT", portrait, "CENTER", x, y }
+    if point and samePoint(point, desired) then
+        state.lastResult = "level mirror applied"; return
     end
     local setter = field(texture, "SetPoint")
     if type(setter) ~= "function" then state.lastResult = "no SetPoint"; return end
     state.applying = true
-    local ok, result = pcall(setter, texture, shifted[1], shifted[2], shifted[3], shifted[4], shifted[5])
+    local success, result = pcall(setter, texture,
+        desired[1], desired[2], desired[3], desired[4], desired[5])
     state.applying = false
-    if ok and result ~= false then
-        state.applied = shifted
+    if success and result ~= false then
+        state.applied = desired
         state.fallbackApplied = not point
-        state.lastResult = state.fallbackApplied and "native-anchor fallback applied" or "offset applied"
+        state.lastResult = "level mirror applied"
     else
         state.lastResult = "SetPoint denied"
     end
 end
 
-local function installCombatIcon(texture, nativeParent)
-    if not outsideCombat() or not accessibleCombatIcon(texture) then return end
+local function installCombatIcon(texture, portrait, level)
+    if not outsideCombat() or not accessibleCombatIcon(texture)
+        or not readable(portrait) or not portrait or not accessible(level) then return end
     local state = combatIcons[texture]
     if not state then state = {}; combatIcons[texture] = state end
-    state.nativeParent = nativeParent
+    state.portrait = portrait
+    state.level = level
     moveCombatIcon(texture, state)
     hookOnce(texture, state, "SetPoint", function(self)
         if state.applying then return end
         state.fallbackApplied = false
         moveCombatIcon(self, state)
     end)
+end
+
+refreshCombatIcon = function()
+    local content = field(_G.PlayerFrame, "PlayerFrameContent")
+    local contextual = field(content, "PlayerFrameContentContextual")
+    local icon = field(contextual, "AttackIcon")
+    local state = icon and combatIcons[icon]
+    if state then moveCombatIcon(icon, state) end
 end
 
 local function enlargeCount(text, state)
@@ -192,7 +264,9 @@ local function apply()
     installLevel(_G.PlayerLevelText, -LEVEL_OUTWARD)
     local playerContent = field(_G.PlayerFrame, "PlayerFrameContent")
     local playerContext = field(playerContent, "PlayerFrameContentContextual")
-    installCombatIcon(field(playerContext, "AttackIcon"), playerContext)
+    local frameContainer = field(_G.PlayerFrame, "PlayerFrameContainer")
+    installCombatIcon(field(playerContext, "AttackIcon"), field(frameContainer, "PlayerPortrait"),
+        _G.PlayerLevelText)
     for _, name in ipairs({ "TargetFrame", "FocusFrame" }) do
         local content = field(_G[name], "TargetFrameContent")
         local main = field(content, "TargetFrameContentMain")
@@ -234,8 +308,11 @@ SlashCmdList.BJARKIUI_COMBATICON = function()
     local state = icon and combatIcons[icon]
     local point = icon and pointOf(icon)
     local where = point and (tostring(point[1]) .. " " .. tostring(point[4]) .. "," .. tostring(point[5])) or "unreadable"
+    local portrait = field(field(_G.PlayerFrame, "PlayerFrameContainer"), "PlayerPortrait")
+    local relative = point and (point[2] == portrait and point[3] == "CENTER" and "portrait center" or "other") or "unreadable"
     local result = state and state.lastResult or (icon and "not installed" or "icon inaccessible")
+    local x, y = icon and portrait and mirroredCombatAnchor(_G.PlayerLevelText, portrait, icon)
     print("bjarkiUI combat-icon: " .. tostring(result)
-        .. " | point=" .. where .. " | target=TOPLEFT " .. tostring(64 + COMBAT_OUTWARD)
-        .. "," .. tostring(-62 - LEVEL_DOWN))
+        .. " | point=" .. where .. " | relative=" .. relative .. " | mirrored="
+        .. (x and tostring(x) .. "," .. tostring(y) or "unreadable"))
 end

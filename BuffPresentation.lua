@@ -83,19 +83,16 @@ end
 local durationFormatter
 local timerStats = { native = 0, fallback = 0, readable = 0,
     visibilityRestricted = 0, retries = 0, lastReason = "none" }
-local MAX_DURATION_ATTEMPTS = 3
 local DURATION_RETRY_DELAY = 0.25
+local MAX_DURATION_RETRY_DELAY = 2
 
-local function resetDurationObject(button)
+local function invalidateDurationObject(button)
     local state = states[button]
     if not state then return end
-    state.durationAttempted = nil
-    state.durationAttempts = 0
-    state.durationRetryAt = nil
-    state.visibilityReported = nil
+    -- An actual aura assignment/expiration refresh is new evidence. Do not
+    -- inherit a backoff window from an older, temporarily inaccessible read.
     state.durationObject = nil
-    state.durationReported = nil
-    state.durationUnit, state.durationID, state.durationInfo = nil, nil, nil
+    state.durationRetryAt, state.durationRetryDelay = nil, nil
 end
 
 local function getDurationFormatter()
@@ -150,13 +147,12 @@ end
 
 local function deferNativeDuration(state, reason)
     state.durationObject = nil
-    state.durationRetryAt = nil
-    if (state.durationAttempts or 0) < MAX_DURATION_ATTEMPTS then
-        local now = timerClock()
-        if now then
-            state.durationRetryAt = now + DURATION_RETRY_DELAY * state.durationAttempts
-        end
-    end
+    -- Rate-limit persistent failures without permanently abandoning a buff.
+    -- Attempts happen only through native UpdateDuration, never a ticker.
+    local previous = state.durationRetryDelay or 0
+    state.durationRetryDelay = previous == 0 and DURATION_RETRY_DELAY
+        or math.min(previous * 2, MAX_DURATION_RETRY_DELAY)
+    state.durationRetryAt = (timerClock() or 0) + state.durationRetryDelay
     noteNativeTimer(state, reason)
 end
 
@@ -167,28 +163,33 @@ local function showNativeDuration(button, duration)
     local id, unit = member(info, "auraInstanceID"), member(button, "unit")
     -- Compare only positively public identities. No spell-ID allowlist, lookup
     -- by hidden spell name, or estimated Escape Artist duration.
-    if info ~= state.durationInfo or id ~= state.durationID or unit ~= state.durationUnit then
-        resetDurationObject(button)
-        state.durationInfo, state.durationID, state.durationUnit = info, id, unit
+    if id ~= state.durationID or unit ~= state.durationUnit then
+        state.durationID, state.durationUnit = id, unit
+        state.durationObject, state.durationRetryAt, state.durationRetryDelay = nil, nil, nil
+        state.durationReported = nil
     end
-    if state.durationAttempted and not state.durationObject then
-        local now = state.durationRetryAt and timerClock()
+    if info ~= state.durationInfo then
+        state.durationInfo, state.durationObject = info, nil
+        state.durationRetryAt, state.durationRetryDelay = nil, nil
+    end
+    if type(unit) ~= "string" or (unit ~= "player" and unit ~= "vehicle")
+        or type(id) ~= "number" or not (id > 0 and id < math.huge and id == math.floor(id)) then
+        noteNativeTimer(state, "no public aura identity"); return
+    end
+    if state.durationRetryAt then
+        local now = timerClock()
         if not now or now < state.durationRetryAt then return end
-        state.durationAttempted = nil
         state.durationRetryAt = nil
         timerStats.retries = timerStats.retries + 1
     end
-    if not state.durationAttempted then
-        state.durationAttempted = true
-        state.durationAttempts = (state.durationAttempts or 0) + 1
-        if type(unit) ~= "string" or (unit ~= "player" and unit ~= "vehicle")
-            or type(id) ~= "number" or not (id > 0 and id < math.huge and id == math.floor(id)) then
-            noteNativeTimer(state, "no public aura identity"); return
-        end
+    if not state.durationObject then
         local get = member(C_UnitAuras, "GetAuraDuration")
         local formatter = getDurationFormatter()
-        local modifier = member(member(Enum, "DurationTimeModifier"), "BaseTime")
-        if type(get) ~= "function" or not formatter or type(modifier) ~= "number" then
+        -- The native default is RealTime: unlike BaseTime it applies the
+        -- aura's time modifier. Use explicit RealTime where available and the
+        -- documented native default when the enum isn't exposed.
+        local modifier = member(member(Enum, "DurationTimeModifier"), "RealTime")
+        if type(get) ~= "function" or not formatter then
             deferNativeDuration(state, "native duration formatter unavailable"); return
         end
         local ok, object = pcall(get, unit, id)
@@ -200,7 +201,6 @@ local function showNativeDuration(button, duration)
         state.durationModifier = modifier
     end
     local object = state.durationObject
-    if not object then return end
     local format = member(object, "FormatRemainingDuration")
     local set = member(duration, "SetText")
     if type(format) ~= "function" or type(set) ~= "function" then
@@ -208,11 +208,17 @@ local function showNativeDuration(button, duration)
     end
     -- The result may itself be a secret string. Do NOT inspect, compare,
     -- concatenate, stringify or secrecy-filter it; pass it to the text sink.
-    local ok, text = pcall(format, object, durationFormatter, state.durationModifier)
+    local ok, text
+    if type(state.durationModifier) == "number" then
+        ok, text = pcall(format, object, durationFormatter, state.durationModifier)
+    else
+        ok, text = pcall(format, object, durationFormatter)
+    end
     if ok then ok = pcall(set, duration, text) end
     if not ok then
         deferNativeDuration(state, "native formatting write rejected"); return
     end
+    state.durationRetryDelay = nil
     noteNativeTimer(state)
 end
 
@@ -224,18 +230,21 @@ local function canFormatDuration(button, duration)
     local isShown = member(duration, "IsShown")
     if type(isShown) ~= "function" then return false end
     local ok, shown = pcall(isShown, duration)
-    if not ok then return false end
+    if not ok then return false end -- A throwing getter is not a secret-value witness.
     if readable(shown) then return shown == true end
     if type(issecretvalue) ~= "function" then return false end
-    local checked, secret = pcall(issecretvalue, shown)
-    if not checked or secret ~= true then return false end
+    local checked, hidden = pcall(issecretvalue, shown)
+    if not checked or hidden ~= true then return false end
     local get = member(C_CVar, "GetCVarBool") or member(_G, "GetCVarBool")
     if type(get) ~= "function" then return false end
     local enabledOK, enabled = pcall(get, "buffDurations")
     if not enabledOK or not readable(enabled) or enabled ~= true then return false end
     local state = states[button]
-    if state and not state.visibilityReported then
-        state.visibilityReported = true
+    local info = member(button, "buttonInfo")
+    local binding = member(info, "auraInstanceID") or info or false
+    local unit = member(button, "unit")
+    if state and (binding ~= state.visibilityBinding or unit ~= state.visibilityUnit) then
+        state.visibilityBinding, state.visibilityUnit = binding, unit
         timerStats.visibilityRestricted = timerStats.visibilityRestricted + 1
     end
     return true
@@ -245,22 +254,67 @@ local function showTenths(button, timeLeft)
     if not accessible(button) or member(button, "isExample") == true then return end
     local duration = member(button, "Duration") or member(button, "duration") or namedRegion(button, "Duration")
     if not accessible(duration) then return end
-    if not canFormatDuration(button, duration) then return end
-    if not readable(timeLeft) then
-        -- Secrecy itself is public metadata. Nil or an uncertain probe is not
-        -- evidence of a restricted timer and must not revive an old duration.
-        if type(issecretvalue) == "function" then
-            local checked, secret = pcall(issecretvalue, timeLeft)
-            if checked and secret == true then showNativeDuration(button, duration) end
-        end
+    if not canFormatDuration(button, duration) then
+        if bjarkiUINativeDigitCells then bjarkiUINativeDigitCells.ClearBuff(duration) end
         return
     end
-    if type(timeLeft) ~= "number" or not (timeLeft > 0 and timeLeft < 10) then return end
+    if not readable(timeLeft) then
+        if bjarkiUINativeDigitCells then bjarkiUINativeDigitCells.ClearBuff(duration) end
+        -- Secrecy itself is public metadata. Nil or an uncertain probe is not
+        -- evidence of a restricted timer and must not revive an old duration.
+        if type(issecretvalue) ~= "function" then return end
+        local checked, secret = pcall(issecretvalue, timeLeft)
+        if not checked or secret ~= true then return end
+        if member(button, "auraType") ~= "TempEnchant" then
+            showNativeDuration(button, duration)
+            return
+        end
+        -- Stock weapon-enchant buttons have an inventory slot, no aura instance
+        -- ID or time modifier. Use only the current binding's public expiration.
+        local info = member(button, "buttonInfo")
+        local expiration = member(info, "expirationTime")
+        local now = timerClock()
+        if type(expiration) ~= "number" or not (expiration > 0 and expiration < math.huge) or not now then
+            local state = states[button]
+            if state then noteNativeTimer(state, "no public enchant expiration") end
+            return
+        end
+        -- Blizzard's readable path divides (expiration - GetTime) by timeMod.
+        -- No calculation when that modifier exists but is secret/invalid.
+        local okRate, rawRate = pcall(readMember, info, "timeMod")
+        local rate = 1
+        if not okRate or (rawRate ~= nil and
+            (not readable(rawRate) or type(rawRate) ~= "number"
+            or rawRate == math.huge or rawRate == -math.huge or rawRate ~= rawRate)) then
+            local state = states[button]
+            if state then noteNativeTimer(state, "unreadable enchant time modifier") end
+            return
+        end
+        if rawRate ~= nil and rawRate > 0 then rate = rawRate end
+        timeLeft = (expiration - now) / rate
+    end
+    local digitCells = bjarkiUINativeDigitCells
+    if type(timeLeft) ~= "number" or not (timeLeft > 0 and timeLeft < 10) then
+        if digitCells then digitCells.ClearBuff(duration) end
+        return
+    end
     local setText = member(duration, "SetFormattedText")
     if type(setText) ~= "function" then return end
-    -- Keep .270's already-working readable-value rounding and end clamps.
-    local tenths = math.min(9.9, math.max(0.1, math.floor(timeLeft * 10 + 0.5) / 10))
-    local ok = pcall(setText, duration, "%.1f", tenths)
+    -- Preserve the native font. Only once the original text can be cleared
+    -- may the stable glyph cells take over; otherwise use native formatting.
+    local deci = math.min(99, math.max(1, math.floor(timeLeft * 10 + 0.5)))
+    local ok = false
+    if digitCells and type(digitCells.ShowBuff) == "function" then
+        local clear = member(duration, "SetText")
+        if type(clear) == "function" and pcall(clear, duration, "") then
+            if digitCells.ShowBuff(duration, deci) then
+                ok = true
+            else
+                digitCells.ClearBuff(duration)
+            end
+        end
+    end
+    if not ok then ok = pcall(setText, duration, "%.1f", deci / 10) end
     if ok then
         timerStats.readable = timerStats.readable + 1
     elseif states[button] then
@@ -347,13 +401,17 @@ local function setupButton(button)
     if type(hooksecurefunc) == "function" then
         for _, method in ipairs({"Update", "UpdateExpirationTime"}) do
             if not state.timerHooks[method] and type(member(button, method)) == "function" then
-                if pcall(hooksecurefunc, button, method, resetDurationObject) then
+                if pcall(hooksecurefunc, button, method, invalidateDurationObject) then
                     state.timerHooks[method] = true
                 end
             end
         end
     end
     styleIcon(button, state)
+    local digitCells = bjarkiUINativeDigitCells
+    if digitCells and type(digitCells.PrepareBuff) == "function" and outOfCombat() then
+        digitCells.PrepareBuff(member(button, "Duration"))
+    end
     keepOpaque(button)
 end
 
@@ -624,7 +682,7 @@ if type(SlashCmdList) == "table" then
     SlashCmdList.BJARKIUITIMERS = function()
         -- Read-only coverage: distinguish skipped private anchors and failed
         -- installation from a formatter failure. Do not query live aura values.
-        local buttons, hooked, private, blocked = 0, 0, 0, 0
+        local buttons, hooked, private, blocked, pending, fallbacks = 0, 0, 0, 0, 0, 0
         for _, name in ipairs({"BuffFrame", "DebuffFrame"}) do
             local list = member(member(_G, name), "auraFrames")
             if type(list) == "table" then
@@ -643,17 +701,22 @@ if type(SlashCmdList) == "table" then
                             buttons = buttons + 1
                             local state = states[button]
                             if state and state.durationHook then hooked = hooked + 1 end
+                            if state and state.durationRetryAt then pending = pending + 1 end
+                            if state and state.durationReported and state.durationReported ~= "native" then
+                                fallbacks = fallbacks + 1
+                            end
                         end
                     end
                 end
             end
         end
-        local line = "bjarkiUI aura timers .282 | native=" .. timerStats.native
+        local line = "bjarkiUI aura timers .291 | native=" .. timerStats.native
             .. ", fallback=" .. timerStats.fallback .. ", last=" .. timerStats.lastReason
             .. " | readable-writes=" .. timerStats.readable
             .. ", visibility-restricted=" .. timerStats.visibilityRestricted
             .. ", retries=" .. timerStats.retries
             .. " | hooked=" .. hooked .. "/" .. buttons
+            .. ", retry-pending=" .. pending .. ", fallback-buttons=" .. fallbacks
             .. ", private=" .. private .. ", inaccessible=" .. blocked
         local add = member(DEFAULT_CHAT_FRAME, "AddMessage")
         if type(add) == "function" then pcall(add, DEFAULT_CHAT_FRAME, line)

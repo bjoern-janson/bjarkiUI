@@ -105,6 +105,11 @@ local function styleButton(button, formatter)
             styleCooldown(cooldown, formatter)
         end
     end
+    -- One-time native digit-cell installation; no per-tick layout or font work.
+    local digitCells = bjarkiUINativeDigitCells
+    if digitCells and type(digitCells.InstallAction) == "function" then
+        digitCells.InstallAction(button)
+    end
 end
 
 local function applyCooldownSeconds()
@@ -126,12 +131,14 @@ end
 local events = CreateFrame("Frame")
 for _, event in ipairs({
     "PLAYER_LOGIN", "PLAYER_ENTERING_WORLD", "EDIT_MODE_LAYOUTS_UPDATED",
-    "PLAYER_REGEN_ENABLED", "ADDON_LOADED",
+    "PLAYER_REGEN_ENABLED", "ADDON_LOADED", "CVAR_UPDATE",
 }) do
     events:RegisterEvent(event)
 end
 events:SetScript("OnEvent", function(_, event, addon)
-    if event == "ADDON_LOADED" then
+    if event == "CVAR_UPDATE" then
+        if type(addon) ~= "string" or addon:lower() ~= "countdownforcooldowns" then return end
+    elseif event == "ADDON_LOADED" then
         if addon ~= "Blizzard_ActionBar" and addon ~= "Blizzard_MultiActionBars"
             and addon ~= "Blizzard_PetActionBar"
             and addon ~= "Blizzard_PossessActionBar"
