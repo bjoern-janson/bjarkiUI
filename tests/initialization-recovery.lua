@@ -232,5 +232,42 @@ test('target frame-local health bar cannot borrow a focus bar', function()
     eq(focus.b, .92, 'unavailable target frame cannot borrow focus')
 end)
 
+
+test('combat exit applies each current name color once and restores changed recipients', function()
+    local e=fixture()
+    local units={'player','target','focus','targettarget','focustarget'}
+    local labels,players={},{}
+    e.UnitExists=function()return true end
+    e.UnitIsPlayer=function(unit)return players[unit]==true end
+    e.UnitClassBase=function()return 'MAGE' end
+    e.UnitGUID=function(unit)return (players[unit] and 'Player-' or 'Creature-')..unit end
+    e.RAID_CLASS_COLORS={MAGE={r=.25,g=.78,b=.92}}
+    for _,unit in ipairs(units)do
+        players[unit]=true
+        local label={color={1,.82,0,1},writes=0}
+        function label:GetTextColor()return self.color[1],self.color[2],self.color[3],self.color[4]end
+        function label:SetTextColor(...)self.color={...};self.writes=self.writes+1 end
+        labels[unit]=label
+    end
+    e.PlayerFrame=e.player();e.PlayerFrame.name=labels.player
+    e.TargetFrame={unit='target',name=labels.target}
+    e.FocusFrame={unit='focus',name=labels.focus}
+    e.TargetFrameToT={unit='targettarget',name=labels.targettarget}
+    e.FocusFrameToT={unit='focustarget',name=labels.focustarget}
+    e.event('PLAYER_REGEN_ENABLED')
+    for _,unit in ipairs(units)do
+        eq(labels[unit].color[3],.92,unit..' receives current class tint')
+        eq(labels[unit].writes,1,unit..' has one combat-exit name write')
+    end
+    -- A recycled Target now needs its native baseline, while the other four
+    -- recipients still receive their current class tint in the same event.
+    players.target=false
+    for _,label in pairs(labels)do label.writes=0 end
+    e.event('PLAYER_REGEN_ENABLED')
+    eq(labels.target.color[1],1,'recycled nonplayer target restores native red')
+    eq(labels.target.color[2],.82,'recycled nonplayer target restores native green')
+    for _,unit in ipairs(units)do eq(labels[unit].writes,1,unit..' keeps one reconciliation')end
+end)
+
 if failures > 0 then error(failures .. '/' .. scenarios .. ' initialization recovery scenarios failed') end
 print('bjarkiUI initialization recovery: ' .. scenarios .. ' scenarios, ' .. assertions .. ' full-module assertions passed')

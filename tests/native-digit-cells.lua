@@ -23,6 +23,12 @@ local function label(parent)
  function f:SetNonSpaceWrap(b)self.nonSpaceWrap=b end
  function f:SetPoint(...)self.points={...}end
  function f:ClearAllPoints()self.points={}end
+ function f:GetNumPoints()return self.nativePoints and #self.nativePoints or 1 end
+ function f:GetPoint(i)if self.nativePoints then return table.unpack(self.nativePoints[i])end;return 'TOP',self.parent.Icon or self.parent,'BOTTOM',0,0 end
+ function f:GetEffectiveScale()return (self.scale or 1)*self.parent:GetEffectiveScale()end
+ function f:SetScale(v)self.scale=v end
+ function f:GetTextScale()return self.textScale or 1 end
+ function f:SetTextScale(v)self.textScale=v end
  function f:SetJustifyH(v)self.justify=v end
  function f:GetTextColor()return 0.9,0.6,0.2,1 end
  function f:SetTextColor(...)self.color={...}end
@@ -44,6 +50,7 @@ local function container()
  local o={}
  function o:IsForbidden()return false end
  function o:CreateFontString()created=created+1;return label(self)end
+ function o:GetEffectiveScale()return self.scale or 1 end
  return o
 end
 UIParent=container()
@@ -136,10 +143,6 @@ formatterAllowed=false
 ok(not api.InstallAction(button),'unsupported renderer rules refuse install')
 eq(cooldown:GetHideCountdownNumbers(),false,'no suppression on formatter failure')
 formatterAllowed=true
-durationAllowed=false
-ok(not api.InstallAction(button),'native duration outage refuses install')
-eq(cooldown:GetHideCountdownNumbers(),false,'no suppression while duration unavailable')
-durationAllowed=true
 do
  local create=cooldown.CreateFontString
  local capacity=3
@@ -186,6 +189,10 @@ do
  C_DurationUtil.CreateDurationTextBinding=factory
  hooksecurefunc=installHook
 end
+durationAllowed=false
+ok(not api.InstallAction(button),'native duration outage refuses takeover')
+eq(cooldown:GetHideCountdownNumbers(),false,'no suppression while duration unavailable')
+durationAllowed=true
 canHide=false
 ok(not api.InstallAction(button),'refused hide retains native labels')
 eq(cooldown:GetHideCountdownNumbers(),false,'native displayed after protected hide rejection')
@@ -197,15 +204,81 @@ eq(hooks,pendingHooks,'denied activation reuses installed hooks')
 canHide=true
 ok(api.InstallAction(button),'full installation succeeds')
 eq(cooldown.hidden,true,'stock countdown explicitly hidden')
-ok(created>=10,'nine timer labels plus a one-time font metrics probe')
+eq(created,7,'six timer labels plus one reusable font metrics probe')
 local digits={}
-for i=#labelList-8,#labelList do digits[#digits+1]=labelList[i] end
-eq(#allBindings,9,'safe activation reuses the nine prepared bindings')
+for i=#labelList-5,#labelList do digits[#digits+1]=labelList[i] end
+eq(#allBindings,6,'safe activation reuses the six prepared bindings')
 local good={}
-for i=#allBindings-8,#allBindings do good[#good+1]=allBindings[i] end
+for _,binding in ipairs(allBindings) do good[#good+1]=binding end
 for i,b in ipairs(good) do ok(b.enabled and b.interval==0.1,'synchronized native binding interval ' ..i) end
 ok(digits[1].font==nativeLabel.font and digits[1].size==nativeLabel.size,'original Blizzard font unchanged')
 ok(digits[1].color and digits[1].color[1]==0.9 and digits[1].shadowOffset[1]==1,'native colour and shadow copied')
+do
+ local originalColor,originalShadow=nativeLabel.GetTextColor,nativeLabel.GetShadowOffset
+ local fontWrites=0
+ local setters={}
+ for i,cell in ipairs(digits)do
+  setters[i]=cell.SetFont
+  cell.SetFont=function(self,...)fontWrites=fontWrites+1;return setters[i](self,...)end
+ end
+ ok(api.InstallAction(button),'unchanged source rediscovery succeeds')
+ eq(fontWrites,0,'unchanged source performs no font writes')
+ nativeLabel:SetFont('Fonts\\Changed.TTF',18,'THICKOUTLINE')
+ nativeLabel.GetTextColor=function()return .2,.4,.6,.8 end
+ nativeLabel.GetShadowOffset=function()return 2,-3 end
+ ok(api.InstallAction(button),'changed native source style resynchronizes existing cells')
+ for _,cell in ipairs(digits)do
+  eq(cell.font,'Fonts\\Changed.TTF','source font path copied')
+  eq(cell.size,18,'source font size copied');eq(cell.flags,'THICKOUTLINE','source outline copied')
+  eq(cell.color[1],.2,'source RGB copied');eq(cell.color[4],.8,'source alpha copied')
+  eq(cell.shadowOffset[1],2,'source shadow copied')
+ end
+ local writes,regions=fontWrites,created
+ ok(api.InstallAction(button));eq(fontWrites,writes,'successful style receipt prevents repeated writes')
+ nativeLabel:SetFont('Fonts\\Combat.TTF',20,'OUTLINE');currentCombat=true
+ ok(not api.InstallAction(button),'font resynchronization defers in combat')
+ cooldown:SetCooldown(6.3);eq(fontWrites,writes,'native combat updates do not rewrite cell style')
+ currentCombat=false
+ ok(api.InstallAction(button),'safe rediscovery applies deferred source font')
+ eq(digits[1].font,'Fonts\\Combat.TTF');eq(created,regions,'style changes reuse existing cells')
+ local hideSetter=cooldown.SetHideCountdownNumbers
+ local refuseRestore=true
+ cooldown.SetHideCountdownNumbers=function(self,hidden)
+  if not hidden and refuseRestore then return false end
+  return hideSetter(self,hidden)
+ end
+ nativeLabel:SetFont('Fonts\\AfterRestore.TTF',17,'OUTLINE')
+ writes=fontWrites
+ ok(not api.InstallAction(button),'style change cannot succeed while stock restoration is refused')
+ eq(fontWrites,writes,'stock restoration must precede every changed cell style write')
+ for _,binding in ipairs(good)do eq(binding.enabled,true,'unchanged complete presenter survives initial restoration refusal')end
+ cooldown:SetCooldown(4.8)
+ eq(fontWrites,writes,'pending native tick cannot perform partial style setup')
+ for _,binding in ipairs(good)do eq(binding.enabled,false,'pending native clock cannot repaint an unfinished presenter')end
+ refuseRestore=false
+ cooldown:SetCooldown(4.7)
+ eq(cooldown:GetHideCountdownNumbers(),false,'native tick can finish deferred stock restoration')
+ for _,binding in ipairs(good)do eq(binding.enabled,false,'restored stock keeps ownership until safe style discovery')end
+ ok(api.InstallAction(button),'safe discovery completes style after stock restoration recovers')
+ eq(digits[1].font,'Fonts\\AfterRestore.TTF')
+ cooldown.SetHideCountdownNumbers=hideSetter
+ local third=digits[3].SetFont
+ digits[3].SetFont=function()return false end
+ nativeLabel:SetFont('Fonts\\Recovered.TTF',16,'OUTLINE')
+ ok(not api.InstallAction(button),'partial style refusal delegates to stock')
+ eq(cooldown:GetHideCountdownNumbers(),false,'partial style failure restores stock visibility')
+ for _,binding in ipairs(good)do eq(binding.enabled,false,'partial style failure stops every custom cell')end
+ cooldown:SetCooldown(5.2)
+ eq(cooldown:GetHideCountdownNumbers(),false,'native update cannot reclaim an unfinished style')
+ eq(nativeLabel.font,'Fonts\\Recovered.TTF','source native font is never rewritten')
+ digits[3].SetFont=third
+ ok(api.InstallAction(button),'next safe discovery completes the existing style')
+ for _,cell in ipairs(digits)do eq(cell.font,'Fonts\\Recovered.TTF');eq(cell.size,16)end
+ nativeLabel:SetFont('Fonts\\FRIZQT__.TTF',12,'OUTLINE')
+ nativeLabel.GetTextColor, nativeLabel.GetShadowOffset=originalColor,originalShadow
+ ok(api.InstallAction(button),'source baseline can be restored')
+ for i,cell in ipairs(digits)do cell.SetFont=setters[i]end
+end
 for _,f in ipairs(digits) do
  eq(f.points[1],'CENTER','cell uses centered origin')
  ok(f.points[2]==cooldown,'cells anchored to cooldown, NOT its changing text label')
@@ -217,16 +290,9 @@ eq(digits[1].width,digits[3].width,'equal-width digit cells')
 eq(digits[5].width,digits[6].width,'equal-width whole-second digit cells')
 ok(math.abs((digits[5].points[4]+digits[6].points[4])/2-0.45)<0.00001,
   'two-digit number is shifted 0.45 units right of icon center')
-for i=7,9 do
-  eq(digits[i].maxLines,1,'triple digit cell never wraps to a second line')
-  eq(digits[i].nonSpaceWrap,false,'triple digit does not wrap non-space glyphs')
-  ok(digits[i].width>=digitWidths['8'],'triple digits have full-width label, never dot width')
-end
-eq(digits[8].points[4],0,'triple middle digit exactly on icon center')
-eq(digits[7].points[4],-digits[9].points[4],'triple cells mirror center')
-ok(digits[8].width>digits[2].width,'triple tens digit is never placed in narrow decimal-point slot')
-ok(digits[7].points[4]<digits[1].points[4] and digits[9].points[4]>digits[3].points[4],
-   'triple digits have their own wider spacing')
+eq(digits[4].points[4],0,'unit-suffixed text is centered on the icon')
+eq(digits[4].maxLines,1,'unit-suffixed text stays on one line')
+eq(digits[4].nonSpaceWrap,false,'unit suffix cannot wrap')
 local function draw(value)
  cooldown:SetCooldown(value)
  for _,b in ipairs(good) do b:Tick(value) end
@@ -234,16 +300,33 @@ local function draw(value)
  for _,d in ipairs(digits) do output=output..d.text end
  return output
 end
-for _,sample in ipairs({{1.1,'1.1'},{8.7,'8.7'},{8.8,'8.8'},{9.9,'9.9'},
- {10.0,'10'},{25.0,'25'},{42.9,'42'},{99.9,'99'},
- {100,'100'},{120,'120'},{123.9,'123'},{219.1,'219'},{359.9,'359'},
- {360.0,'6m'},{0,'0.0'}}) do
- local output=draw(sample[1])
- if sample[1]<10 then
-  eq(output,sample[1]==0 and '' or sample[2],'exactly one visible timer, no double text')
- else
-  eq(output,sample[2], 'fixed two digits from 10-99, whole label >=100')
+do
+ -- Model the native single-line raster result independently of GetText:
+ -- the scaled, outlined button needs more room than the UIParent probe.
+ -- A narrow field can fit two trailing dots but cannot fit the digit.
+ local function painted(extra)
+  local text=''
+  for _,d in ipairs(digits) do
+   local glyph=d.text
+   if glyph~='' and d.width and d.width>0 and digitWidths[glyph] and digitWidths[glyph]+extra>d.width then
+    glyph=string.rep('.',math.min(3,math.floor(d.width/digitWidths['.'])))
+   end
+   text=text..glyph
+  end
+  return text
  end
+ eq(draw(85),'85','native formatter still produces the right glyphs')
+ eq(painted(0),'85','unscaled one-line control')
+ eq(painted(1.5),'85','outlined digit cells cannot truncate 85 into four dots')
+ eq(draw(8.1),'8.1');eq(painted(1.5),'8.1','decimal track retains the original text with outline')
+end
+for _,sample in ipairs({{1.1,'1.1'},{8.7,'8.7'},{8.8,'8.8'},{9.9,'9.9'},
+ {10.0,'10'},{25.0,'25'},{42.9,'42'},{89.999,'89'},{90,'90'},{90.999,'90'},
+ {91,'2m'},{99.9,'2m'},{100,'2m'},{120,'2m'},{120.01,'3m'},{219.1,'4m'},
+ {359.9,'6m'},{360,'6m'},{360.01,'7m'},{3599.9,'60m'},{3600,'1h'},{3600.1,'2h'},
+ {86399.9,'24h'},{86400,'1d'},{86400.1,'2d'},{0,''}}) do
+ local output=draw(sample[1])
+ eq(output,sample[2],'one visible action timer at '..sample[1])
 end
 -- The .304 screenshot showed a 10 + 9.9 overlap at the format boundary.
 -- All six bindings must share the SAME update cadence so the native
@@ -251,8 +334,9 @@ end
 local beforeTransitionWrites=textWrites
 for _,crossing in ipairs({{10.19,'10'}, {10.01,'10'}, {9.99,'9.9'},
                             {9.91,'9.9'}, {9.89,'9.9'}, {9.81,'9.8'},
-                            {100.01,'100'}, {99.99,'99'},
-                            {360.01,'7m'}, {359.99,'359'}}) do
+                            {91.01,'2m'}, {90.99,'90'}, {91,'2m'}, {9.9,'9.9'},
+                            {86400,'1d'}, {90.05,'90'}, {3600,'1h'},
+                            {360.01,'7m'}, {359.99,'6m'}}) do
  local result=draw(crossing[1])
  eq(result,crossing[2],'boundary shows exactly one countdown presenter')
 end
@@ -267,42 +351,32 @@ end
 local synchronized=''
 for _,d in ipairs(digits) do synchronized=synchronized..d.text end
 eq(synchronized,'9.9','no old whole-second glyphs during 10-to-decimal handoff')
-draw(100.01)
+draw(91.01)
 for _,b in ipairs(good) do
- if b.interval<=0.1 then b:Tick(99.91) end
+ if b.interval<=0.1 then b:Tick(90.91) end
 end
-local hundredHandoff=''
-for _,d in ipairs(digits) do hundredHandoff=hundredHandoff..d.text end
-eq(hundredHandoff,'99','no old three-digit glyphs during 100-to-99 handoff')
+local minuteHandoff=''
+for _,d in ipairs(digits) do minuteHandoff=minuteHandoff..d.text end
+eq(minuteHandoff,'90','minute text clears when the two whole-second cells return')
 -- No glyph repositioning or label allocation while durations change.
 local twoDigitStep=digits[6].points[4]-digits[5].points[4]
 ok(twoDigitStep>7.8 and twoDigitStep<8.2,'whole digits slightly tighter than .305')
 local decimalStep=digits[3].points[4]-digits[2].points[4]
 ok(decimalStep>=4.8 and decimalStep<5.35,'decimal gap tightened modestly')
 ok(twoDigitStep>decimalStep,'whole-second gap wider than decimal gap')
-local tripleStep=digits[9].points[4]-digits[8].points[4]
-ok(tripleStep>=digits[8].width,'triple-digit spacing is wide enough for full glyphs')
-ok(tripleStep>decimalStep,'triple-digit positions are independent from compact decimals')
--- Three-digit mode has independent full-width cells; never reallocate on a tick.
 local reused=created
-for _,v in ipairs({100,135.9,235.9,359.9,9.9,36.9}) do draw(v) end
-eq(created,reused,'three-digit cells allocated once, not on countdown updates')
-for v=100,359 do
- local output=draw(v+0.37)
- eq(output,tostring(v),'all 260 triple-digit values show exactly 3 single-character cells')
- -- Each binding must own exactly one glyph; otherwise WoW wraps tiny labels.
- for i=1,3 do eq(digits[i].text,'','decimal cells empty for triple digits') end
- for i=5,6 do eq(digits[i].text,'','two-digit cells empty for triple digits') end
- for i=7,9 do
-   eq(#digits[i].text,1,'triple-cell output is a single glyph')
-   ok((digitWidths[digits[i].text] or 100) <= digits[i].width,
-      'triple digit fits the width of its native FontString without wrapping')
- end
+for v=10,90 do
+ eq(draw(v+0.37),tostring(v),'whole seconds round down across the compact range')
+ eq(digits[4].text,'','minute text is empty while whole seconds are visible')
+ eq(#digits[5].text,1,'single tens glyph');eq(#digits[6].text,1,'single ones glyph')
 end
--- Verify that a decimal glyph cannot bleed into three-digit mode.
-draw(135.79)
-eq(digits[2].text,'','narrow decimal dot cell remains empty above 100s')
-eq(digits[8].text,'3','center triple digit rendered in wide, dedicated cell')
+for v=91,359 do
+ local minutes=math.ceil((v+0.37)/60)..'m'
+ eq(draw(v+0.37),minutes,'action minutes round up from the raw time')
+ eq(digits[4].text,minutes,'only the suffix cell renders minutes')
+ for _,i in ipairs({1,2,3,5,6}) do eq(digits[i].text,'','unused digit stays empty in minute mode') end
+end
+eq(created,reused,'mode changes reuse the six action cells')
 local beforeMetrics=metrics
 local beforeCreated=created
 local beforeHooks=hooks
@@ -322,7 +396,9 @@ local p=label(container())
 local e=container()
 -- Buff label parent is a separate icon button, not a cooldown.
 p.parent=e; e.Icon=container()
+local beforeBuff=created
 ok(api.PrepareBuff(p),'public buff cell preparation')
+eq(created-beforeBuff,3,'buffs still use exactly three decimal cells')
 ok(api.ShowBuff(p,87),'readable buff split')
 local buffList={labelList[#labelList-2],labelList[#labelList-1],labelList[#labelList]}
 eq(buffList[1].text..buffList[2].text..buffList[3].text,'8.7','public buff stable output')
@@ -402,7 +478,7 @@ for _,b in ipairs(good) do ok(not b.enabled,'native clear stops every custom bin
 cooldown:SetCooldown(25)
 for _,b in ipairs(good) do ok(b.enabled,'new native cooldown restarts the bindings') end
 
--- A zero duration can be identified before setting nine duration objects.
+-- A zero duration can be identified before updating any action binding.
 local writes=0
 for _,b in ipairs(good) do
  local previous=b.SetDuration
@@ -410,7 +486,7 @@ for _,b in ipairs(good) do
 end
 C_ActionBar.GetActionCooldownDuration=function() return {IsZero=function()return true end} end
 cooldown:SetCooldown(0.9);cooldown:SetCooldown(0.9)
-eq(writes,0,'public GCD-only duration never bound to nine idle cells')
+eq(writes,0,'public GCD-only duration never bound to idle cells')
 C_ActionBar.GetActionCooldownDuration=oldGet
 
 -- An explicit spell identifier must never borrow the unrelated action slot.
@@ -483,7 +559,7 @@ do
   if order=='rescan-first' then cooldown:Clear() end
   for _,b in ipairs(good) do ok(not b.enabled,'cleared normal cooldown stays blank') end
   cooldown:SetCooldown(25)
-  for _,b in ipairs(good) do ok(b.enabled,order..' next native clock takes all nine bindings') end
+  for _,b in ipairs(good) do ok(b.enabled,order..' next native clock takes all six bindings') end
   eq(cooldown.hidden,true,'safe rediscovery retains normal custom presentation')
  end
  cooldown.SetHideCountdownNumbers=visibilityWriter
@@ -776,11 +852,11 @@ do
  issecretvalue=secretProbe
 end
 
--- Failure to disable one binding must not leave its eight siblings running.
+-- Failure to disable one binding must not leave its siblings running.
 local enableFirst=good[1].SetEnabled
 good[1].SetEnabled=function(self,on) if not on then error('stop denied') end;return enableFirst(self,on) end
 cooldown:SetHideCountdownNumbers(false)
-for i=2,9 do ok(not good[i].enabled,'stop continues after the first rejection') end
+for i=2,#good do ok(not good[i].enabled,'stop continues after the first rejection') end
 good[1]:Tick(8.7)
 ok(good[1].label.hidden,'denied binding cannot repaint over visible native text')
 good[1].SetEnabled=enableFirst
@@ -859,6 +935,62 @@ for _,order in ipairs({'before','after'}) do
  end
 end
 currentCombat=false
+
+-- Blizzard reasserts the current preference at load and in its own CVar
+-- callback. The first ON write can arrive without a preceding OFF.
+do
+ local original=C_ActionBar.GetActionCooldownDuration
+ local function owner()
+  local cd=container()
+  function cd:GetCountdownFontString()return nativeLabel end
+  function cd:GetHideCountdownNumbers()return self.hidden==true end
+  function cd:SetHideCountdownNumbers(value)self.hidden=value end
+  function cd:GetMinimumCountdownDuration()return 0 end
+  function cd:SetCooldown()end
+  function cd:Clear()end
+  return {cooldown=cd,action=5}
+ end
+ for _,fault in ipairs({'stock-on','clock','late-clock','binding','external-on','external-off'}) do
+  local b=owner();local cd=b.cooldown;local first=#allBindings+1
+  local real={seconds=8.1,IsZero=function()return false end}
+  local idle={IsZero=function()return true end}
+  local clock=fault~='late-clock' and real or nil
+  C_ActionBar.GetActionCooldownDuration=function(slot,ignore)assert(slot==5 and ignore);return clock end
+  eq(api.InstallAction(b),fault~='late-clock',fault..' initial acquisition')
+  local objects,watches=created,hooks
+  currentCombat=true
+  if fault=='stock-on' then
+   ActionButton_UpdateCooldownNumberHidden(b)
+   eq(cd.hidden,true,'verified initial stock ON preserves the active fixed presenter')
+  elseif fault=='external-on' or fault=='external-off' then
+   cd:SetHideCountdownNumbers(fault=='external-off')
+   ActionButton_UpdateCooldownNumberHidden(b)
+  elseif fault=='clock' then
+   clock=nil;cd:SetCooldown(0,7,1)
+   eq(cd:GetHideCountdownNumbers(),false,'missing normal clock yields immediately to stock')
+  elseif fault=='binding' then
+   local binding=allBindings[first+2];local write=binding.SetDuration
+   binding.SetDuration=function()return false end;cd:SetCooldown(0,7,1)
+   eq(cd:GetHideCountdownNumbers(),false,'a partial bind returns to visible native text')
+   binding.SetDuration=write
+  end
+  cd:Clear()
+  for i=first,#allBindings do ok(not allBindings[i].enabled,fault..' respects native clear') end
+  clock=idle;cd:SetCooldown(0,1,1)
+  for i=first,#allBindings do ok(not allBindings[i].enabled,fault..' excludes a GCD-only pulse') end
+  clock=real;cd:SetCooldown(0,8.1,1)
+  local recovered=fault~='external-on' and fault~='external-off'
+  eq(cd:GetHideCountdownNumbers(),recovered,fault..' follows stock or genuine external ownership')
+  if recovered then eq(#allBindings-first+1,6,fault..' has a complete fixed presenter') end
+  for i=first,#allBindings do
+   eq(allBindings[i].enabled,recovered,fault..' ordinary set recovers before leaving combat')
+   if recovered then eq(allBindings[i].duration,real,fault..' uses the current non-GCD clock') end
+  end
+  eq(created,objects,fault..' allocates no combat regions');eq(hooks,watches,fault..' installs no combat hooks')
+  currentCombat=false
+ end
+ C_ActionBar.GetActionCooldownDuration=original
+end
 
 -- Clear can precede the first hook. Follow the same LOC source as Blizzard.
 for _,spell in ipairs({false,98765}) do
@@ -983,11 +1115,11 @@ do
  cd.GetCooldownDisplayDuration=function()error('widget duration unavailable')end
  scaled=6000;cd:SetCooldown(0,6,1);eq(measured(),'','denied current total does not revive old digits')
  cd.GetCooldownDisplayDuration=read;total=6000;cd:SetCooldown(0,6,1);eq(measured(),'1.4','next readable native clock recovers')
- local last=allBindings[before+9];local bind=last.SetDuration
+ local last=allBindings[before+6];local bind=last.SetDuration
  last.SetDuration=function()return false end
  cd:SetCooldown(0,6,1);eq(cd:GetHideCountdownNumbers(),false,'explicit refusal to bind one cell restores the stock presenter')
- for i=before+1,before+9 do ok(not allBindings[i].enabled,'partly rejected source has no mixed custom glyphs') end
- last.SetDuration=bind;currentCombat=false;ok(api.InstallAction(owner),'later lifecycle retries the same nine cells');currentCombat=true
+ for i=before+1,before+6 do ok(not allBindings[i].enabled,'partly rejected source has no mixed custom glyphs') end
+ last.SetDuration=bind;currentCombat=false;ok(api.InstallAction(owner),'later lifecycle retries the same six cells');currentCombat=true
  cd:SetMinimumCountdownDuration(9000)
  preference=false;api.StopActionNumbers()
  total,scaled=10000,10000;cd:SetCooldown(0,10,1)
@@ -1090,6 +1222,384 @@ do
  PetActionButton1=nil;C_SpellBook=nil;C_PetInfo=nil;Enum.SpellBookSpellBank=nil;Enum.SpellBookItemType=nil
  C_ActionBar.GetActionCooldownDuration=get
 end
+do
+ local create=C_DurationUtil.CreateDurationTextBinding
+ for _,mode in ipairs({'ready','helper-false','helper-error','setter-false','setter-error','ignored','partial'}) do
+  local cd=container();local clock={}
+  function cd:GetCountdownFontString()return nativeLabel end
+  function cd:GetHideCountdownNumbers()return self.hidden==true end
+  function cd:SetHideCountdownNumbers(value)self.hidden=value end
+  function cd:GetMinimumCountdownDuration()return 0 end
+  function cd:SetCooldown()end
+  function cd:Clear()end
+  local before=#allBindings;local offered,base,styled
+  local attempts,styleWrites,gate=0,0,mode
+  local profiles={}
+  local function suffix(label,formatter)
+   offered,base=label,formatter
+   attempts=attempts+1
+   if gate=='helper-false' then return false end
+   if gate=='helper-error' then error('suffix geometry unavailable') end
+   local key=label.font..label.size..(label.scale or 1)
+   if not profiles[key] then
+    profiles[key]={FormatNumber=function(_,n)
+     local raw=formatter:FormatNumber(n);return raw~='' and '<'..raw..'>' or ''
+    end}
+   end
+   styled=profiles[key];return styled
+  end
+  C_DurationUtil.CreateDurationTextBinding=function()
+   local b=create();local set=b.SetFormatter
+   if mode~='helper-false' then
+    b.GetFontString=function(self)return self.label end
+    b.GetFormatter=function(self)return self.formatter end
+   end
+   local index=#allBindings-before
+   b.SetFormatter=function(self,formatter)
+    if index==4 then styleWrites=styleWrites+1 end
+    if index==5 and gate=='partial' then return false end
+    if styled and formatter==styled then
+     if gate=='setter-false' then return false end
+     if gate=='setter-error' then error('native suffix refused') end
+     if gate=='ignored' then return end
+    end
+    return set(self,formatter)
+   end
+   return b
+  end
+  mod('bjarkiUI',{GetFixedActionFormatter=suffix})
+  local owner={action=5,cooldown=cd}
+  local get=C_ActionBar.GetActionCooldownDuration
+  C_ActionBar.GetActionCooldownDuration=function(_,ignore)assert(ignore);return clock end
+  if mode=='partial' then
+   ok(not bjarkiUINativeDigitCells.InstallAction(owner),'fifth binding may fail after the suffix is ready')
+   eq(cd:GetHideCountdownNumbers(),false,'partial preparation keeps stock visible')
+   allBindings[before+4].label.scale=.6;gate='ready'
+  end
+  ok(bjarkiUINativeDigitCells.InstallAction(owner),mode..' optional suffix does not block fixed digits')
+  local binding=allBindings[before+4]
+  eq(#allBindings-before,6,'optional suffix reuses the fourth binding')
+  eq(offered,binding.label,'measure the actual suffix glyphs')
+  eq(binding.formatter,gate=='ready' and styled or base,mode..' picks a validated suffix formatter')
+  if mode=='partial' then eq(styled,profiles[binding.label.font..binding.label.size..binding.label.scale],'retry rechecks the existing fourth label') end
+  binding:Tick(90.99);eq(binding.label.text,'','suffix keeps out of the two-digit range')
+  binding:Tick(91);eq(binding.label.text,gate=='ready' and '<2m>' or '2m','suffix starts at 91 seconds')
+  binding:Tick(601);eq(binding.label.text,gate=='ready' and '<11m>' or '11m','initial two-digit suffix')
+  gate='ready'
+  ok(bjarkiUINativeDigitCells.InstallAction(owner));binding:Tick(601)
+  eq(binding.label.text,'<11m>',mode..' same widget recovers styled 11m at safe rediscovery')
+  local writes=styleWrites
+  ok(bjarkiUINativeDigitCells.InstallAction(owner))
+  eq(styleWrites,writes,'same current suffix makes no setter call')
+  local firstStyle=binding.formatter
+  binding.label.scale=.75
+  local coldAttempts=attempts;currentCombat=true
+  cd:SetCooldown(0,601,1);bjarkiUINativeDigitCells.InstallAction(owner)
+  eq(attempts,coldAttempts,'no style probe on a combat rediscovery or ordinary clock refresh')
+  currentCombat=false;ok(bjarkiUINativeDigitCells.InstallAction(owner))
+  ok(binding.formatter~=firstStyle and binding.formatter==styled,'effective scale selects a new style')
+  local zoomed=binding.formatter
+  binding.label.font='other.ttf';ok(bjarkiUINativeDigitCells.InstallAction(owner))
+  ok(binding.formatter~=zoomed and binding.formatter==styled,'actual suffix font selects a new style')
+  if binding.GetFormatter then
+   binding.formatter=base;ok(bjarkiUINativeDigitCells.InstallAction(owner))
+   eq(binding.formatter,styled,'native formatter getter detects a replaced formatter')
+   local boundLabel=binding.label;binding.label=nativeLabel;writes=styleWrites
+   ok(bjarkiUINativeDigitCells.InstallAction(owner))
+   eq(styleWrites,writes,'a changed native binding destination is never restyled')
+   binding.label=boundLabel
+  end
+  clock={IsZero=function()return true end};cd:SetCooldown(0,1.5,1)
+  ok(not binding.enabled,'a styled suffix cannot display a GCD')
+  C_ActionBar.GetActionCooldownDuration=get
+ end
+ C_DurationUtil.CreateDurationTextBinding=create
+ bjarkiUINativeDigitCells=api
+end
+do
+ -- Diagnostics describe already observed routes without reading live clocks.
+ mod()
+ local diagnosticAPI=bjarkiUINativeDigitCells
+ ok(type(diagnosticAPI.GetActionTimerDiagnostics)=='function','action timer diagnostics are available')
+ local source,secretCheck=C_ActionBar.GetActionCooldownDuration,issecretvalue
+ local secret={};issecretvalue=function(v)return rawequal(v,secret)end
+ local minimum,total=2000,12000
+ local reads,writes,names=0,0,0
+ local clock={IsZero=function()return false end}
+ C_ActionBar.GetActionCooldownDuration=function()reads=reads+1;return clock end
+ local owner={action=5,cooldown=container()};local cd=owner.cooldown
+ function owner:GetName()names=names+1;return 'ActionButton5' end
+ function cd:GetCountdownFontString()return nativeLabel end
+ function cd:GetHideCountdownNumbers()reads=reads+1;return self.hidden==true end
+ function cd:SetHideCountdownNumbers(v)writes=writes+1;self.hidden=v end
+ function cd:GetMinimumCountdownDuration()reads=reads+1;return minimum end
+ function cd:GetCooldownDisplayDuration()reads=reads+1;return total end
+ cd.GetCooldownDuration=cd.GetCooldownDisplayDuration
+ function cd:SetCooldown()end;function cd:Clear()end
+ ok(diagnosticAPI.InstallAction(owner))
+ local function report()
+  local r,w,n=reads,writes,names
+  local text=diagnosticAPI.GetActionTimerDiagnostics()
+  eq(reads,r,'diagnostic does not read a timer or visibility')
+  eq(writes,w,'diagnostic does not change presentation')
+  eq(names,n,'diagnostic uses the cached public button name')
+  return text
+ end
+ ok(report():find('cells=1 stock=0 idle=0',1,true),'active route is counted')
+ total=secret;cd:SetCooldown(0,12,1)
+ local hidden=report()
+ ok(hidden:find('cells=0 stock=1 idle=0',1,true),'restricted total records stock fallback')
+ ok(hidden:find('minimum-read-denied=1',1,true),'restricted minimum check is reported')
+ ok(hidden:find('ActionButton5:gate-unsupported',1,true),'restricted minimum check identifies the cached button')
+ local realClock=clock;clock=nil;cd:SetCooldown(0,12,1)
+ ok(report():find('ActionButton5:clock-unavailable',1,true),'later missing clock replaces the preceding fallback reason')
+ clock=realClock
+ minimum=secret;total=12000;cd:SetCooldown(0,12,1)
+ ok(report():find('minimum-read-denied=1',1,true),'restricted threshold uses the same denied-check reason')
+ minimum=2000
+ total=2000;cd:SetCooldown(0,2,1)
+ ok(report():find('below/equal-minimum=1',1,true),'equality has its own observed reason')
+ total=1200;cd:SetCooldown(0,1.2,1)
+ ok(report():find('below/equal-minimum=1',1,true),'subminimum fast path retains the correct reason')
+ total=12000;cd:SetCooldown(0,12,1)
+ local restored=report()
+ ok(restored:find('cells=1 stock=0 idle=0',1,true),'next readable update recovers')
+ ok(not restored:find('ActionButton5',1,true),'recovered buttons leave the fallback list')
+ cd:Clear();ok(report():find('cells=0 stock=0 idle=1',1,true),'native Clear is idle')
+ local retained={}
+ total=secret
+ for i=1,5 do
+  local named={action=5,cooldown=container()};retained[i]=named
+  local name=i==5 and secret or 'ActionButton'..i
+  function named:GetName()return name end
+  for _,key in ipairs({'GetCountdownFontString','GetHideCountdownNumbers','SetHideCountdownNumbers',
+   'GetMinimumCountdownDuration','GetCooldownDisplayDuration','GetCooldownDuration'}) do named.cooldown[key]=cd[key] end
+  function named.cooldown:SetCooldown()end;function named.cooldown:Clear()end
+  diagnosticAPI.InstallAction(named)
+ end
+ local limited=report()
+ local _,nameCount=limited:gsub('ActionButton','')
+ eq(nameCount,3,'diagnostic lists at most three cached public button names')
+ ok(limited:find('cells=0 stock=5 idle=1',1,true),'unnamed restricted-name fallback is still counted safely')
+ C_ActionBar.GetActionCooldownDuration,issecretvalue=source,secretCheck
+ bjarkiUINativeDigitCells=api
+end
+-- Secret widget totals must use two native duration gates, never Lua comparisons.
+do
+ local oldCreate,oldDuration,oldCurves,oldColor,oldTime=CreateFrame,C_DurationUtil.CreateDuration,C_CurveUtil,CreateColor,GetTime
+ local oldFactory,oldSource,oldSecret=C_DurationUtil.CreateDurationTextBinding,C_ActionBar.GetActionCooldownDuration,issecretvalue
+ local secrets=setmetatable({},{__mode='k'})
+ local function opaque(v)local x=setmetatable({},{__lt=function()error('secret comparison')end,__le=function()error('secret comparison')end,__mul=function()error('secret arithmetic')end,__tostring=function()error('secret string')end});secrets[x]=v;return x end
+ local function unwrap(v)return secrets[v] or v end
+ issecretvalue=function(v)return secrets[v]~=nil or oldSecret(v)end
+ Enum.DurationTimeModifier={RealTime=0,BaseTime=1};Enum.DurationTextBindingProperty={TotalDuration=4};Enum.LuaCurveType={Step=1}
+ local allocations=0
+ CreateColor=function(r,g,b,a)return {GetRGBA=function()return r,g,b,a end}end
+ local function curve()
+  allocations=allocations+1;local c={points={}}
+  function c:SetType(t)eq(t,1)end
+  function c:AddPoint(x,y)self.points[#self.points+1]={x,y}end
+  function c:Evaluate(x)local y;for _,p in ipairs(self.points)do if x>=p[1]then y=p[2]end end;return y end
+  return c
+ end
+ C_CurveUtil={CreateCurve=curve,CreateColorCurve=curve}
+ local function duration()
+  allocations=allocations+1;local d={}
+  function d:SetTimeFromStart(s,t,r)self.total,self.rate=t,r or 1 end
+  function d:GetTotalDuration(mod)if self.sealed then error('addon read secret clock')end;return mod==1 and self.total/self.rate or self.total end
+  function d:EvaluateTotalDuration(c,mod)local v=c:Evaluate(mod==1 and self.total/self.rate or self.total);return self.sealed and opaque(v)or v end
+  function d:IsZero()return false end
+  return d
+ end
+ C_DurationUtil.CreateDuration=duration;GetTime=function()return 100 end
+ local function alphaLabel(f)
+  function f:SetAlpha(v)self.alpha=unwrap(v)end
+  function f:GetAlpha()return self.alpha or 1 end
+  return f
+ end
+ CreateFrame=function(kind)
+  eq(kind,'Cooldown','only one harmless calibration cooldown')
+  local p=container();local l=alphaLabel(label(p));p.Hide=function()end
+  function p:GetCountdownFontString()if self.duration then return l end end
+  function p:CreateFontString()return alphaLabel(label(self))end
+  function p:SetCooldownFromDurationObject(d)self.duration=d end
+  function p:GetCooldownDisplayDuration()return self.duration:GetTotalDuration(1)*1000 end
+  function p:GetCooldownDuration()return self.duration:GetTotalDuration(0)*1000 end
+  return p
+ end
+ local incompleteColors,zeroColors,colorReads=0,0,0
+ C_DurationUtil.CreateDurationTextBinding=function()
+  local b=oldFactory()
+  function b:SetTextColorCurve(c,p)eq(p,4);self.curve=c end
+  function b:ClearTextColorCurve()self.curve=nil end
+  function b:GetFormattedTextColor()
+   colorReads=colorReads+1
+   if not self.curve or not self.formatter or not self.enabled then incompleteColors=incompleteColors+1;return end
+   if self.duration.total==0 then zeroColors=zeroColors+1;return end
+   return self.curve:Evaluate(self.duration.total)
+  end
+  return b
+ end
+ local minimum=2000;local sealed=true;local clock=duration();clock:SetTimeFromStart(100,12,1);clock.sealed=true;clock.seconds=6.3
+ C_ActionBar.GetActionCooldownDuration=function(_,ignore)eq(ignore,true);return clock end
+ local owner={action=5,cooldown=container()};local cd=owner.cooldown;local l=label(cd)
+ function owner:GetName()return 'ActionButton5'end
+ cd.CreateFontString=function(self)return alphaLabel(container().CreateFontString(self))end
+ function cd:GetCountdownFontString()return l end
+ function cd:GetHideCountdownNumbers()return self.hidden==true end
+ function cd:SetHideCountdownNumbers(v)self.hidden=v end
+ function cd:GetMinimumCountdownDuration()return minimum end
+ function cd:SetMinimumCountdownDuration(v)minimum=v end
+ function cd:GetCooldownDisplayDuration()return sealed and opaque(1)or clock.total/clock.rate*1000 end
+ function cd:GetCooldownDuration()return sealed and opaque(1)or clock.total*1000 end
+ function cd:SetCooldown()end;function cd:Clear()end
+ assert(loadfile(addon..'/NativeDigitCells.lua'))()
+ local gated=bjarkiUINativeDigitCells
+ local first=#allBindings+1
+ ok(gated.InstallAction(owner),'sealed native totals activate calibrated fixed cells')
+ eq(colorReads,3,'public native color preflight covers below, equal and above minimum')
+ eq(incompleteColors,0,'public color preflight configures and enables the binding')
+ eq(zeroColors,0,'zero duration does not require a formatted color result')
+ local cells={}
+ for i=first,#allBindings do local b=allBindings[i];if b.label and b.label.parent==cd then cells[#cells+1]=b end end
+ eq(#cells,6)
+ local function output()
+  local s='';for _,b in ipairs(cells)do
+   if b.enabled then
+    b:Tick(clock.seconds)
+    local a=1;if b.curve then local _,_,_,v=b:GetFormattedTextColor():GetRGBA();a=v end
+    if a*(b.label.alpha or 1)>0 and not b.label.hidden then s=s..b.label.text end
+   end
+  end;return s
+ end
+ eq(output(),'6.3');eq(cd.hidden,true,'stock hidden only after gated binding')
+ local before=allocations;currentCombat=true
+ for _,case in ipairs({{2,1,''},{1.5,1,''},{2.1,1,'6.3'},{3,2,''},{1.5,.5,''},{3,.5,'6.3'}})do
+  clock.total,clock.rate=case[1],case[2];cd:SetCooldown();eq(output(),case[3],'both total gates and equality')
+ end
+ eq(allocations,before,'combat refresh allocates no curves or durations')
+ minimum=3000;cd:SetMinimumCountdownDuration(minimum);eq(cd.hidden,false,'uncalibrated combat threshold keeps stock')
+ minimum=0;cd:SetMinimumCountdownDuration(0);eq(output(),'6.3','zero minimum clears both gates')
+ for _,b in ipairs(cells)do eq(b.curve,nil);eq(b.label.alpha,1);eq(b.label.color[1],.9,'original RGB restored')end
+ minimum=2000;cd:SetMinimumCountdownDuration(minimum)
+ local replacement=duration();replacement.total,replacement.rate,replacement.sealed,replacement.seconds=1,1,true,6.3
+ clock=replacement;cd:SetCooldown();eq(output(),'','replacement cannot retain eligible old clock')
+ sealed=false;clock.total=12;cd:SetCooldown();eq(output(),'6.3','readable path resets former gates')
+ sealed=true
+ local setCurve=cells[3].SetTextColorCurve;cells[3].SetTextColorCurve=function()return false end
+ cd:SetCooldown();eq(cd.hidden,false,'partly refused native gate restores stock');eq(output(),'')
+ cells[3].SetTextColorCurve=setCurve;cd:SetCooldown();eq(output(),'6.3','current native gate recovers')
+ currentCombat=false
+ local configuredFactory=C_DurationUtil.CreateDurationTextBinding
+ C_DurationUtil.CreateDurationTextBinding=function()
+  local b=configuredFactory();b.SetTextColorCurve=function()end;return b
+ end
+ assert(loadfile(addon..'/NativeDigitCells.lua'))()
+ cd.hidden=false
+ ok(not bjarkiUINativeDigitCells.InstallAction(owner),'ignored native color setup fails public preflight')
+ eq(cd.hidden,false,'unsupported native gate never suppresses stock')
+ ok(bjarkiUINativeDigitCells.GetActionTimerDiagnostics():find('ActionButton5:gate-unsupported/color-readback-1',1,true),
+  'cached diagnostic identifies rejected positive below-threshold color')
+ C_DurationUtil.CreateDurationTextBinding=configuredFactory
+ local properCreate=CreateFrame
+ local mappingDenied=true
+ CreateFrame=function(...)
+  local p=properCreate(...);local getDuration=p.GetCooldownDuration
+  function p:GetCooldownDuration()if mappingDenied then return 7 end;return getDuration(self)end
+  return p
+ end
+ assert(loadfile(addon..'/NativeDigitCells.lua'))()
+ cd.hidden=false
+ ok(not bjarkiUINativeDigitCells.InstallAction(owner),'contradictory native duration mapping still declines fixed cells')
+ eq(cd.hidden,false,'mapping failure preserves stock minimum policy')
+ local diagnosticAllocations,diagnosticReads=allocations,colorReads
+ ok(bjarkiUINativeDigitCells.GetActionTimerDiagnostics():find('ActionButton5:gate-unsupported/probe-mapping',1,true),
+  'cached diagnostic separates widget mapping from native color failure')
+ eq(allocations,diagnosticAllocations,'reporting failure allocates no native probes')
+ eq(colorReads,diagnosticReads,'reporting failure performs no binding readback')
+ bjarkiUINativeDigitCells.RetryActionMinimumGates()
+ ok(not bjarkiUINativeDigitCells.InstallAction(owner),'a persistent probe failure still keeps stock')
+ eq(allocations,diagnosticAllocations,'failed probe retries reuse the existing native resources')
+ mappingDenied=false
+ bjarkiUINativeDigitCells.RetryActionMinimumGates()
+ ok(bjarkiUINativeDigitCells.InstallAction(owner),'a repaired public probe admits a new minimum calibration')
+ eq(cd:GetHideCountdownNumbers(),true,'repaired probe can restore fixed digits')
+ -- A public calibration read can recover. Native ticks must retain the cached
+ -- refusal, while a real safe lifecycle event admits exactly one new attempt.
+ CreateFrame=properCreate
+ local temporaryFailure=true
+ local probeBinding,colorAttempts=nil,0
+ C_DurationUtil.CreateDurationTextBinding=function()
+  local b=configuredFactory();local getColor=b.GetFormattedTextColor
+  b.GetFormattedTextColor=function(self)
+   colorAttempts=colorAttempts+1
+   if temporaryFailure then error('temporary public color readback failure')end
+   return getColor(self)
+  end
+  if not probeBinding then probeBinding=b end
+  return b
+ end
+ local retryOwner={action=5,cooldown=container()};local retryCD=retryOwner.cooldown;local retryLabel=label(retryCD)
+ function retryOwner:GetName()return 'ActionButton5'end
+ retryCD.CreateFontString=function(self)return alphaLabel(label(self))end
+ function retryCD:GetCountdownFontString()return retryLabel end
+ function retryCD:GetHideCountdownNumbers()return self.hidden==true end
+ function retryCD:SetHideCountdownNumbers(v)self.hidden=v end
+ function retryCD:GetMinimumCountdownDuration()return 2000 end
+ function retryCD:GetCooldownDisplayDuration()return opaque(1)end
+ function retryCD:GetCooldownDuration()return opaque(1)end
+ function retryCD:SetCooldown()end;function retryCD:Clear()end
+ assert(loadfile(addon..'/NativeDigitCells.lua'))()
+ local retryAPI=bjarkiUINativeDigitCells
+ ok(not retryAPI.InstallAction(retryOwner),'temporary calibration failure keeps stock')
+ local failedAttempts=colorAttempts
+ retryCD:SetCooldown();retryAPI.InstallAction(retryOwner)
+ eq(colorAttempts,failedAttempts,'native events and discovery reuse a failed calibration receipt')
+ local frames={};local createCooldown=CreateFrame
+ CreateFrame=function(kind,...)
+  if kind~='Frame' then return createCooldown(kind,...)end
+  local f={};function f:RegisterEvent()end
+  function f:SetScript(name,callback)self[name]=callback end
+  frames[#frames+1]=f;return f
+ end
+ local shared={}
+ assert(loadfile(addon..'/NativePrecision.lua'))('bjarkiUI',shared)
+ assert(loadfile(addon..'/ActionTimerSpacing.lua'))('bjarkiUI',shared)
+ local oldButton=ActionButton5;ActionButton5=retryOwner
+ assert(loadfile(addon..'/CooldownSeconds.lua'))('bjarkiUI',shared)
+ local event=frames[#frames]
+ event:OnEvent('PLAYER_REGEN_ENABLED')
+ eq(colorAttempts,failedAttempts+1,'one safe lifecycle retry while the same public read still fails')
+ temporaryFailure=false
+ probeBinding:SetEnabled(true)
+ ok(probeBinding:GetFormattedTextColor(),'the same retained calibration binding recovers')
+ probeBinding:SetEnabled(false)
+ local beforeRecovery=colorAttempts
+ currentCombat=true;event:OnEvent('PLAYER_ENTERING_WORLD')
+ eq(colorAttempts,beforeRecovery,'combat lifecycle does not attempt public calibration')
+ currentCombat=false;event:OnEvent('PLAYER_REGEN_ENABLED')
+ eq(retryCD:GetHideCountdownNumbers(),true,'real combat-exit handler recovers fixed native digits')
+ eq(colorAttempts,beforeRecovery+3,'recovery verifies all positive public calibration samples')
+ local successfulAttempts,successfulAllocations=colorAttempts,allocations
+ event:OnEvent('PLAYER_REGEN_ENABLED');event:OnEvent('PLAYER_ENTERING_WORLD')
+ eq(colorAttempts,successfulAttempts,'safe events retain successful calibration')
+ eq(allocations,successfulAllocations,'successful gate reuse allocates no new native objects')
+ retryLabel:SetFont('Fonts\\GateChanged.TTF',19,'OUTLINE')
+ retryLabel.GetTextColor=function()return .4,.5,.6,.7 end
+ event:OnEvent('EDIT_MODE_LAYOUTS_UPDATED')
+ eq(retryCD:GetHideCountdownNumbers(),true,'changed style retains the opaque native timer route')
+ for _,b in ipairs(allBindings)do
+  if b.label and b.label.parent==retryCD then
+   eq(b.label.font,'Fonts\\GateChanged.TTF','gated cells inherit the actual source font')
+   local r,g,blue,a=b:GetFormattedTextColor():GetRGBA()
+   eq(r,.4,'new gate takes RGB from stock source');eq(g,.5);eq(blue,.6);eq(a,.7,'new gate takes source alpha')
+  end
+ end
+ ActionButton5=oldButton
+ CreateFrame,C_DurationUtil.CreateDuration,C_CurveUtil,CreateColor,GetTime=oldCreate,oldDuration,oldCurves,oldColor,oldTime
+ C_DurationUtil.CreateDurationTextBinding,C_ActionBar.GetActionCooldownDuration,issecretvalue=oldFactory,oldSource,oldSecret
+ bjarkiUINativeDigitCells=api
+end
 local owned=created
 currentCombat=true
 ok(not api.InstallAction(button),'installation deferred in combat')
@@ -1104,7 +1614,5 @@ for _,bad in ipairs({'SetCountdownFormatter(', 'GetCooldownTimes(', 'SetScript("
  'SetScript(\'OnUpdate\'','SLASH_','C_Timer.After','SetCountdownFont('}) do
  ok(not source:find(bad,1,true),'forbidden heavyweight/native-mask operation absent: '..bad)
 end
-ok(source:find("'hundreds','hundredTens','hundredOnes'",1,true)~=nil,
-  'independent 3-digit formatter names retained')
-eq(#good,9,'all nine native digit bindings exercised')
+eq(#good,6,'all six native digit bindings exercised')
 print('SINGLE-OWNER DIGIT CELL TESTS: '..n..' passed')

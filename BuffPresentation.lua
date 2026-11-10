@@ -5,6 +5,7 @@
 -- Recovery: native target/focus rows are left alone. UnitAuraStyling.lua is
 -- a status-only compatibility stub, loaded first to prevent native scanning.
 -- Never inspect private pools, private aura anchors, or protected aura data.
+local _, shared = ...
 local states = setmetatable({}, { __mode = "k" })
 local targetHooks = setmetatable({}, { __mode = "k" })
 local settingCVars = false
@@ -161,8 +162,7 @@ local function getDurationFormatter()
     local nearest, down, up = member(rounding, "Nearest"), member(rounding, "Down"), member(rounding, "Up")
     if type(create) ~= "function" or type(nearest) ~= "number"
         or type(down) ~= "number" or type(up) ~= "number" then return nil end
-    -- Match SecondsToTimeAbbrev's >=1.5-unit transitions, not the action-bar
-    -- six-minute policy. Localized native labels are retained above ten.
+    -- Match SecondsToTimeAbbrev's >=1.5-unit transitions and localized native labels.
     local sec, min, hour, day = SECOND_ONELETTER_ABBR, MINUTE_ONELETTER_ABBR,
         HOUR_ONELETTER_ABBR, DAY_ONELETTER_ABBR
     if not readable(sec) or type(sec) ~= "string" or not readable(min) or type(min) ~= "string"
@@ -247,6 +247,34 @@ local function deferNativeDuration(state, reason)
     noteNativeTimer(state, reason)
 end
 
+-- Failure diagnostics only: identify the rejected field without comparing,
+-- logging, or using its hidden payload. The renderer retains its public gate.
+local function identityField(object, key)
+    local ok, value = pcall(readMember, object, key)
+    if not ok then return nil, "inaccessible" end
+    if type(issecretvalue) == "function" then
+        local checked, secret = pcall(issecretvalue, value)
+        if not checked or type(secret) ~= "boolean" then return nil, "inaccessible" end
+        if secret then return nil, "secret" end
+    end
+    if value == nil then return nil, "missing" end
+    return value
+end
+
+local function identityFailureReason(button)
+    local unit, reason = identityField(button, "unit")
+    if reason then return "aura unit " .. reason end
+    if type(unit) ~= "string" or (unit ~= "player" and unit ~= "vehicle") then return "aura unit unsupported" end
+    local info
+    info, reason = identityField(button, "buttonInfo")
+    if reason then return reason == "missing" and "aura info missing" or "aura info inaccessible" end
+    local id
+    id, reason = identityField(info, "auraInstanceID")
+    if reason then return "aura ID " .. reason end
+    if type(id) ~= "number" or not (id > 0 and id < math.huge and id == math.floor(id)) then return "aura ID invalid" end
+    return "aura identity changed during inspection"
+end
+
 local function showNativeDuration(button, duration)
     local state = states[button]
     if not state then return end
@@ -268,7 +296,7 @@ local function showNativeDuration(button, duration)
     end
     if type(unit) ~= "string" or (unit ~= "player" and unit ~= "vehicle")
         or type(id) ~= "number" or not (id > 0 and id < math.huge and id == math.floor(id)) then
-        noteNativeTimer(state, "no public aura identity"); return
+        noteNativeTimer(state, identityFailureReason(button)); return
     end
     if state.durationRetryAt then
         local now = timerClock()
@@ -1068,7 +1096,7 @@ if type(SlashCmdList) == "table" then
                 end
             end
         end
-        local line = "bjarkiUI aura timers .291 | native=" .. timerStats.native
+        local line = "bjarkiUI aura timers | native=" .. timerStats.native
             .. ", fallback=" .. timerStats.fallback .. ", last=" .. timerStats.lastReason
             .. " | readable-writes=" .. timerStats.readable
             .. ", visibility-restricted=" .. timerStats.visibilityRestricted
@@ -1079,6 +1107,19 @@ if type(SlashCmdList) == "table" then
         local add = member(DEFAULT_CHAT_FRAME, "AddMessage")
         if type(add) == "function" then pcall(add, DEFAULT_CHAT_FRAME, line)
         elseif type(print) == "function" then print(line) end
+        local statuses = {}
+        for _, entry in ipairs({{bjarkiUINativeDigitCells, "GetActionTimerDiagnostics"}, {shared, "GetCastTimerDiagnostics"}}) do
+            local get = member(entry[1], entry[2])
+            if type(get) == "function" then
+                local ok, status = pcall(get)
+                if ok and readable(status) and type(status) == "string" and status ~= "" then statuses[#statuses + 1] = status end
+            end
+        end
+        if #statuses > 0 then
+            local statusLine = table.concat(statuses, " | ")
+            if type(add) == "function" then pcall(add, DEFAULT_CHAT_FRAME, statusLine)
+            elseif type(print) == "function" then print(statusLine) end
+        end
     end
     SLASH_BJARKIUIICONS1 = "/buiicons"
     SlashCmdList.BJARKIUIICONS = function()

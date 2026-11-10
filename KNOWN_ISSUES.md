@@ -1,6 +1,30 @@
 # Known issues and bugs
 
-## Live checks for 0.2.323
+Current source is **0.2.334**. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+
+## Current live follow-up
+
+| Open observation | Current behavior and next evidence |
+| --- | --- |
+| Action/cast numbers move sideways or disappear | Fixed action/cast rendering remains enabled with the current native font. Capture `/buitimers` during the affected cooldown/cast and record UI scale, native countdown/cast-time setting and combat state. Repeat cast/channel transitions before treating a single successful display as recovery. |
+| Some short player buffs use whole seconds | Public short timers and supported public-identity native formatting have separate routes. Secret-ID ordinary buffs, private anchors and forbidden frames can intentionally retain stock formatting. Capture the precise identity/coverage reason; do not infer a formatter defect from the visible precision alone. |
+| Combat stuttering | The .334 case proves an unchanged-layout retention defect in a modeled native sequence. It does not identify the cause of live stuttering or measure a frame-time improvement. A comparable live workload and frame-time capture are still needed. |
+| Intermittent buff/debuff decorative borders | Run `/buiborders` before `/buiicons` or reload. Public skin coverage does not include every private/inaccessible icon. |
+| Battleground colors, cosmetic alignment and protected calls | Historical observations below remain open pending current-build client checks. Preserve native Target/Focus aura rows and user settings while gathering evidence. |
+
+## Version-specific repair evidence
+
+**0.2.334 buff timer repair, live verification pending:** The native aura-font-adjustment path can repeat an identical anchor after every duration update. Version .333 incorrectly retired prepared fixed digits in combat on that unchanged write. The regression now exercises the full native font-and-anchor sequence; unchanged layouts retain fixed digits, while actual changes retain the stock fallback. This offline reproduction does not establish the cause of reported in-game stuttering or close other live timer reports.
+
+**0.2.333 audit repairs, live verification pending:** Fixed action and cast timers remain enabled. Failed action minimum-gate preparation can retry at safe lifecycle boundaries, and prepared action digits can refresh changed native font/style. Buff tenths retain the native above/below/beside placement. Combat exit no longer performs the same name-color pass twice. Tests cover these code paths; actual client rendering, protected execution and frame time remain separate checks.
+
+**0.2.332 forward timer repair, live verification pending:** The fixed action/cast paths remain enabled. Cast glyphs no longer anchor to an emptied native FontString or unbounded parent; a model allowing empty text to have no geometry reproduced the old blank display. Action minimum-gate calibration now supplies a formatter and uses positive test durations, matching the native binding setup rather than demanding a color from an incomplete or zero-duration binding. Neither conditional reproduction establishes the exact live cause. The .331 rollback was rejected. Retest repeated casts/channels and capture /buitimers while an affected cooldown is active.
+
+**0.2.330 targeted timer changes, live verification pending:** The live .329 action diagnostic confirmed three minimum-read-denied fallbacks, and the cast diagnostic confirmed the tabular-font opt-out. Action cells now use a native minimum gate when its client duration/rate mapping passes a synthetic check. Cast digits use the current native text in fixed-position regions. These are source-level repairs with regression coverage, not a claim of confirmed in-game spacing. Secret-ID ordinary player buffs remain on Blizzard’s native formatting; no supported narrow conditional-decimal route has been established for them.
+
+**Current timer reports (.329 diagnostic build):** Action and cast numbers still move sideways in game, and some short player buffs display whole seconds. The live .328 diagnostic showed three active identity-gate fallbacks; its old message did not distinguish missing, secret or invalid fields. Version .329 provides that distinction and reports cached action cell/fallback and cast calibration status through the same /buitimers command. It changes diagnostic metadata, not timer rendering. Capture after a short cast while an affected action cooldown and short buff are active. A successful offline fallback test does not establish that static digits or decimals meet the requested behavior.
+
+## Earlier live checks recorded for 0.2.323
 
 Check that cast-to-channel transitions retain one visible timer, including empowered hold-at-max time. At the UI scales you use, watch short buff timers during button reuse and check party anchors after a pet changes. Frame time in a busy battleground still needs measurement. [Code and tests](docs/CODE_MAP.md)
 
@@ -48,7 +72,7 @@ For disappearing borders or missing decimals, use `/buiborders` and `/buitimers`
 
 **v16 suite update (2026-10-22):** this addon receives release-version metadata only. Its behavior is byte-identical to v15 apart from that version string. The three timing repairs are in bjarkiCC Model/Observer. The full v16 suite passes 49 regression scripts and 28 runtime syntax checks on both Lua 5.1 and Lua 5.4; live-client findings below retain their existing status. The behavior described in architecture section 31 remains applicable.
 
-Current packaged source baseline (2026-11-02): **bjarkiUI 0.2.264-audit-fixes-test**. The reports below are historical client observations and remain open pending current-client verification. Offline source, syntax and modeled-API checks do not close them. See architecture section 32 for the current layout-neutral behavior.
+Historical packaged source baseline (2026-11-02): **bjarkiUI 0.2.264-audit-fixes-test**. The reports below are historical client observations and remain open pending current-client verification. Offline source, syntax and modeled-API checks do not close them. See architecture section 32 for the origin of the layout-neutral behavior retained by current source.
 
 Original status recorded 2026-10-08 for **bjarkiUI 0.2.90-local**.
 
@@ -82,7 +106,7 @@ separate issues.
 
 ## Verification boundary
 
-No live WoW test has confirmed these reports fixed in 0.2.90-local. See
+These reports originated in 0.2.90-local; no live result recorded here closes them for current 0.2.334. See
 [`ARCHITECTURE.md`](ARCHITECTURE.md) for the frame/color implementation and
 reported BG diagnostics. Pet portraits and aura category failures are tracked
 in the [bjarkiPortraits issue list](https://github.com/bjoern-janson/bjarkiPortraits/blob/main/KNOWN_ISSUES.md).

@@ -11,7 +11,7 @@ local function eq(actual,expected,name)
     check(actual==expected,(name or "value mismatch").." got="..tostring(actual)..
         " expected="..tostring(expected))
 end
-local function loadWith(env)
+local function loadWith(env,private)
     setmetatable(env,{__index=_G})
     env._G=env
     local chunk
@@ -21,7 +21,7 @@ local function loadWith(env)
     else
         chunk=assert(load(source,"CooldownSeconds.lua","t",env))
     end
-    chunk()
+    chunk("bjarkiUI",private)
     return env
 end
 local function makeCooldown()
@@ -126,13 +126,14 @@ do
     eq(rules[1].format,"%.1f","one decimal strictly under ten")
     eq(rules[2].threshold,10,"whole seconds begin exactly at ten")
     eq(rules[2].format,"%.0f","no decimals at ten or above")
-    eq(rules[3].threshold,360,"6-minute breakpoint unchanged")
+    eq(rules[3].threshold,91,"90 is the last displayed whole second")
     eq(rules[4].threshold,3600,"hour breakpoint unchanged")
     eq(rules[5].threshold,86400,"day breakpoint unchanged")
     for _,pair in ipairs({
         {0.1,"0.1"},{1.9,"1.9"},{4.9,"4.9"},{5,"5.0"},
         {5.1,"5.1"},{5.9,"5.9"},{9.9,"9.9"},{10,"10"},{10.1,"10"},{59.9,"59"},{60,"60"},
-        {105,"105"},{321,"321"},{359.9,"359"},
+        {86,"86"},{89.99,"89"},{90,"90"},{90.99,"90"},{91,"2m"},
+        {99,"2m"},{100,"2m"},{105,"2m"},{120,"2m"},{120.01,"3m"},{321,"6m"},{359.9,"6m"},
         {360,"6m"},{361,"7m"},{900,"15m"},
         {3600,"1h"},{5400,"2h"},{86400,"1d"},
     }) do
@@ -140,7 +141,6 @@ do
     end
     eq(render(fmt,9.9),"9.9","decimal presentation below ten")
     eq(render(fmt,10),"10","integer presentation at ten")
-    eq(render(fmt,105),"105","no minutes:seconds representation")
 
     spy.emit("PLAYER_LOGIN")
     spy.emit("PLAYER_ENTERING_WORLD")
@@ -289,6 +289,50 @@ do
 end
 
 do
+    local env,spy=makeEnv()
+    local normal,charge,loc=makeCooldown(),makeCooldown(),makeCooldown()
+    local fixedA,fixedB,base={},{},nil
+    local a,b={},{}
+    for _,cd in ipairs({normal,charge,loc}) do
+        cd.label=a
+        cd.GetCountdownFontString=function(self)return self.label end
+        cd.SetHideCountdownNumbers=function()error("styling must not change native visibility")end
+    end
+    env.ActionButton1={cooldown=normal,chargeCooldown=charge,lossOfControlCooldown=loc}
+    env.ActionButton1Cooldown=normal
+    local helper={GetFixedActionFormatter=function(label,baseFormatter)
+        base=baseFormatter
+        if label==a then return fixedA elseif label==b then return fixedB end
+    end}
+    loadWith(env,helper)
+    for _,cd in ipairs({normal,charge,loc}) do
+        eq(cd.formatter,fixedA,"the stock widget can use fixed spacing when its own text is visible")
+    end
+    normal.label=b
+    spy.emit("UI_SCALE_CHANGED")
+    eq(normal.formatter,fixedB,"remeasure the current label at its new scale")
+    eq(charge.setterCalls,1,"unchanged native renderer stays installed")
+    loc.label={}
+    spy.emit("EDIT_MODE_LAYOUTS_UPDATED")
+    eq(loc.formatter,base,"an unverified style keeps the normal countdown")
+
+    local flakey=makeCooldown()
+    flakey.GetCountdownFontString=function()return a end
+    local refuse=true
+    function flakey:SetCountdownFormatter(fmt)
+        self.setterCalls=self.setterCalls+1
+        if refuse and fmt==fixedA then return false end
+        self.formatter=fmt
+    end
+    env.ActionButton2={cooldown=flakey}
+    spy.emit("PLAYER_ENTERING_WORLD")
+    eq(flakey.formatter,base,"a refused fixed renderer still has the standard numeric policy")
+    refuse=false
+    spy.emit("PLAYER_REGEN_ENABLED")
+    eq(flakey.formatter,fixedA,"a later lifecycle refresh can restore fixed spacing")
+end
+
+do
     -- No body reads cooldown times or creates replacement countdown text.
     check(not source:find(":GetCooldownTimes(",1,true),"no protected duration reads")
     check(not source:find("SetCooldown(",1,true),"no protected cooldown writers")
@@ -296,5 +340,16 @@ do
     check(not source:find("C_EditMode.SaveLayouts",1,true),"no layout mutation")
     check(not source:find("SetCountdownAbbrevThreshold",1,true),
         "doesn't misuse native abbreviation threshold as seconds formatter")
+end
+do
+    local env,spy=makeEnv()
+    local invalidations=0
+    env.bjarkiUINativeDigitCells={RetryActionMinimumGates=function()invalidations=invalidations+1 end}
+    loadWith(env)
+    eq(invalidations,0,"initial discovery does not discard calibration receipts")
+    spy.emit("EDIT_MODE_LAYOUTS_UPDATED");spy.emit("UI_SCALE_CHANGED");spy.emit("PET_UI_UPDATE")
+    eq(invalidations,0,"layout and pet rediscovery retain failed calibration receipts")
+    spy.emit("PLAYER_LOGIN");spy.emit("PLAYER_ENTERING_WORLD");spy.emit("PLAYER_REGEN_ENABLED")
+    eq(invalidations,3,"login, world entry and combat exit each admit one bounded calibration retry")
 end
 print("bjarkiUI cooldown seconds: "..assertions.." source-backed assertions passed")

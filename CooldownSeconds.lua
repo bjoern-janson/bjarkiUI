@@ -1,9 +1,10 @@
 -- Native action-button countdown format: decimals below ten seconds,
--- whole seconds up to six minutes.
+-- whole seconds through 90, then rounded-up minutes.
 -- Blizzard owns duration values, cooldown timing, text colors, swipes and fonts.
 -- No GetCooldownTimes, custom FontStrings, combat log, or OnUpdate polling.
 local DECIMAL_CUTOFF = 10
-local SECONDS_CUTOFF = 360
+local _, private = ...
+local MINUTES_START = 91 -- Whole seconds round down, so the last seconds label is 90.
 
 local BUTTON_GROUPS = {
     {"ActionButton", 12},
@@ -51,61 +52,80 @@ local function getFormatter()
     local gotMethod, setter = pcall(function() return formatter.SetBreakpoints end)
     if not gotMethod or type(setter) ~= "function" then return nil end
 
-    -- A countdown can pass its *secret* seconds directly through this native
-    -- formatter; Lua never branches on duration or remaining time.
-    -- 9.9 -> 9.9; 10.0 -> 10; 321 -> 321; 360 -> 6m.
-    -- The native formatter owns protected-value comparisons and rendering.
-    -- Below ten seconds, use the same one-decimal format as portrait auras.
-    -- From ten seconds onward, keep the established round-down behavior.
+    -- The native formatter chooses the rule even when the cooldown is secret.
     local rules = {
         { threshold = 0, format = "%.1f" },
         { threshold = DECIMAL_CUTOFF, step = 1, rounding = rounding.Down,
             format = "%.0f" },
-        { threshold = SECONDS_CUTOFF, step = 60, rounding = rounding.Up,
+        { threshold = MINUTES_START, step = 60, rounding = rounding.Up,
             format = "%.0fm", components = {{div = 60}} },
         { threshold = 3600, step = 3600, rounding = rounding.Up,
             format = "%.0fh", components = {{div = 3600}} },
         { threshold = 86400, step = 86400, rounding = rounding.Up,
             format = "%.0fd", components = {{div = 86400}} },
     }
-    if not pcall(setter, formatter, rules) then return nil end
+    local set, result = pcall(setter, formatter, rules)
+    if not set or isSecret(result) or result == false then return nil end
     cooldownFormatter = formatter
     return cooldownFormatter
 end
 
-local function styleCooldown(cooldown, formatter)
-    if not cooldown or isSecret(cooldown) then return end
-    local ok, setter, getter, forbidden = pcall(function()
+local function installFormatter(cooldown, setter, current, wanted)
+    if not rawequal(current, wanted) then
+        local ok, result = pcall(setter, cooldown, wanted)
+        if not ok or isSecret(result) or result == false then
+            applied[cooldown] = nil
+            return false
+        end
+    end
+    applied[cooldown] = wanted
+    return true
+end
+
+local function styleCooldown(cooldown, formatter, seen)
+    if isSecret(cooldown) or not cooldown or seen[cooldown] then return end
+    seen[cooldown] = true
+    local ok, setter, getter, getLabel = pcall(function()
         local check = cooldown.IsForbidden
         if type(check) == "function" then
             local checked, value = pcall(check, cooldown)
             if not checked or isSecret(value) or value ~= false then return end
         end
-        return cooldown.SetCountdownFormatter, cooldown.GetCountdownFormatter, false
+        return cooldown.SetCountdownFormatter, cooldown.GetCountdownFormatter, cooldown.GetCountdownFontString
     end)
-    if not ok or forbidden ~= false or type(setter) ~= "function" then return end
+    if not ok or type(setter) ~= "function" then return end
 
-    -- Check for native replacement of the formatter on layout rebuilds.
+    local current = applied[cooldown]
     if type(getter) == "function" then
-        local read, current = pcall(getter, cooldown)
-        if not read or isSecret(current) then return end
-        if current == formatter then applied[cooldown] = true; return end
-    elseif applied[cooldown] then
-        return
+        local read, value = pcall(getter, cooldown)
+        if not read or isSecret(value) then return end
+        current = value
     end
 
-    if pcall(setter, cooldown, formatter) then applied[cooldown] = true end
+    if private and private.GetFixedActionFormatter and type(getLabel) == "function" then
+        local read, label = pcall(getLabel, cooldown)
+        if read and not isSecret(label) and label then
+            local built, fixed = pcall(private.GetFixedActionFormatter, label, formatter, cooldown)
+            if built and not isSecret(fixed) and fixed and not rawequal(fixed, formatter) then
+                if installFormatter(cooldown, setter, current, fixed) then return end
+                current = nil -- A refused setter may already have changed the widget.
+            end
+        elseif current and rawequal(current, applied[cooldown]) then
+            return -- Keep an installed formatter while the label is temporarily inaccessible.
+        end
+    end
+    installFormatter(cooldown, setter, current, formatter)
 end
 
-local function styleButton(button, formatter, petIndex)
+local function styleButton(button, formatter, petIndex, seen)
     if not button or isSecret(button) then return end
     for _, field in ipairs(COOLDOWN_FIELDS) do
         local ok, cooldown = pcall(function() return button[field] end)
         if ok and cooldown and not isSecret(cooldown) then
-            styleCooldown(cooldown, formatter)
+            styleCooldown(cooldown, formatter, seen)
         end
     end
-    -- One-time native digit-cell installation; no per-tick layout or font work.
+    -- Reuse the button's prepared cells across cooldowns and layout refreshes.
     local digitCells = bjarkiUINativeDigitCells
     if digitCells and type(digitCells.InstallAction) == "function" then
         digitCells.InstallAction(button,petIndex)
@@ -127,16 +147,17 @@ local function applyCooldownSeconds(petOnly)
     observeStockVisibility()
     local formatter = getFormatter()
     if not formatter then return end
+    local seen = {}
     for _, spec in ipairs(BUTTON_GROUPS) do
         local isPet=spec[1]=="PetActionButton"
         if not petOnly or isPet then
             for index = 1, spec[2] do
                 local name = spec[1] .. index
-                styleButton(_G[name],formatter,isPet and index or nil)
+                styleButton(_G[name],formatter,isPet and index or nil,seen)
                 -- Some versions expose global cooldown regions rather than
                 -- instance fields; both paths are idempotent via the weak cache.
-                styleCooldown(_G[name .. "Cooldown"], formatter)
-                styleCooldown(_G[name .. "ChargeCooldown"], formatter)
+                styleCooldown(_G[name .. "Cooldown"], formatter, seen)
+                styleCooldown(_G[name .. "ChargeCooldown"], formatter, seen)
             end
         end
     end
@@ -147,7 +168,7 @@ local pendingPreferenceRefresh
 for _, event in ipairs({
     "PLAYER_LOGIN", "PLAYER_ENTERING_WORLD", "EDIT_MODE_LAYOUTS_UPDATED",
     "PLAYER_REGEN_ENABLED", "ADDON_LOADED", "CVAR_UPDATE",
-    "PET_BAR_UPDATE", "PET_UI_UPDATE", "UNIT_PET",
+    "PET_BAR_UPDATE", "PET_UI_UPDATE", "UNIT_PET", "UI_SCALE_CHANGED", "DISPLAY_SIZE_CHANGED",
 }) do
     events:RegisterEvent(event)
 end
@@ -187,6 +208,11 @@ events:SetScript("OnEvent", function(_, event, addon)
             and addon ~= "Blizzard_PetActionBar"
             and addon ~= "Blizzard_PossessActionBar"
             and addon ~= "Blizzard_StanceBar" then return end
+    end
+    if event=="PLAYER_LOGIN" or event=="PLAYER_ENTERING_WORLD" or event=="PLAYER_REGEN_ENABLED" then
+        if private and private.RetryFixedActionFormatters then private.RetryFixedActionFormatters() end
+        local cells=bjarkiUINativeDigitCells
+        if cells and cells.RetryActionMinimumGates then cells.RetryActionMinimumGates() end
     end
     applyCooldownSeconds()
 end)

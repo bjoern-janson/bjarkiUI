@@ -7,94 +7,27 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   package:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Install Lua 5.1 and 5.4
         run: |
           sudo apt-get update
           sudo apt-get install -y lua5.1 lua5.4
-      - name: Compile manifest modules and run regressions
+      - name: Verify current source and package
         run: |
-          set -euo pipefail
-          failures=0
-          mapfile -t addon_modules < <(awk '/\.lua[[:space:]]*$/ && $0 !~ /^[[:space:]]*#/ {print $1}' bjarkiUI.toc)
-          test "${#addon_modules[@]}" -eq 12
-          for version in 5.1 5.4; do
-            for file in "${addon_modules[@]}" tests/*.lua; do
-              if ! "luac${version}" -p "$file"; then
-                echo "::error::Syntax: $file (Lua $version)"
-                failures=$((failures + 1))
-              fi
-            done
-            test_options=()
-            if [ "$version" = 5.1 ]; then test_options=(-l tests.support.lua51); fi
-            for test in tests/*.lua; do
-              if ! "lua${version}" "${test_options[@]}" "$test" .; then
-                echo "::error::Regression: $test (Lua $version)"
-                failures=$((failures + 1))
-              fi
-            done
-          done
-          if [ "$failures" -ne 0 ]; then
-            echo "::error::Found $failures failing Lua checks"
-            exit 1
-          fi
-      - name: Validate manifests and stage addon
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import hashlib
-          import shutil
-
-          root = Path(".")
-          manifests = [root / "bjarkiUI.toc", root / "bjarkiUI_Camelot.toc"]
-
-          def modules(manifest):
-              return [
-                  line.strip()
-                  for line in manifest.read_text(encoding="utf-8").splitlines()
-                  if line.strip() and not line.lstrip().startswith("#")
-              ]
-
-          source_modules = modules(manifests[0])
-          assert source_modules, "Main manifest does not declare Lua modules"
-          assert source_modules == modules(manifests[1]), "The two TOC module lists disagree"
-          assert len(source_modules) == len(set(source_modules)), "Duplicate Lua module in TOC"
-
-          package = Path("dist/bjarkiUI")
-          package.mkdir(parents=True, exist_ok=True)
-          inputs = manifests + [root / path for path in source_modules]
-          # Keep shared installations free of preset files and layout writers.
-          assert not list(root.glob("EditMode-*.txt")), "Bundled Edit Mode presets are prohibited"
-          for module in source_modules:
-              source = (root / module).read_text(encoding="utf-8")
-              if any(name in source for name in (
-                  "C_EditMode.SaveLayouts", "C_EditMode.OnLayoutAdded",
-                  "C_EditMode.SetActiveLayout", "C_EditMode.ConvertStringToLayoutInfo",
-              )):
-                  raise RuntimeError(f"Unexpected Edit Mode layout writer in {module}")
-
-          for item in inputs:
-              if not item.is_file():
-                  raise FileNotFoundError(f"TOC references missing module: {item}")
-              if item.suffix == ".lua" and (item.is_absolute() or ".." in item.parts):
-                  raise ValueError(f"Unsafe module path: {item}")
-              shutil.copy2(item, package / item.name)
-
-          if sorted(p.name for p in package.glob("*.lua")) != sorted(Path(x).name for x in source_modules):
-              raise RuntimeError("Package source differs from the manifest")
-          sums = [
-              hashlib.sha256((package / item.name).read_bytes()).hexdigest() + "  " + item.name
-              for item in inputs
-          ]
-          (package / "SHA256SUMS.txt").write_text("\n".join(sums) + "\n", encoding="utf-8")
-          print("Staged:", ", ".join(item.name for item in inputs))
-          PY
+          python3 tools/verify.py --output "$RUNNER_TEMP/bjarkiUI-verified.zip"
+          python3 -m zipfile -e "$RUNNER_TEMP/bjarkiUI-verified.zip" "$RUNNER_TEMP/bjarkiUI-package"
       - uses: actions/upload-artifact@v4
         with:
           name: bjarkiUI
-          path: dist
+          path: ${{ runner.temp }}/bjarkiUI-package
           if-no-files-found: error

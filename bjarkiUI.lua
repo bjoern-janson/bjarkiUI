@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.323"
+local BJARKI_UI_VERSION = "0.2.334"
 -- Standalone PRD treatment is retained. Unit-frame resource bars stay native.
 local PRD_MANA_R, PRD_MANA_G, PRD_MANA_B = 0.10, 0.25, 1.00
 local WORLD_TEXT_SCREEN_Y = "0.0430"
@@ -2884,9 +2884,6 @@ events:SetScript("OnEvent", function(_, event, unit)
             local bar = healthBar(token)
             primaryClassColorRepair.Install(bar, token)
             primaryClassColorRepair.Queue(bar, token)
-        end
-        for _, token in ipairs({ "player", "target", "focus", "targettarget", "focustarget" }) do
-            applyClassNameColor(token)
         end
         installDerivedFrameAlignment()
         installPRDAlternateManaColor()

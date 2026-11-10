@@ -1,25 +1,54 @@
 # bjarkiUI code map
 
-The two manifests load the same 12 Lua files in order. Both declare `bjarkiUISettings` as per-character saved variables. Start with the module that writes the affected region. For a symptom that appears after login, a frame replacement, or combat, follow its event handler back to that writer. [Default manifest](../bjarkiUI.toc) · [Camelot manifest](../bjarkiUI_Camelot.toc)
+Current source: **0.2.334**. Start with the physical region that displays the symptom, then follow its native writer, addon observer, ownership record and cleanup. [Timer lifecycle detail](TIMER_LIFECYCLE.md) · [Verification commands and suite map](TESTING.md)
 
-| Symptom or task | Runtime entry points | Focused tests |
+## Runtime load order
+
+The [default manifest](../bjarkiUI.toc) and [Camelot manifest](../bjarkiUI_Camelot.toc) load these same 13 files in this order and declare `bjarkiUISettings` as per-character saved variables. This order is part of the integration contract: formatter helpers load before their consumers; the digit API exists before aura setup.
+
+| Order | Module | Responsibility |
 | --- | --- | --- |
-| Health bars, unit names, status text | `applyAll` and `applyUnit` install the unit presentation. Follow `applyHealthColor` and `nativeHealthStyle.Restore` for color ownership, `applyClassNameColor` for names, or `installUnitStatusFonts` for status text. [bjarkiUI.lua](../bjarkiUI.lua) | [Health color](../tests/health-color-observer.lua), [name ownership](../tests/name-color-ownership.lua), [pet status](../tests/pet-status-text.lua) |
-| Player cast, channel, or empowered countdown | `eventMode` selects the native clock. `updatePresentation` orders changes arriving inside a setter. `activate` binds the digits and checks stock text alpha. `disable` restores the alpha it still owns. Empowered time includes the hold at maximum charge. [CastBarDigits.lua](../CastBarDigits.lua) | [Cast bindings and visibility](../tests/castbar-digit-cells.lua) |
-| Action button or pet countdown | `applyCooldownSeconds` finds native cooldowns and installs their formatter. `api.InstallAction` prepares the digit bindings. Pet buttons use `petBookSlot` to verify the spell identity. Check the widget minimum, countdown preference, and GCD exclusion when fixed digits disappear. [CooldownSeconds.lua](../CooldownSeconds.lua) · [NativeDigitCells.lua](../NativeDigitCells.lua) | [Native formatter](../tests/cooldown-seconds.lua), [digit ownership](../tests/native-digit-cells.lua) |
-| Player buff or debuff duration | `setupButton` hooks the native update. Follow `afterDuration` → `showTenths`. For a recycled duration label, inspect `recoverForeignTimer` and `api.BuffBinding`, which checks the physical owner and binding generation. [BuffPresentation.lua](../BuffPresentation.lua) · [NativeDigitCells.lua](../NativeDigitCells.lua) | [Aura assignment, expiry, and handoff](../tests/aura-presentation.lua) |
-| Tracked buff countdown or icon border | `updateViewer` visits active viewer items. `setTenths` associates the current cooldown with its item, and `applyThreshold` sets the native ten-second threshold. For artwork, follow `Skin.Apply` to the mask, border, and donor restoration code. [TrackedBuffSeconds.lua](../TrackedBuffSeconds.lua) · [IconSkin.lua](../IconSkin.lua) | [Viewer recycling](../tests/presentation.lua), [icon skin](../tests/icon-skin.lua) |
-| Party order after roster or layout changes | `install` observes Blizzard's compact party layout. `queueVisualOrder` leads to `applyVisualOrder`, which snapshots the anchors before moving visible members. `restorePoints` handles partial writes. The vertical order puts numbered party members before the player. [PartyOrder.lua](../PartyOrder.lua) | [Party layout and rollback](../tests/party-order-recovery.lua) |
-| Level labels, player combat icon, bag count font | `apply` discovers the regions out of combat. Follow `moveLevel`, `mirroredCombatAnchor`, or `enlargeCount` for the specific write. `recordReceipt` tracks the geometry or font value Blizzard stored. [FrameLabelTweaks.lua](../FrameLabelTweaks.lua) | [Label geometry](../tests/frame-label-tweaks.lua), [combat icon anchor](../tests/combat-icon-portrait-anchor.lua) |
-| Soft Dark tint or restoration | `applyTheme` finds eligible artwork. On release, `restore` checks ownership before returning it to its prior appearance. Tint and label code use the shared `RoundToFloat32` helper to recognize values stored at native precision. [SoftDark.lua](../SoftDark.lua) · [NativePrecision.lua](../NativePrecision.lua) | [Theme restore](../tests/softdark-restore.lua), [discovery handoff](../tests/softdark-discovery-handoff.lua) |
+| 1 | [NativePrecision.lua](../NativePrecision.lua) | Shared `RoundToFloat32` helper for recognizing native-stored presentation values. |
+| 2 | [bjarkiUI.lua](../bjarkiUI.lua) | Settings, unit-frame health/name/status presentation, derived frames, incoming hit text, compact chrome and miscellaneous native UI details. |
+| 3 | [PartyOrder.lua](../PartyOrder.lua) | Vertical compact-party order, native layout observation and partial-write rollback. |
+| 4 | [SoftDark.lua](../SoftDark.lua) | Native artwork tinting, ownership-aware restoration and `/bdark`. |
+| 5 | [TrackedBuffSeconds.lua](../TrackedBuffSeconds.lua) | Native ten-second decimal threshold for active tracked-buff cooldown widgets. |
+| 6 | [ActionTimerSpacing.lua](../ActionTimerSpacing.lua) | Measures current native font glyphs, verifies spacing formatters and provides digit metrics. |
+| 7 | [CooldownSeconds.lua](../CooldownSeconds.lua) | Installs native action countdown formatting; observes settings and safe bar lifecycle events. |
+| 8 | [NativeDigitCells.lua](../NativeDigitCells.lua) | Action duration bindings, fixed action cells, buff glyph preparation and physical-label ownership. |
+| 9 | [CastBarDigits.lua](../CastBarDigits.lua) | Copies fresh native player cast text into fixed glyph positions with native fallback. |
+| 10 | [IconSkin.lua](../IconSkin.lua) | Native icon masks/rims, donor visibility restoration and `/buiborders`. |
+| 11 | [UnitAuraStyling.lua](../UnitAuraStyling.lua) | Inert compatibility stub reporting retirement of the custom target/focus aura route. |
+| 12 | [BuffPresentation.lua](../BuffPresentation.lua) | Accessible aura/cast/icon discovery; player duration post-hooks; `/buitimers` and `/buiicons`. |
+| 13 | [FrameLabelTweaks.lua](../FrameLabelTweaks.lua) | Level offsets, combat-icon geometry, bag/ammunition count fonts and `/buicombat`. |
 
-For protected-frame changes, check the permission test at the writer. Party reanchoring requires positive confirmation that combat lockdown and raid mode are both off. In timer code, an unavailable read and a native zero are separate outcomes. Keep restricted timing data in the native formatter or duration binding. Target and focus retain Blizzard's aura rows. The compatibility function `bjarkiUIUnitAuraRows.GetStatus` reports that the custom route is retired. [Party guards](../PartyOrder.lua) · [Timer handling](../BuffPresentation.lua) · [UnitAuraStyling.lua](../UnitAuraStyling.lua) · [Retirement test](../tests/unit-aura-retirement.lua)
+## Find a symptom
 
-### Run a regression
+| Symptom | Writer, ownership and recovery route | Focused tests |
+| --- | --- | --- |
+| Health colors or stale class tint | `applyUnit` → `applyHealthColor` → `nativeHealthStyle.Prepare/ObserveColor/Restore`. Separate unit identity from class availability and native color writes. Restore only the current recipient and owned color/material state. | [health-color-observer.lua](../tests/health-color-observer.lua), [lifecycle.lua](../tests/lifecycle.lua) |
+| Name color after target/focus replacement | `applyClassNameColor`, `prepareNameColor`, `restoreNativeNameColor`; check alias/owner identity and native setter order. The combat-exit route performs one name-color reconciliation pass. | [name-color-ownership.lua](../tests/name-color-ownership.lua) |
+| Status text/shadow or pet text | `installUnitStatusFonts` → `installStatusFont` → `styleStatusFont`; the native font/style writes and effective scale determine the next application. | [status-style.lua](../tests/status-style.lua), [status-scale.lua](../tests/status-scale.lua), [status-combat.lua](../tests/status-combat.lua), [pet-status-text.lua](../tests/pet-status-text.lua) |
+| Incoming player hit-text placement | `anchorCombatText`; follow safe lifecycle retries and native write refusals separately from geometry math. | [hit-text-lifecycle.lua](../tests/hit-text-lifecycle.lua), [hit-text-write-recovery.lua](../tests/hit-text-write-recovery.lua) |
+| Action or pet-action countdown | `applyCooldownSeconds` → `InstallAction` → `prepareAction/setDuration/refreshAction`; native duration bindings drive cells. `restoreStock` and visibility ownership return the native countdown. Check minimum/GCD policy, preference, spell identity and current source style. | [cooldown-seconds.lua](../tests/cooldown-seconds.lua), [action-timer-spacing.lua](../tests/action-timer-spacing.lua), [native-digit-cells.lua](../tests/native-digit-cells.lua) |
+| Player cast/channel countdown | Native `UpdateCastTimeText` → `update/paint`; `sourceWritten` invalidates an older claim and `release` restores only still-owned text. The current module mirrors native text; it does not query a cast clock or duration object. | [castbar-digit-cells.lua](../tests/castbar-digit-cells.lua) |
+| Player buff/debuff countdown | Native `UpdateDuration` → `afterDuration/showTenths`; `PrepareBuff/BuffBinding/ReadyBuff/ShowBuff` manage the physical label and its generation. `releaseDigits/ClearBuff` and stock receipts handle retirement or handoff. Native font/layout setters can run after the duration hook. | [aura-presentation.lua](../tests/aura-presentation.lua) |
+| Tracked buff countdown | Viewer `RefreshLayout` → `updateViewer/setTenths/applyThreshold`; a pass identity and current item-to-cooldown association prevent recycled items from reclaiming old widgets. | [presentation.lua](../tests/presentation.lua) |
+| Missing icon rims/masks | `BuffPresentation.setupButton/styleIcon` → `Skin.Apply`; follow icon ownership, donor alpha, mask attachment and `release/restore`. Private/inaccessible icons are outside public skin coverage. | [icon-skin.lua](../tests/icon-skin.lua), [aura-presentation.lua](../tests/aura-presentation.lua) |
+| Party or pet order | Native layout → `queueVisualOrder/applyVisualOrder`; `readPoints` snapshots before writes and `restorePoints` unwinds touched frames. Only displaced anchors should be rewritten. | [party-order-recovery.lua](../tests/party-order-recovery.lua) |
+| Level/combat-icon/bag-count geometry | `FrameLabelTweaks.apply` → `moveLevel/mirroredCombatAnchor/moveCombatIcon/enlargeCount`. `recordReceipt` stores native-confirmed geometry/font state; do not mistake an addon request for an accepted write. | [frame-label-tweaks.lua](../tests/frame-label-tweaks.lua), [combat-icon-level-mirror.lua](../tests/combat-icon-level-mirror.lua), [combat-icon-portrait-anchor.lua](../tests/combat-icon-portrait-anchor.lua) |
+| Soft Dark stale tint or restoration | `applyTheme/tintTexture` and `restore`; inspect original values, native float precision, later writers and failed restoration retries. Edit Mode callback registration is a separate recovery path. | [softdark-restore.lua](../tests/softdark-restore.lua), [softdark-discovery-handoff.lua](../tests/softdark-discovery-handoff.lua), [softdark-callback-recovery.lua](../tests/softdark-callback-recovery.lua) |
+| Failed initialization or later native UI availability | Main `installHooks/installNativeUpdateHooks` and each module's setup/event handler. A failed install must remain retryable without duplicating successful hooks. | [initialization-recovery.lua](../tests/initialization-recovery.lua), [hardening.lua](../tests/hardening.lua), [lifecycle.lua](../tests/lifecycle.lua) |
+| Restricted target/focus aura behavior | Native aura rows remain authoritative. `bjarkiUIUnitAuraRows.GetStatus` reports retirement; do not revive the old custom renderer from historical notes. | [unit-aura-retirement.lua](../tests/unit-aura-retirement.lua) |
 
-From the repository root, pass `.` as the test's addon directory. Lua 5.1 needs the fixture compatibility module. Substitute any top-level `tests/*.lua` script to exercise another route. The release workflow compiles the manifest modules and runs all these scripts under both interpreters. Client frame placement and combat behavior also need in-game observation. [Release workflow](../.github/workflows/package-addon.yml) · [Lua 5.1 fixture support](../tests/support/lua51.lua)
+## Shared boundaries
 
-```sh
-lua5.4 tests/castbar-digit-cells.lua .
-lua5.1 -l tests.support.lua51 tests/castbar-digit-cells.lua .
-```
+A duration object's existence is not permission to read its remaining time. Action cells use native bindings; the restricted public-identity aura route forwards native formatted text to its sink without parsing it. Secret or unavailable identity leaves that aura on the native fallback. Cast cells require a publicly readable native string. These are different permission paths, not interchangeable timer implementations.
+
+Many modules intentionally repeat safe discovery at login, world entry, combat exit or addon load. Timer progression comes from existing native writers and bindings, not an addon-created polling loop. Recovery callbacks and bounded retries are still work: offline tests do not measure their live cost.
+
+For protected-frame changes, inspect the permission check immediately before the writer. Keep native ownership, successful write receipts and later external writes distinct. The shared float helper accounts for native storage precision; it is not a broad tolerance for overwriting changed state.
+
+## Current versus historical material
+
+`tests/*.lua` is the current 27-script verification set. `tests/snapshot-0.2.309/`, `tools/audit/`, the `CODEX_*` audit prompts and [AUDIT_BASELINE.md](AUDIT_BASELINE.md) describe the pinned .309 audit. [ARCHITECTURE.md](../ARCHITECTURE.md) preserves historical design notes, some of which describe superseded cast/timer implementations. Use current source and this map when changing main.

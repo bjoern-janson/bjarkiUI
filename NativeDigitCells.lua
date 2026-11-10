@@ -3,9 +3,10 @@
 -- Action bar: Blizzard's own duration object + native fixed-position digit bindings.
 -- The STOCK countdown is hidden through its explicit visibility API ONLY after
 -- every binding has passed validation. We never mask it via a formatter.
--- Separate 3-digit cells prevent digits from wrapping in the decimal-point slot.
+-- Action timers use separate decimal, two-digit and unit-suffixed text tracks.
 -- No font replacement, OnUpdate, polling, text interception, slash commands,
 -- protected time arithmetic, or layout work during combat.
+local _,private=...
 local api = {}
 bjarkiUINativeDigitCells = api
 local installed = setmetatable({}, {__mode='k'})
@@ -112,9 +113,50 @@ local function inheritStyle(from,to)
     end
     return true
 end
+local actionStyleParts={
+    {'color','GetTextColor','SetTextColor',4},
+    {'shadowColor','GetShadowColor','SetShadowColor',4},
+    {'shadowOffset','GetShadowOffset','SetShadowOffset',2},
+}
+local function readActionStyle(label)
+    local path,size,flags=getFont(label)
+    if not path then return nil end
+    local style={font={path,size,flags or ''}}
+    for _,part in ipairs(actionStyleParts)do
+        local get=m(label,part[2])
+        if get then
+            local values={pcall(get,label)}
+            if not values[1] then return nil end
+            table.remove(values,1)
+            for i=1,part[4]do
+                if not public(values[i]) or type(values[i])~='number' then return nil end
+            end
+            style[part[1]]=values
+        end
+    end
+    return style
+end
+local function sameActionStyle(a,b)
+    if not a or not b then return false end
+    for _,key in ipairs({'font','color','shadowColor','shadowOffset'})do
+        local left,right=a[key],b[key]
+        if (left==nil)~=(right==nil) then return false end
+        if left then for i=1,#left do if left[i]~=right[i] then return false end end end
+    end
+    return true
+end
+local function writeActionStyle(style,label)
+    local spread=unpack or table.unpack
+    if not accepted(pcall(m(label,'SetFont'),label,spread(style.font))) then return false end
+    for _,part in ipairs(actionStyleParts)do
+        local values=style[part[1]]
+        if values and not accepted(pcall(m(label,part[3]),label,spread(values))) then return false end
+    end
+    return true
+end
 -- A hidden font probe may over-report visible glyph ink in Forever.
 -- Keep spacing modest and bounded by the original font size, with independent
--- positions for decimals, two-digit whole seconds, and three-digit seconds.
+-- positions for decimals and two-digit whole seconds.
 local function decimalStep(width,dot,size)
     -- Tighten the decimal cluster without changing glyphs or their font.
     return math.max(1,math.min((width+dot)/2-0.45,size*0.53))
@@ -123,13 +165,9 @@ local function wholeStep(width,size)
     -- Just inside the .305 spacing; two-digit cluster is nudged right below.
     return math.min(width+0.15,size*0.71)
 end
-local function tripleStep(width,size)
-    -- Unlike decimals, every position contains a FULL digit, including the
-    -- middle one. These centers must be farther apart than decimal centers.
-    return math.min(width+0.25,size*0.77)
-end
 local WHOLE_RIGHT=0.45
-local function makeCells(native,center,withWhole,existing,keepText)
+local MINUTE_CUTOFF=91
+local function makeCells(native,center,withWhole,existing,keepText,actionStyle)
     if not outOfCombat() or not safe(native) or not safe(center) then return nil end
     local width,dot,height=metrics(native)
     if not width then return nil end
@@ -140,14 +178,11 @@ local function makeCells(native,center,withWhole,existing,keepText)
     local cells=existing or {}
     local decimal=decimalStep(width,dot,size)
     local halfWhole=wholeStep(width,size)/2
-    local triple=tripleStep(width,size)
-    -- 1-3: compact decimals; 4: minute/hour suffix; 5-6: shifted and
-    -- slightly tightened two-digit seconds; 7-9: separate full-width
-    -- hundreds/tens/ones. Never print a digit into the narrow dot cell.
-    local centers={-decimal,0,decimal,0,-halfWhole+WHOLE_RIGHT,halfWhole+WHOLE_RIGHT,
-        -triple,0,triple}
-    local widths={width,dot,width,width*4,width,width,width,width,width}
-    for i=1,(withWhole and 9 or 3) do
+    -- Buffs need just the first three decimal cells. Actions also use a
+    -- centered unit label and two slightly right-shifted whole-second digits.
+    local centers={-decimal,0,decimal,0,-halfWhole+WHOLE_RIGHT,halfWhole+WHOLE_RIGHT}
+    local widths={width,dot,width}
+    for i=1,(withWhole and #centers or 3) do
         local fs=cells[i]
         if not fs then
             local ok,region=pcall(create,center,nil,'OVERLAY')
@@ -155,11 +190,16 @@ local function makeCells(native,center,withWhole,existing,keepText)
             fs=region
             cells[i]=fs
         end
-        if not inheritStyle(native,fs) then return nil end
+        if actionStyle then
+            if not writeActionStyle(actionStyle,fs) then return nil end
+        elseif not inheritStyle(native,fs) then return nil end
         if not m(fs,'SetSize') or not m(fs,'SetPoint')
             or not m(fs,'SetText') or not m(fs,'SetJustifyH') then return nil end
         if not accepted(pcall(function()
-            if not accepted(true,fs:SetSize(widths[i],height)) then return false end
+            -- The CENTER anchor fixes each action glyph's position. Keep its
+            -- text box auto-sized so outline/scale rounding cannot elide the
+            -- digit (or a long unit suffix) inside a probe-sized field.
+            if not withWhole and not accepted(true,fs:SetSize(widths[i],height)) then return false end
             -- Guard against the multi-line spills seen in the .305 screenshot
             -- if a client ever supplies an unexpected value to a tiny cell.
             if m(fs,'SetMaxLines') then fs:SetMaxLines(1) end
@@ -178,14 +218,12 @@ local function buildFormatters()
     local new=field(C_StringUtil,'CreateNumericRuleFormatter')
     if type(new)~='function' then return nil end
     local f={}
-    for k,kind in ipairs({'integer','point','tenths','whole','tens','ones',
-        'hundreds','hundredTens','hundredOnes'}) do
+    for k,kind in ipairs({'integer','point','tenths','whole','tens','ones'}) do
         local ok,obj=pcall(new)
         if not ok or not safe(obj) or not m(obj,'SetBreakpoints') or not m(obj,'FormatNumber') then return nil end
         local rules={}
         if kind=='point' then
-            -- The point cell must NEVER receive a whole digit. It is sized
-            -- for '.', not a numeral, and would wrap a three-digit timer.
+            -- The point cell is sized for '.' and clears at ten seconds.
             rules={{threshold=0,format='.'},{threshold=10,format=''}}
         elseif kind=='whole' then
             local rounding=field(Enum,'NumericRuleFormatRounding')
@@ -193,34 +231,17 @@ local function buildFormatters()
                 or type(field(rounding,'Up'))~='number' then return nil end
             rules={
                 {threshold=0,format=''},
-                {threshold=360,step=60,rounding=rounding.Up,format='%.0fm',components={{div=60}}},
+                {threshold=MINUTE_CUTOFF,step=60,rounding=rounding.Up,format='%.0fm',components={{div=60}}},
                 {threshold=3600,step=3600,rounding=rounding.Up,format='%.0fh',components={{div=3600}}},
                 {threshold=86400,step=86400,rounding=rounding.Up,format='%.0fd',components={{div=86400}}},
             }
-        elseif kind=='hundreds' then
-            -- Constant one-glyph rules, known to work in the live renderer.
-            rules={{threshold=0,format=''},{threshold=100,format='1'},
-                {threshold=200,format='2'},{threshold=300,format='3'},
-                {threshold=360,format=''}}
-        elseif kind=='hundredTens' then
-            rules={{threshold=0,format=''}}
-            for i=100,359,10 do
-                rules[#rules+1]={threshold=i,format=tostring(math.floor(i/10)%10)}
-            end
-            rules[#rules+1]={threshold=360,format=''}
-        elseif kind=='hundredOnes' then
-            rules={{threshold=0,format=''}}
-            for i=100,359 do
-                rules[#rules+1]={threshold=i,format=tostring(i%10)}
-            end
-            rules[#rules+1]={threshold=360,format=''}
         elseif kind=='tens' or kind=='ones' then
             rules={{threshold=0,format=''}}
-            for i=10,99 do
+            for i=10,MINUTE_CUTOFF-1 do
                 rules[#rules+1]={threshold=i,
                     format=tostring(kind=='tens' and math.floor(i/10) or i%10)}
             end
-            rules[#rules+1]={threshold=100,format=''}
+            rules[#rules+1]={threshold=MINUTE_CUTOFF,format=''}
         else
             -- Decimal mode: 0–9.9. Retain the live-proven literal glyph
             -- rules rather than relying on floating-point modulo for tenths.
@@ -228,9 +249,6 @@ local function buildFormatters()
                 rules[#rules+1]={threshold=i==0 and 0 or (i-0.5)/10,
                     format=tostring(kind=='integer' and math.floor(i/10) or i%10)}
             end
-            -- Triple-digit values now belong exclusively to cells 7-9.
-            -- This avoids multi-character formatting and wrapping in the
-            -- narrow decimal-point cell on the real game client.
             rules[#rules+1]={threshold=10,format=''}
         end
         if not pcall(obj.SetBreakpoints,obj,rules) then return nil end
@@ -239,23 +257,18 @@ local function buildFormatters()
     -- THIS CHECK RUNS IN THE LIVE CLIENT, NOT JUST IN OFFLINE TESTS.
     -- If an engine build cannot interpret constant-rule formatting as a
     -- single glyph, never hide the original countdown.
-    local probes={{1.1,'1','.','1','','','','','',''},
-        {8.7,'8','.','7','','','','','',''},
-        {9.9,'9','.','9','','','','','',''},
-        {10,'','','','','1','0','','',''},
-        {25,'','','','','2','5','','',''},
-        {99,'','','','','9','9','','',''},
-        {100,'','','','','','','1','0','0'},
-        {105.99,'','','','','','','1','0','5'},
-        {110,'','','','','','','1','1','0'},
-        {123.99,'','','','','','','1','2','3'},
-        {199.99,'','','','','','','1','9','9'},
-        {200,'','','','','','','2','0','0'},
-        {299.99,'','','','','','','2','9','9'},
-        {359.99,'','','','','','','3','5','9'},
-        {360,'','','','6m','','','','',''}}
+    local probes={{1.1,'1','.','1','','',''},
+        {8.7,'8','.','7','','',''},
+        {9.9,'9','.','9','','',''},
+        {10,'','','','','1','0'},
+        {25,'','','','','2','5'},
+        {90.99,'','','','','9','0'},
+        {91,'','','','2m','',''},
+        {120.01,'','','','3m','',''},
+        {3600,'','','','1h','',''},
+        {86400,'','','','1d','',''}}
     for _,sample in ipairs(probes) do
-        for k=1,9 do
+        for k=1,#f do
             local ok,value=pcall(f[k].FormatNumber,f[k],sample[1])
             if not ok or not public(value) or value~=sample[k+1] then return nil end
         end
@@ -438,43 +451,206 @@ local function publicMilliseconds(widget,method)
     local ok,value=pcall(m(widget,method),widget)
     if ok and public(value) and type(value)=='number' and value>=0 and value<math.huge then return value end
 end
-local function aboveNativeMinimum(widget)
+-- Native total-duration gates keep GCD/minimum policy when widget totals are
+-- secret. Only synthetic public clocks are read during one safe calibration.
+local minimumGates,minimumKeys,minimumFailures,minimumSlot={},{},{},1
+local minimumProbe,minimumProbeStage,minimumProbeResources
+function api.RetryActionMinimumGates()
+    if not outOfCombat() then return end
+    -- A safe lifecycle grants one fresh attempt to failed profiles. Successful
+    -- gates and their native resources survive every ordinary refresh.
+    for slot,key in pairs(minimumKeys)do
+        if minimumGates[key]==false then
+            minimumGates[key],minimumFailures[key],minimumKeys[slot]=nil,nil,nil
+        end
+    end
+    if minimumProbe==false then minimumProbe,minimumProbeStage=nil,nil end
+end
+local function minimumCalibration()
+    if minimumProbe~=nil then return minimumProbe or nil end
+    if not outOfCombat() then return nil end
+    minimumProbe=false
+    minimumProbeStage='probe-resources'
+    local ok,p=pcall(function()
+        -- Reuse partial resources after a denied public calibration. Repeated
+        -- safe retries must not create another hidden frame on every event.
+        local p=minimumProbeResources or {};minimumProbeResources=p
+        if not p.duration then p.duration=C_DurationUtil.CreateDuration() end
+        if not p.widget then p.widget=CreateFrame('Cooldown',nil,UIParent) end
+        if not p.binding then p.binding=C_DurationUtil.CreateDurationTextBinding() end
+        minimumProbeStage='probe-enums'
+        p.real=Enum.DurationTimeModifier.RealTime;p.base=Enum.DurationTimeModifier.BaseTime
+        p.property=Enum.DurationTextBindingProperty.TotalDuration
+        minimumProbeStage='probe-binding'
+        assert(accepted(pcall(p.widget.Hide,p.widget)))
+        if not p.label then p.label=p.widget:CreateFontString(nil,'OVERLAY') end
+        assert(accepted(pcall(p.binding.SetEnabled,p.binding,false)))
+        assert(accepted(pcall(p.binding.SetFontString,p.binding,p.label)))
+        -- GetFormattedTextColor may return nothing for an incomplete binding.
+        -- Configure a public synthetic formatter, just as native aura text does.
+        minimumProbeStage='probe-formatter'
+        local formatter=p.formatter or C_StringUtil.CreateNumericRuleFormatter();p.formatter=formatter
+        assert(accepted(pcall(formatter.SetBreakpoints,formatter,{{threshold=0,format='0'}})))
+        assert(accepted(pcall(p.binding.SetFormatter,p.binding,formatter)))
+        minimumProbeStage='probe-time'
+        local now=GetTime();assert(public(now) and type(now)=='number')
+        for _,rate in ipairs({1,2,.5}) do
+            minimumProbeStage='probe-clock'
+            assert(accepted(pcall(p.duration.SetTimeFromStart,p.duration,now,12,rate)))
+            assert(accepted(pcall(p.widget.SetCooldownFromDurationObject,p.widget,p.duration,false)))
+            assert(accepted(pcall(p.widget.Hide,p.widget)))
+            minimumProbeStage='probe-mapping'
+            local real,base=p.duration:GetTotalDuration(p.real),p.duration:GetTotalDuration(p.base)
+            local display,adjusted=p.widget:GetCooldownDisplayDuration(),p.widget:GetCooldownDuration()
+            assert(public(real) and public(base) and public(display) and public(adjusted))
+            assert((display==base*1000 and adjusted==real*1000) or (display==real*1000 and adjusted==base*1000))
+        end
+        minimumProbeStage='probe-alpha'
+        assert(accepted(pcall(p.label.SetAlpha,p.label,.25)) and p.label:GetAlpha()==.25)
+        assert(accepted(pcall(p.label.SetAlpha,p.label,1)))
+        return p
+    end)
+    if ok then minimumProbe=p;minimumProbeStage=nil end
+    return ok and p or nil
+end
+local function minimumGate(state,minimum)
+    if not state.timerColor then state.minimumGateFailure='source-color';return nil end
+    local color=state.timerColor
+    local key=string.format('%.17g:%.17g:%.17g:%.17g:%.17g',minimum,color[1],color[2],color[3],color[4])
+    if minimumGates[key]~=nil then state.minimumGateFailure=minimumFailures[key];return minimumGates[key] or nil end
+    if not outOfCombat() then state.minimumGateFailure='combat-cold';return nil end
+    local p=minimumCalibration()
+    local stage=minimumProbeStage or 'probe-unavailable'
+    local ok,gate=pcall(function()
+        assert(p)
+        stage='scalar-setup'
+        local threshold=minimum/1000
+        local function create(nextValue)
+            local scalar=C_CurveUtil.CreateCurve()
+            assert(accepted(pcall(scalar.SetType,scalar,Enum.LuaCurveType.Step)))
+            for _,point in ipairs({{0,0},{threshold,0},{nextValue,1}})do
+                assert(accepted(pcall(scalar.AddPoint,scalar,point[1],point[2])))
+            end
+            return scalar
+        end
+        local exponent=2^math.floor(math.log(threshold)/math.log(2))
+        if exponent>threshold then exponent=exponent/2 end
+        local nextValue=threshold+exponent*2^-52
+        local scalar=create(nextValue)
+        if scalar:Evaluate(threshold)~=0 then
+            nextValue=threshold+exponent*2^-23;scalar=create(nextValue)
+        end
+        stage='scalar-threshold'
+        assert(scalar:Evaluate(0)==0 and scalar:Evaluate(threshold)==0 and scalar:Evaluate(threshold+.001)==1)
+        stage='color-setup'
+        local curve=C_CurveUtil.CreateColorCurve()
+        assert(accepted(pcall(curve.SetType,curve,Enum.LuaCurveType.Step)))
+        for _,point in ipairs({{0,0},{threshold,0},{nextValue,color[4]}})do
+            assert(accepted(pcall(curve.AddPoint,curve,point[1],CreateColor(color[1],color[2],color[3],point[2]))))
+        end
+        assert(accepted(pcall(p.binding.SetTextColorCurve,p.binding,curve,p.property)))
+        -- Zero clocks need no text and native bindings may return no color.
+        -- Test the color gate on a positive below-threshold clock instead;
+        -- scalar zero safety remains independently verified above.
+        for i,sample in ipairs({threshold/2,threshold,threshold+.001})do
+            stage='color-clock-'..i
+            assert(accepted(pcall(p.duration.SetTimeFromStart,p.duration,GetTime(),sample)))
+            assert(accepted(pcall(p.binding.SetDuration,p.binding,p.duration)))
+            assert(accepted(pcall(p.binding.SetEnabled,p.binding,true)))
+            stage='color-readback-'..i
+            local r,g,b,a=p.binding:GetFormattedTextColor():GetRGBA()
+            local expected=sample>threshold and color[4] or 0
+            assert(public(r) and public(g) and public(b) and public(a) and r==color[1] and g==color[2] and b==color[3] and a==expected)
+            stage='scalar-duration-'..i
+            assert(p.duration:EvaluateTotalDuration(scalar,p.base)==(sample>threshold and 1 or 0))
+        end
+        return {curve=curve,scalar=scalar,base=p.base,property=p.property}
+    end)
+    if p then pcall(p.binding.SetEnabled,p.binding,false) end
+    if minimumKeys[minimumSlot] then minimumGates[minimumKeys[minimumSlot]]=nil;minimumFailures[minimumKeys[minimumSlot]]=nil end
+    minimumKeys[minimumSlot]=key;minimumSlot=minimumSlot%32+1;minimumGates[key]=ok and gate or false
+    minimumFailures[key]=not ok and stage or nil;state.minimumGateFailure=minimumFailures[key]
+    return ok and gate or nil
+end
+local function resetMinimumGate(state)
+    if not state.minimumGated then return true end
+    local complete=true
+    for i,b in ipairs(state.bindings)do
+        local cell=state.cells[i]
+        if not accepted(pcall(m(b,'ClearTextColorCurve'),b))
+            or not accepted(pcall(m(cell,'SetAlpha'),cell,1))
+            or not accepted(pcall(m(cell,'SetTextColor'),cell,(unpack or table.unpack)(state.timerColor)))then complete=false end
+    end
+    if complete then state.minimumGated=nil end
+    return complete
+end
+local function applyMinimumGate(state,duration,gate)
+    state.minimumGated=true
+    state.minimumGateFailure='duration-evaluate'
+    local ok,alpha=pcall(m(duration,'EvaluateTotalDuration'),duration,gate.scalar,gate.base)
+    if not ok then return false end -- alpha may be secret: forward it unchanged.
+    for i,b in ipairs(state.bindings)do
+        state.minimumGateFailure='binding-color'
+        if not accepted(pcall(m(b,'SetTextColorCurve'),b,gate.curve,gate.property))then return false end
+        state.minimumGateFailure='cell-alpha'
+        if not accepted(pcall(m(state.cells[i],'SetAlpha'),state.cells[i],alpha))then return false end
+    end
+    state.minimumGateFailure=nil
+    return true
+end
+local function aboveNativeMinimum(state)
+    local widget=state.cooldown
     local minimum=publicMilliseconds(widget,'GetMinimumCountdownDuration')
+    state.minimum=minimum
+    state.fallbackReason='minimum-read-denied'
     if not minimum then return false end
     if minimum==0 then return true end
     -- These widget values are TOTAL milliseconds, not the ticking remainder.
     -- If rate scaling straddles the threshold or either read is restricted,
     -- let the original widget apply its own rule (including equality).
     local display=publicMilliseconds(widget,'GetCooldownDisplayDuration')
-    if not display or display<=minimum then return false end
+    if not display then return false end
+    if display<=minimum then state.fallbackReason='below/equal-minimum';return false end
     local adjusted=publicMilliseconds(widget,'GetCooldownDuration')
+    if adjusted and adjusted<=minimum then state.fallbackReason='below/equal-minimum' end
     return adjusted and adjusted>minimum or false
 end
-local function strictlyBelowNativeMinimum(widget)
+local function strictlyBelowNativeMinimum(state)
+    local widget=state.cooldown
     local minimum=publicMilliseconds(widget,'GetMinimumCountdownDuration')
     if not minimum or minimum<=0 then return false end
     local display=publicMilliseconds(widget,'GetCooldownDisplayDuration')
     if not display or display<=0 or display>=minimum then return false end
     local adjusted=publicMilliseconds(widget,'GetCooldownDuration')
-    return adjusted and adjusted>0 and adjusted<minimum or false
+    local below=adjusted and adjusted>0 and adjusted<minimum or false
+    if below then state.fallbackReason='below/equal-minimum' end
+    return below
 end
 local function setDuration(state,duration)
     local epoch=state.epoch
     local zero=durationIsPublicZero(duration)
     if state.epoch~=epoch then return nil end
     if zero==true then
+        state.fallbackReason=nil
         local stopped=setRendering(state,false)
         if state.epoch~=epoch then return nil end
         return stopped
     end
-    local allowed=aboveNativeMinimum(state.cooldown)
+    local allowed=aboveNativeMinimum(state)
     if state.epoch~=epoch then return nil end
+    local gate
+    if not allowed and state.fallbackReason=='minimum-read-denied' and state.minimum and state.minimum>0 then
+        gate=minimumGate(state,state.minimum)
+        allowed=gate and applyMinimumGate(state,duration,gate)
+        if not allowed then state.fallbackReason='gate-unsupported' end
+    elseif not resetMinimumGate(state) then allowed=false end
     if not allowed then
         state.stockFallback=true
         setRendering(state,false)
         if state.epoch~=epoch then return nil end
         return false
     end
+    state.fallbackReason='binding-refused'
     for _,binding in ipairs(state.bindings) do
         local setter=m(binding,'SetDuration')
         local ok=accepted(pcall(setter,binding,duration))
@@ -496,7 +672,7 @@ local function setDuration(state,duration)
         setRendering(state,false)
         return nil
     end
-    if enabled then return true end
+    if enabled then state.fallbackReason=nil;return true end
     setRendering(state,false)
     return false
 end
@@ -511,7 +687,7 @@ local function wantsNativeNumbers()
 end
 local function releaseVisibility(state,preserveSerial)
     if not preserveSerial then state.stockVisibilitySerial=nil end
-    state.stockOffCandidate=nil
+    state.eligibleBeforeVisibilityWrite=nil
     state.ownsHidden=false
     state.epoch=state.epoch+1
     state.pendingSet=false
@@ -565,6 +741,13 @@ local function refreshCurrentClock(state)
         restoreStock(state)
         return
     end
+    if state.stylePending then
+        -- A native tick can finish the visibility handoff, but only safe
+        -- discovery may finish a changed/partially refused cell style.
+        setRendering(state,false)
+        restoreStock(state)
+        return
+    end
     if state.restorePending then
         restoreStock(state)
         if not state.restorePending then
@@ -589,20 +772,24 @@ local function refreshCurrentClock(state)
     -- An idle/GCD-only presenter already has every glyph disabled. Repeated
     -- subminimum native sets cannot require either presenter to show digits.
     if state.active and state.ownsHidden and state.rendering==false
-        and strictlyBelowNativeMinimum(state.cooldown) then return end
+        and strictlyBelowNativeMinimum(state) then return end
     if state.epoch~=epoch then return end
     local duration=nativeDuration(state.button)
     if state.epoch~=epoch then return end
     if not duration then
+        state.fallbackReason='clock-unavailable'
         -- The same widget, and even the same numerical slot, can now contain
         -- another action. Its preceding duration is no longer evidence.
-        if petButtons[state.button] then state.stockFallback=true end
         setRendering(state,false)
     else
         local bound=setDuration(state,duration)
         if bound then state.stockFallback=nil end
         if bound~=false then return end -- success or a superseding native writer
     end
+    if state.epoch~=epoch then return end
+    -- We yielded this prepared widget to stock ourselves. Its next normal
+    -- SetCooldown may supply a usable clock or accept the binding again.
+    state.stockFallback=true
     if not state.restorePending then restoreStock(state) end
 end
 local function refreshAction(state,nativeSet)
@@ -641,16 +828,68 @@ local function clearAction(state)
     -- Blizzard clears the normal widget even while a real cooldown exists,
     -- for example when the loss-of-control cooldown replaces it.
     state.cleared=true
+    state.fallbackReason=nil
     state.epoch=state.epoch+1
     state.pendingSet=true
     refreshAction(state)
 end
-local function prepareAction(state,label,formatters,createBinding)
-    if not state.cellsReady then
-        if not makeCells(label,state.cooldown,true,state.cells) then return false end
-        state.cellsReady=true
+local function matchesBindingFormatter(binding,getter,formatter)
+    local read,actual=pcall(getter,binding)
+    if not read or (type(actual)~='nil' and not public(actual)) then return nil end
+    return rawequal(actual,formatter)
+end
+local function useSuffixFormatter(state,binding,formatter)
+    local getter=m(binding,'GetFormatter')
+    local matches=rawequal(state.suffixFormatter,formatter)
+    if getter then
+        matches=matchesBindingFormatter(binding,getter,formatter)
+        if matches==nil then return false end
     end
-    for i=state.readyBindings+1,9 do
+    if not matches then
+        state.suffixFormatter=nil
+        local written=accepted(pcall(binding.SetFormatter,binding,formatter))
+        if getter then written=matchesBindingFormatter(binding,getter,formatter) end
+        if not written then return false end
+    end
+    state.suffixFormatter=formatter
+    return true
+end
+local function applySuffixFormatter(state,base)
+    local binding,label=state.bindings[4],state.cells[4]
+    local receiver=m(binding,'GetFontString')
+    if receiver then
+        local read,actual=pcall(receiver,binding)
+        if not read or not public(actual) or not rawequal(actual,label) then return false end
+    end
+    local desired=base
+    local get=field(private,'GetFixedActionFormatter')
+    if type(get)=='function' then
+        local ok,fixed=pcall(get,label,base)
+        if ok and m(fixed,'FormatNumber') and safe(fixed) then desired=fixed end
+    end
+    if useSuffixFormatter(state,binding,desired) then return true end
+    return not rawequal(desired,base) and useSuffixFormatter(state,binding,base)
+end
+local function setCellFormatter(state,i,base)
+    if i~=4 then return accepted(true,state.bindings[i]:SetFormatter(base)) end
+    if state.updatingSuffix then return false end
+    state.updatingSuffix=true
+    local ok,applied=pcall(applySuffixFormatter,state,base)
+    state.updatingSuffix=nil
+    return ok and applied
+end
+local function prepareAction(state,label,formatters,createBinding)
+    local style=readActionStyle(label)
+    if not style then return false end
+    state.timerColor=style.color
+    local minimum=publicMilliseconds(state.cooldown,'GetMinimumCountdownDuration')
+    if minimum and minimum>0 then minimumGate(state,minimum) end
+    if not state.cellsReady or not sameActionStyle(state.actionStyle,style) then
+        if not makeCells(label,state.cooldown,true,state.cells,false,style) then return false end
+        state.cellsReady=true
+        state.actionStyle=style
+    end
+    for i=state.readyBindings+1,#formatters do
         local binding=state.bindings[i]
         if not binding then
             local ok,obj=pcall(createBinding)
@@ -661,7 +900,7 @@ local function prepareAction(state,label,formatters,createBinding)
         if not m(binding,'SetDuration') or not accepted(pcall(function()
             return accepted(true,binding:SetEnabled(false))
                 and accepted(true,binding:SetFontString(state.cells[i]))
-                and accepted(true,binding:SetFormatter(formatters[i]))
+                and setCellFormatter(state,i,formatters[i])
                 and accepted(true,binding:SetUpdateInterval(0.1))
                 and accepted(true,binding:SetZeroDurationText(''))
                 and accepted(true,binding:SetExpiredText(''))
@@ -691,7 +930,7 @@ local function prepareAction(state,label,formatters,createBinding)
             state.lastHideValue=nil
             if public(value) and type(value)=='boolean' then state.lastHideValue=value end
             releaseVisibility(state,true)
-            state.stockOffCandidate=eligible
+            state.eligibleBeforeVisibilityWrite=eligible
         end)
         if not state.hideHook then return false end
     end
@@ -703,6 +942,24 @@ local function prepareAction(state,label,formatters,createBinding)
         end)
         if not state.minimumHook then return false end
     end
+    return true
+end
+local function resyncActionStyle(state)
+    local got,label=pcall(m(state.cooldown,'GetCountdownFontString'),state.cooldown)
+    local style=got and safe(label) and readActionStyle(label)
+    if not state.stylePending and sameActionStyle(state.actionStyle,style) then return true end
+    -- Restore stock before changing any cell. If visibility restoration is
+    -- refused, retain the intact current presenter until the next native clock
+    -- invalidates it. A partial style refusal always leaves stock in charge.
+    state.stylePending=true
+    state.stockFallback=true
+    state.fallbackReason=style and 'style-refused' or 'style-unavailable'
+    if not restoreStock(state) or not style or not resetMinimumGate(state) then return false end
+    if not makeCells(label,state.cooldown,true,state.cells,false,style) then return false end
+    -- The source is the native stock label, never a gated replacement cell.
+    state.timerColor=style.color
+    state.actionStyle=style
+    state.stylePending=nil
     return true
 end
 function api.StopActionNumbers()
@@ -725,16 +982,16 @@ function api.StockCountdownVisibilityChanged(button)
     local preference=nativeNumberPreference()
     if not ok or not public(hidden) or state.hideSerial~=serial or state.lastHideValue~=hidden then return end
     local consecutive=state.stockVisibilitySerial and serial==state.stockVisibilitySerial+1
-    if hidden==true and preference==false and (state.stockOffCandidate or consecutive) then
+    if hidden==true and preference==false and (state.eligibleBeforeVisibilityWrite or consecutive) then
         state.stockVisibilitySerial=serial
-    elseif hidden==false and preference==true and consecutive then
-        -- Every visibility write since the first verified off came from
-        -- Blizzard's helper, including repetitions of the same setting.
+    elseif hidden==false and preference==true and (state.eligibleBeforeVisibilityWrite or consecutive) then
+        -- This verified stock write released our own presenter, or follows
+        -- another verified stock write without any intervening owner.
         state.stockVisibilitySerial=serial
         state.stockFallback=true
         if not state.cleared then refreshAction(state) end
     end
-    state.stockOffCandidate=nil
+    state.eligibleBeforeVisibilityWrite=nil
 end
 function api.ResumeOwnedActionNumbers()
     if not wantsNativeNumbers() then return end
@@ -754,6 +1011,13 @@ function api.ResumeOwnedActionNumbers()
         end
     end
 end
+local function diagnosticButtonName(button)
+    local get=m(button,'GetName')
+    if not get then return nil end
+    local ok,name=pcall(get,button)
+    if ok and public(name) and type(name)=='string' and #name<=80
+        and name:match('^[%a_][%w_]*$') then return name end
+end
 installAction=function(button,prepared,petIndex)
     if (not prepared and not outOfCombat()) or not safe(button) or not wantsNativeNumbers() then return false end
     if not prepared and not petButtons[button] then
@@ -770,11 +1034,13 @@ installAction=function(button,prepared,petIndex)
     -- A legitimate later SetCooldown/minimum change may reclaim only this
     -- already-prepared stock fallback. No new resources or hooks in combat.
     if prepared and (state~=prepared or state.button~=button or not state.prepared or not state.stockFallback) then return false end
+    if prepared and state.stylePending then return false end
     if state and state.button~=button then
         -- The native widget and its hooks survived, but their former button
         -- cannot authorize the new clock (including a pre-existing LOC clear).
         clearAction(state)
         state.button=button
+        state.buttonName=diagnosticButtonName(button)
         state.cleared=nil
         restoreStock(state)
     end
@@ -783,6 +1049,10 @@ installAction=function(button,prepared,petIndex)
         refreshAction(state)
         if state.restorePending then return false end
     end
+    if not prepared and state and state.prepared and not resyncActionStyle(state) then return false end
+    -- An already-configured suffix can acquire new font/scale metrics at
+    -- layout discovery, including on a retry of a partially prepared button.
+    if not prepared and state and state.readyBindings>=4 then setCellFormatter(state,4,nativeFormatters[4]) end
     if state and state.active then return true end
     local getHide=m(cooldown,'GetHideCountdownNumbers')
     if not getHide or not m(cooldown,'SetHideCountdownNumbers') then return false end
@@ -797,10 +1067,16 @@ installAction=function(button,prepared,petIndex)
         -- strictly below its own minimum, neither the real spell nor a GCD
         -- could display a number. Re-evaluate on the next native widget set.
         if state and state.prepared and state.stockFallback and not state.ownsHidden
-            and strictlyBelowNativeMinimum(cooldown) then return false end
+            and strictlyBelowNativeMinimum(state) then return false end
         if state and state.epoch~=claimEpoch then return false end
         duration=nativeDuration(button)
-        if not duration then return false end
+        if not duration then
+            if state then state.fallbackReason='clock-unavailable' end
+            -- A known normal slot may precede its first usable clock. Prepare
+            -- its hooks and cells out of combat, leaving the native text on.
+            if prepared or petButtons[button]
+                or type(actionQuery(button,'GetSpellCooldownDuration','GetActionCooldownDuration'))~='function' then return false end
+        end
     end
     if not (state and state.prepared) then
         local getLabel=m(cooldown,'GetCountdownFontString')
@@ -810,7 +1086,7 @@ installAction=function(button,prepared,petIndex)
         local formatters=buildFormatters()
         if not got or not safe(label) or not formatters then return false end
         if not state then
-            state={button=button,cooldown=cooldown,cells={},bindings={},muted={},
+            state={button=button,buttonName=diagnosticButtonName(button),cooldown=cooldown,cells={},bindings={},muted={},
                 readyBindings=0,rendering=false,epoch=0}
             installed[cooldown]=state
         end
@@ -819,10 +1095,17 @@ installAction=function(button,prepared,petIndex)
     end
     state.button=button
     claimEpoch=claimEpoch or state.epoch
+    if not duration and not state.cleared then
+        if state.epoch==claimEpoch then state.stockFallback=true;state.fallbackReason='clock-unavailable' end
+        return false
+    end
     if duration then
         local bound=setDuration(state,duration)
         if not bound then
-            if bound==false then restoreStock(state) end
+            if bound==false and state.epoch==claimEpoch then
+                state.stockFallback=true
+                restoreStock(state)
+            end
             return false
         end
     end
@@ -863,6 +1146,31 @@ installAction=function(button,prepared,petIndex)
 end
 function api.InstallAction(button,petIndex)
     return installAction(button,nil,petIndex)
+end
+function api.GetActionTimerDiagnostics()
+    -- Summarize existing receipts only. Never inspect a live clock or ask the
+    -- renderer to refresh; restricted values stay in their native sinks.
+    local cells,stock,idle,denied,below=0,0,0,0,0
+    local names={}
+    for _,state in pairs(installed) do
+        if state.prepared then
+            if state.active and state.rendering==true then
+                cells=cells+1
+            elseif not state.cleared and (state.stockFallback or state.restorePending) then
+                stock=stock+1
+                local reason=state.fallbackReason or 'unavailable'
+                if reason=='minimum-read-denied' or reason=='gate-unsupported' then denied=denied+1
+                elseif reason=='below/equal-minimum' then below=below+1 end
+                if state.buttonName and #names<3 then
+                    if reason=='gate-unsupported' and state.minimumGateFailure then reason=reason..'/'..state.minimumGateFailure end
+                    names[#names+1]=state.buttonName..':'..reason
+                end
+            else idle=idle+1 end
+        end
+    end
+    table.sort(names)
+    return string.format('actions cells=%d stock=%d idle=%d minimum-read-denied=%d below/equal-minimum=%d',
+        cells,stock,idle,denied,below)..(#names>0 and ' ['..table.concat(names,', ')..']' or '')
 end
 -- Player aura durations are already refreshed by Blizzard's UpdateDuration;
 -- reuse the EXISTING post-hook, never register an additional OnUpdate.
@@ -1056,7 +1364,38 @@ local function revokeBuff(state,label)
     end
     return false
 end
-local function layoutBuff(label,state,parent,icon,path,size,flags)
+local buffPoints={TOP=true,BOTTOM=true,LEFT=true,RIGHT=true}
+local function buffNumber(value,positive)
+    return public(value) and type(value)=='number' and value==value
+        and value>-math.huge and value<math.huge and (not positive or value>0)
+end
+local function buffLayout(label,parent)
+    local counted,count=pcall(m(label,'GetNumPoints'),label)
+    if not counted or not public(count) or count~=1 then return end
+    local got,point,relative,relativePoint,x,y=pcall(m(label,'GetPoint'),label,1)
+    if not got or not public(point) or not buffPoints[point]
+        or not public(relativePoint) or not buffPoints[relativePoint]
+        or not safe(relative) or rawequal(relative,label)
+        or not buffNumber(x) or not buffNumber(y) then return end
+    local scaled,scale=pcall(m(label,'GetEffectiveScale'),label)
+    local parentScaled,parentScale=pcall(m(parent,'GetEffectiveScale'),parent)
+    if not scaled or not parentScaled or not buffNumber(scale,true) or not buffNumber(parentScale,true) then return end
+    local textScale=1
+    local getTextScale=m(label,'GetTextScale')
+    if getTextScale then
+        local known;known,textScale=pcall(getTextScale,label)
+        if not known or not buffNumber(textScale,true) then return end
+    end
+    local relativeScale=scale/parentScale
+    if not buffNumber(relativeScale,true) then return end
+    return {point=point,relative=relative,relativePoint=relativePoint,x=x,y=y,
+        scale=relativeScale,textScale=textScale}
+end
+local function sameBuffLayout(a,b)
+    return a and b and a.point==b.point and a.relative==b.relative and a.relativePoint==b.relativePoint
+        and a.x==b.x and a.y==b.y and a.scale==b.scale and a.textScale==b.textScale
+end
+local function layoutBuff(label,state,parent,icon,path,size,flags,layout)
     -- A failed old cleanup cannot be transferred into a newly prepared owner.
     if state.dirty and not writeBuff(label,state,nil) then return false end
     -- Verify the individual parents on every incomplete transfer. If the
@@ -1083,16 +1422,37 @@ local function layoutBuff(label,state,parent,icon,path,size,flags)
         state.path,state.size,state.flags=path,size,flags
     end
     if state.icon~=icon then state.icon=icon;state.anchored=0 end
+    if not sameBuffLayout(state.layout,layout) then state.anchored=0 end
+    local width,dot,height=metrics(label)
+    if not width then return false end
+    local step=state.step*layout.textScale
+    local widths={width*layout.textScale,dot*layout.textScale,width*layout.textScale}
+    local point,justify=layout.point,layout.point
+    local origin=layout.x
+    if point=='LEFT' or point=='RIGHT' then
+        -- Preserve the native outside edge of the entire three-cell run.
+        -- A symmetric cluster at LEFT/RIGHT would put half the timer across
+        -- the icon. Each fixed cell instead receives its own CENTER anchor.
+        origin=origin+(point=='LEFT' and 1 or -1)*(step+widths[1]/2)
+        point,justify='CENTER','MIDDLE'
+    end
     for i=state.anchored+1,3 do
         local fs=state.cells[i]
+        if not accepted(pcall(m(fs,'SetScale'),fs,layout.scale)) then return false end
+        local setTextScale=m(fs,'SetTextScale')
+        if setTextScale then
+            if not accepted(pcall(setTextScale,fs,layout.textScale)) then return false end
+        elseif layout.textScale~=1 then return false end
+        if not accepted(pcall(m(fs,'SetSize'),fs,widths[i],height*layout.textScale)) then return false end
         if not m(fs,'ClearAllPoints') or not m(fs,'SetPoint')
             or not accepted(pcall(function()
-                if m(fs,'SetJustifyV') and not accepted(true,fs:SetJustifyV('TOP')) then return false end
+                if m(fs,'SetJustifyV') and not accepted(true,fs:SetJustifyV(justify)) then return false end
                 if not accepted(true,fs:ClearAllPoints()) then return false end
-                return fs:SetPoint('TOP',icon,'BOTTOM',i==1 and -state.step or (i==2 and 0 or state.step),0)
+                return fs:SetPoint(point,layout.relative,layout.relativePoint,origin+(i-2)*step,layout.y)
             end)) then return false end
         state.anchored=i
     end
+    state.layout,state.layoutDirty=layout,nil
     return true
 end
 function api.PrepareBuff(label,checkFont,afterFont)
@@ -1122,10 +1482,11 @@ function api.PrepareBuff(label,checkFont,afterFont)
     end
     local icon=field(parent,'Icon')
     local same=state and state.ready and state.parent==parent and state.icon==icon and safe(icon)
-    if same and not checkFont and not state.ownerUncertain then return true end
+    if same and not checkFont and not state.layoutDirty and not state.ownerUncertain then return true end
     if state and state.ready and not same then revokeBuff(state,label) end
     local path,size,flags=getFont(label)
-    if same and not state.ownerUncertain and path and state.path==path and state.size==size and state.flags==flags then return true end
+    local sameFont=same and not state.ownerUncertain and path and state.path==path and state.size==size and state.flags==flags
+    if sameFont and not state.layoutDirty then return true end
     if not state then
         if not path or not safe(icon) or not outOfCombat() then return false end
         state={cells={},muted={},anchored=0,parent=parent}
@@ -1156,8 +1517,33 @@ function api.PrepareBuff(label,checkFont,afterFont)
         end)
         if not state.fontHook then return false end
     end
-    if not path or not safe(icon) or not outOfCombat()
-        or not layoutBuff(label,state,parent,icon,path,size,flags) then
+    state.layoutHooks=state.layoutHooks or {}
+    for _,name in ipairs({'SetPoint','ClearAllPoints','SetAllPoints','SetScale','SetTextScale'}) do
+        if not state.layoutHooks[name] and m(label,name) then
+            if not outOfCombat() or type(hooksecurefunc)~='function' then return false end
+            state.layoutHooks[name]=accepted(pcall(hooksecurefunc,label,name,function(source)
+                -- The native layout writer is the invalidation boundary.
+                -- No timer update polls geometry and no glyph anchors to the
+                -- intrinsic label that is emptied after a fixed-cell takeover.
+                state.layoutDirty=true
+                api.PrepareBuff(source,true,true)
+            end))
+            if not state.layoutHooks[name] then return false end
+        end
+    end
+    local preparedLayout,ownerGeneration=state.layout,state.ownerGeneration
+    local layout=buffLayout(label,parent)
+    -- Native duration updates can repeat the same anchor in combat. A fully
+    -- prepared, unchanged receipt needs no geometry writes or stock handoff.
+    -- Failed partial layouts and a changed owner cannot reuse that receipt.
+    if sameFont and state.ready and state.anchored==3
+        and state.ownerGeneration==ownerGeneration and state.layout==preparedLayout
+        and sameBuffLayout(preparedLayout,layout) then
+        state.layoutDirty=nil
+        return true
+    end
+    if not path or not safe(icon) or not layout or not outOfCombat()
+        or not layoutBuff(label,state,parent,icon,path,size,flags,layout) then
         if same then
             local last=state.last
             if last then

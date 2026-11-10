@@ -441,6 +441,42 @@ test('diagnostic survives a short aura ending without printing its values',funct
     assert(line:find('native=1, fallback=0',1,true),line)
     assert(not line:find('2.83',1,true),line)
 end)
+test('identity diagnostic reports metadata without changing the native fallback',function()
+    local cases={
+        {'aura ID missing',function(e)e.buff.buttonInfo.auraInstanceID=nil end},
+        {'aura ID secret',function(e)e.buff.buttonInfo.auraInstanceID=e.secret(101)end},
+        {'aura ID invalid',function(e)e.buff.buttonInfo.auraInstanceID=0 end},
+        {'aura ID inaccessible',function(e)e.buff.buttonInfo=setmetatable({},{__index=function()error('identity unavailable')end})end},
+        {'aura info missing',function(e)e.buff.buttonInfo=nil end},
+        {'aura info inaccessible',function(e)e.buff.buttonInfo=e.secret({auraInstanceID=101})end},
+        {'aura unit missing',function(e)e.buff.unit=nil end},
+        {'aura unit secret',function(e)e.buff.unit=e.secret('player')end},
+        {'aura unit unsupported',function(e)e.buff.unit='target' end},
+        {'aura unit inaccessible',function(e)e.buff.unit=nil;setmetatable(e.buff,{__index=function(_,k)if k=='unit'then error('unit unavailable')end end})end},
+    }
+    for _,case in ipairs(cases)do
+        local e=scenario();e.load();case[2](e)
+        e.tick(e.buff,e.secret(6.3));e.tick(e.buff,e.secret(6.2))
+        equal(e.buff.Duration.text,'6 s','rendering stays native');equal(e.requests,0,'no hidden ID query')
+        e.SlashCmdList.BJARKIUITIMERS();local line=e.messages[#e.messages]
+        assert(line:find('last='..case[1],1,true),case[1]..': '..line)
+        assert(line:find('fallback=1',1,true)and line:find('fallback-buttons=1',1,true),'stable fallback accounting')
+        assert(not line:find('6.3',1,true)and not line:find('101',1,true),'no hidden payload logged')
+        assert(line:find('bjarkiUI aura timers |',1,true),'versionless diagnostic banner')
+    end
+end)
+test('timer diagnostic joins cached action and cast status without querying frames',function()
+    local e=scenario();local calls=0
+    e.bjarkiUINativeDigitCells={GetActionTimerDiagnostics=function()calls=calls+1;return 'actions: cells=2'end}
+    local shared={GetCastTimerDiagnostics=function()calls=calls+1;return 'casts: cells=1'end}
+    assert(loadfile(addon..'/BuffPresentation.lua','t',e))('bjarkiUI',shared)
+    e.SlashCmdList.BJARKIUITIMERS()
+    equal(calls,2);equal(#e.messages,2)
+    equal(e.messages[2],'actions: cells=2 | casts: cells=1')
+    e.bjarkiUINativeDigitCells.GetActionTimerDiagnostics=function()return e.secret('hidden status')end
+    shared.GetCastTimerDiagnostics=function()error('diagnostic unavailable')end
+    e.SlashCmdList.BJARKIUITIMERS();equal(#e.messages,3,'unavailable statuses omitted')
+end)
 test('diagnostic records access lost after an earlier success',function()
     local cfg={};local e=scenario(cfg);e.load();e.tick(e.buff,e.secret(2.83));cfg.formatFails=true
     e.tick(e.buff,e.secret(1.2));assert(e.SlashCmdList.BJARKIUITIMERS)()
@@ -854,6 +890,22 @@ local function realGlyphScene(initialFont)
         function font:GetParent()return self.parent end
         function font:GetText()return self.text end
         function font:SetParent(owner)self.parent=owner end
+        function font:GetNumPoints()return self.nativePoints and #self.nativePoints or 1 end
+        function font:GetPoint(i)
+            if self.nativePoints then return table.unpack(self.nativePoints[i] or {}) end
+            return 'TOP',self.parent.Icon,'BOTTOM',0,0
+        end
+        function font:ClearAllPoints()self.nativePoints={} end
+        function font:SetPoint(point,relative,relativePoint,x,y)
+            self.nativePoints={{point,relative,relativePoint,x or 0,y or 0}}
+        end
+        function font:SetAllPoints(relative)
+            self.nativePoints={{'TOPLEFT',relative,'TOPLEFT',0,0},{'BOTTOMRIGHT',relative,'BOTTOMRIGHT',0,0}}
+        end
+        function font:GetEffectiveScale()return (self.scale or 1)*self.parent:GetEffectiveScale() end
+        function font:SetScale(v)self.scale=v end
+        function font:GetTextScale()return self.textScale or 1 end
+        function font:SetTextScale(v)self.textScale=v end
         function font:GetFont()self.fontReads=(self.fontReads or 0)+1;return 'fixture.ttf',self.size or 12,'' end
         function font:SetFontObject(name)self.size=name=='Small2' and 11 or 15 end
         function font:GetVertexColor()return 1,1,1,1 end
@@ -871,8 +923,13 @@ local function realGlyphScene(initialFont)
         function f:Show()self.shown=true end
         function f:SetFont(_,size)self.size=size end
         function f:SetSize(w,h)self.w,self.h=w,h end
-        function f:SetPoint(_,anchor,_,x,y)self.anchor,self.x,self.y=anchor,x,y end
-        f.ClearAllPoints=function()end;f.SetJustifyH=f.ClearAllPoints
+        function f:SetPoint(point,anchor,relativePoint,x,y)
+            assert(not e.InCombatLockdown(),'combat glyph geometry')
+            self.point,self.relativePoint,self.anchor,self.x,self.y=point,relativePoint,anchor,x,y
+        end
+        f.ClearAllPoints=function()assert(not e.InCombatLockdown(),'combat glyph geometry') end
+        f.SetJustifyH=function()end
+        function f:SetJustifyV(value)self.justifyV=value end
         return f
     end
     local function visible(owner)
@@ -880,12 +937,149 @@ local function realGlyphScene(initialFont)
         for _,f in ipairs(all) do if f.parent==owner and f.shown then s=s..f.text end end
         return s
     end
+    function a:GetEffectiveScale()return self.scale or 1 end
+    function b:GetEffectiveScale()return self.scale or 1 end
     equip(a.Duration,a);equip(b.Duration,b)
     if initialFont then a.Duration:SetFontObject(initialFont) end
-    a.CreateFontString=create;b.CreateFontString=create;e.UIParent={CreateFontString=create}
+    a.CreateFontString=create;b.CreateFontString=create
+    e.UIParent={CreateFontString=create,GetEffectiveScale=function()return 1 end}
     assert(loadfile(addon..'/NativeDigitCells.lua','t',e))();e.load()
     return e,a,b,all,visible
 end
+-- Native orientation choices from AuraContainerMixin:UpdateGridLayout:
+-- Gethe/wow-ui-source 9dc84f0d3bbae1768ac3405b3716000bd93eda06,
+-- Interface/AddOns/Blizzard_BuffFrame/BuffFrame.lua:143-175.
+local function nativeBuffLayout(a,horizontal,toTop,toRight,x,y)
+    local point,relativePoint
+    if horizontal then point=toTop and 'BOTTOM' or 'TOP';relativePoint=toTop and 'TOP' or 'BOTTOM'
+    else point=toRight and 'LEFT' or 'RIGHT';relativePoint=toRight and 'RIGHT' or 'LEFT' end
+    a.Duration:ClearAllPoints()
+    a.Duration:SetPoint(point,a.Icon,relativePoint,x or 0,y or 0)
+    return point,relativePoint
+end
+local function glyphBounds(cell)
+    local box=assert(cell.anchor.box,'independent native relative region')
+    local point=cell.relativePoint
+    local x=point=='LEFT' and box.left or point=='RIGHT' and box.right or (box.left+box.right)/2
+    local y=point=='TOP' and box.top or point=='BOTTOM' and box.bottom or (box.top+box.bottom)/2
+    local scale=cell:GetEffectiveScale()
+    x=x+(cell.x or 0)*scale;y=y+(cell.y or 0)*scale
+    local width,height=cell.w*scale,cell.h*scale
+    if cell.point=='LEFT' then x=x+width/2 elseif cell.point=='RIGHT' then x=x-width/2 end
+    if cell.point=='TOP' then y=y-height/2 elseif cell.point=='BOTTOM' then y=y+height/2 end
+    return {left=x-width/2,right=x+width/2,top=y+height/2,bottom=y-height/2,cx=x,cy=y}
+end
+local function glyphsFor(all,owner)
+    local cells={};for _,cell in ipairs(all)do if cell.parent==owner then cells[#cells+1]=cell end end
+    return cells
+end
+local function close(got,want,what)assert(math.abs(got-want)<0.000001,(what or 'coordinate')..': '..got..' ~= '..want)end
+for _,layout in ipairs({{'below',true,false,false},{'above',true,true,false},{'right',false,false,true},{'left',false,false,false}}) do
+    test('native '..layout[1]..' buff layout keeps independent fixed-cell geometry and scale',function()
+        local e,a,_,all,visible=realGlyphScene()
+        a.scale=.75;a.Icon.box={left=100,right=130,bottom=200,top=230}
+        a.Duration:SetScale(1.4);a.Duration:SetTextScale(1.2)
+        local point,relativePoint=nativeBuffLayout(a,layout[2],layout[3],layout[4],3,-2)
+        e.tick(a,4.2);equal(visible(a),'4.2');equal(a.Duration.text,'')
+        local cells=glyphsFor(all,a);equal(#cells,3)
+        local bounds={};for i,cell in ipairs(cells)do
+            equal(cell.anchor,a.Icon,'not the emptied native duration')
+            equal(cell.relativePoint,relativePoint,'native relative point')
+            equal(cell:GetEffectiveScale(),a.Duration:GetEffectiveScale(),'native font scale')
+            equal(cell:GetTextScale(),a.Duration:GetTextScale(),'native text scale')
+            bounds[i]=glyphBounds(cell)
+        end
+        local scale=a.Duration:GetEffectiveScale()
+        local x=(relativePoint=='LEFT' and 100 or relativePoint=='RIGHT' and 130 or 115)+3*scale
+        local y=(relativePoint=='TOP' and 230 or relativePoint=='BOTTOM' and 200 or 215)-2*scale
+        if point=='TOP' or point=='BOTTOM' then
+            for i,cell in ipairs(cells)do equal(cell.point,point);close(bounds[i][point=='TOP' and 'top' or 'bottom'],y) end
+            close(bounds[2].cx,x,'horizontal cluster midpoint')
+        else
+            for _,b in ipairs(bounds)do close(b.cy,y,'vertical layout baseline') end
+            close(point=='LEFT' and bounds[1].left or bounds[3].right,x,'entire run native edge')
+        end
+        local xs={bounds[1].cx,bounds[2].cx,bounds[3].cx}
+        e.tick(a,1.1)
+        for i,cell in ipairs(cells)do close(glyphBounds(cell).cx,xs[i],'fixed glyph centers') end
+    end)
+end
+test('native buff layout setters refresh unchanged fonts and combat transitions stay on stock',function()
+    local e,a,_,all,visible=realGlyphScene()
+    a.Icon.box={left=100,right=130,bottom=200,top=230}
+    e.tick(a,4.2);local cells=glyphsFor(all,a)
+    local first=cells[1];local defaultX=first.x
+    equal(first.point,'TOP');equal(first.relativePoint,'BOTTOM');equal(first.y,0)
+    nativeBuffLayout(a,true,true,false,0,5);e.tick(a,4.1)
+    equal(visible(a),'4.1');equal(first.point,'BOTTOM');equal(first.relativePoint,'TOP');equal(first.y,5)
+    e.combat=true
+    nativeBuffLayout(a,false,false,true,7,0)
+    equal(visible(a),'','combat relayout retires stale cells');equal(a.Duration.text,'4.1','completed current text restored')
+    e.tick(a,4.0);equal(visible(a),'');equal(a.Duration.text,'4.0')
+    e.combat=false;e.event('PLAYER_REGEN_ENABLED');e.tick(a,3.9)
+    equal(visible(a),'3.9');equal(first.relativePoint,'RIGHT');close(glyphBounds(first).left,137)
+    nativeBuffLayout(a,true,false,false);e.tick(a,3.8)
+    equal(first.point,'TOP');equal(first.relativePoint,'BOTTOM');equal(first.x,defaultX);equal(first.y,0)
+    equal(#glyphsFor(all,a),3,'native layout reuses all cells')
+end)
+test('unknown, multiple and restricted native buff anchors preserve stock and recover on native layout',function()
+    local e,a,_,all,visible=realGlyphScene()
+    e.tick(a,4.2)
+    a.Duration:SetAllPoints(a.Icon);equal(visible(a),'');equal(a.Duration.text,'4.2')
+    e.tick(a,4.1);equal(visible(a),'');equal(a.Duration.text,'4.1')
+    nativeBuffLayout(a,true,false,false);e.tick(a,4.0);equal(visible(a),'4.0')
+    a.Duration:SetPoint('CENTER',a.Icon,'CENTER',0,0);e.tick(a,3.9)
+    equal(visible(a),'');equal(a.Duration.text,'3.9','unknown shape uses native text')
+    nativeBuffLayout(a,true,false,false);e.tick(a,3.8);equal(visible(a),'3.8')
+    local get=a.Duration.GetPoint;a.Duration.GetPoint=function()return e.secret('TOP') end
+    a.Duration:SetPoint('TOP',a.Icon,'BOTTOM',0,0)
+    equal(visible(a),'');equal(a.Duration.text,'3.8','restricted anchor cannot authorize fixed glyphs')
+    e.tick(a,3.7);equal(visible(a),'');equal(a.Duration.text,'3.7')
+    a.Duration.GetPoint=get;nativeBuffLayout(a,true,false,false);e.tick(a,3.6);equal(visible(a),'3.6')
+    a.Duration:ClearAllPoints();e.tick(a,3.5);equal(visible(a),'');equal(a.Duration.text,'3.5','no anchor remains native')
+end)
+test('buff layout is cached during ticks and follows late source scale without changing font',function()
+    local e,a,_,all,visible=realGlyphScene()
+    a.Icon.box={left=100,right=130,bottom=200,top=230}
+    nativeBuffLayout(a,false,false,true,2,1);e.tick(a,4.2)
+    local reads=0;local get=a.Duration.GetPoint
+    a.Duration.GetPoint=function(...)reads=reads+1;return get(...)end
+    e.tick(a,4.1);e.tick(a,4.0);e.tick(a,3.9);equal(reads,0,'native timer ticks do not poll anchors')
+    local first=glyphsFor(all,a)[1];local width=first.w
+    a.Duration:SetScale(1.5);a.Duration:SetTextScale(1.25)
+    equal(visible(a),'3.9','completed fixed text survives safe geometry refresh')
+    equal(first.size,12,'native font size stays unchanged');equal(first:GetEffectiveScale(),1.5)
+    equal(first:GetTextScale(),1.25);close(first.w,width*1.25)
+    close(glyphBounds(first).left,133,'scaled native offset retains the full run edge')
+    assert(reads>0,'native setter refreshed anchor');local after=reads;e.tick(a,3.8);equal(reads,after)
+end)
+test('hidden buff layout changes and cross-button reuse retain the current native anchor',function()
+    local e,a,b,all,visible=realGlyphScene()
+    a.Icon.box={left=100,right=130,bottom=200,top=230}
+    b.Icon.box={left=300,right=330,bottom=400,top=430}
+    e.tick(a,4.2);e.tick(a,nil);equal(visible(a),'')
+    nativeBuffLayout(a,true,true,false,0,2);equal(visible(a),'','layout never shows hidden text')
+    e.tick(a,4.1);equal(visible(a),'4.1');equal(glyphsFor(all,a)[1].relativePoint,'TOP')
+    local source=a.Duration;b.Duration=source;source:SetParent(b)
+    nativeBuffLayout(b,false,false,false,-3,1);e.tick(b,3.9)
+    equal(visible(a),'');equal(visible(b),'3.9');equal(source.text,'')
+    local cells={};for _,cell in ipairs(all)do
+        if cell.parent==b and cell.text~='' then cells[#cells+1]=cell end
+    end
+    equal(#cells,3,'only the transferred label supplies visible glyphs')
+    equal(cells[3].anchor,b.Icon,'recycled native label uses the new owner icon')
+    close(glyphBounds(cells[3]).right,297,'recycled RIGHT edge remains native')
+end)
+test('throwing native anchor reads fall back without an unsafe geometry write',function()
+    local e,a,_,all,visible=realGlyphScene()
+    e.tick(a,4.2);local get=a.Duration.GetPoint
+    a.Duration.GetPoint=function()error('native anchor unavailable')end
+    a.Duration:SetPoint('BOTTOM',a.Icon,'TOP',0,0)
+    equal(visible(a),'');equal(a.Duration.text,'4.2')
+    e.tick(a,4.1);equal(visible(a),'');equal(a.Duration.text,'4.1')
+    a.Duration.GetPoint=get;nativeBuffLayout(a,true,true,false);e.tick(a,4.0)
+    equal(visible(a),'4.0');equal(glyphsFor(all,a)[1].point,'BOTTOM')
+end)
 test('former button cleanup cannot clear digits after a real cross-button transfer',function()
     local e,a,b,all,visible=realGlyphScene()
     e.tick(a,3.7);equal(visible(a),'3.7')
@@ -948,6 +1142,45 @@ test('late native locale font updates refresh existing buff geometry',function()
     e.event('PLAYER_REGEN_ENABLED');e.tick(a,4.0)
     equal(visible(a),'4.0');equal(cell.size,11);equal(cell.x,oldX);equal(#all,count)
 end)
+test('repeated native font and anchor writes preserve fixed buff digits in combat',function()
+    local e,a,_,all,visible=realGlyphScene()
+    -- AuraButtonMixin:OnUpdate writes both after UpdateDuration, even when
+    -- the selected font and anchor are identical to the previous frame.
+    -- Gethe/wow-ui-source 9dc84f0d3bbae1768ac3405b3716000bd93eda06,
+    -- Interface/AddOns/Blizzard_BuffFrame/BuffFrame.lua:1275-1283.
+    local function nativeTick(sample)
+        e.tick(a,sample)
+        a.Duration:SetFontObject('NormalSmall')
+        a.Duration:SetPoint('TOP',a,'BOTTOM')
+    end
+    nativeTick(4.3);nativeTick(4.2)
+    equal(visible(a),'4.2');equal(a.Duration.text,'')
+    local count=#all;local writes=0;local cells=glyphsFor(all,a);local positions={}
+    for i,cell in ipairs(cells) do
+        positions[i]=cell.x
+        for _,name in ipairs({'SetPoint','ClearAllPoints','SetScale','SetTextScale','SetSize','SetFont','SetParent'}) do
+            local original=cell[name]
+            cell[name]=function(...)
+                writes=writes+1
+                return original(...)
+            end
+        end
+    end
+    for i=1,5 do nativeTick(4.2) end
+    equal(writes,0,'identical out-of-combat anchors do not rebuild glyph geometry')
+    e.combat=true
+    nativeTick(4.1)
+    equal(visible(a),'4.1','first identical combat anchor retains fixed digits');equal(a.Duration.text,'')
+    a.Duration:SetScale(1);a.Duration:SetTextScale(1)
+    equal(visible(a),'4.1','unchanged scales retain the same prepared layout');equal(a.Duration.text,'')
+    nativeTick(4.0);equal(visible(a),'4.0');equal(a.Duration.text,'')
+    nativeTick(1.1);equal(visible(a),'1.1');equal(a.Duration.text,'')
+    equal(writes,0,'identical combat anchors require no glyph geometry writes')
+    for i,cell in ipairs(cells) do equal(cell.x,positions[i],'fixed glyph positions') end
+    e.combat=false;e.event('PLAYER_REGEN_ENABLED');nativeTick(1.0)
+    equal(visible(a),'1.0');equal(a.Duration.text,'');equal(#all,count,'reuse the prepared regions')
+end)
+
 test('a transient font denial at takeover keeps current native text and retries safely',function()
     local e,a,_,all,visible=realGlyphScene('Small2')
     local font=a.Duration.GetFont
