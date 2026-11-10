@@ -2,6 +2,9 @@
 -- Native UI boundaries are doubles; all tint, restore and lifecycle code is real.
 local unpack = table.unpack or unpack
 local passed, failed = 0, {}
+local addonPrivate = {}
+local loadPrecision = loadfile("NativePrecision.lua")
+if loadPrecision then loadPrecision("bjarkiUI", addonPrivate) end
 local function near(got, want, label)
     assert(type(got) == "number" and math.abs(got - want) < 0.0000001,
         label .. ": got " .. tostring(got) .. ", expected " .. tostring(want))
@@ -91,7 +94,7 @@ local function make(extra)
     else
         chunk = assert(load(source, "SoftDark.lua", "t", env))
     end
-    chunk()
+    chunk("bjarkiUI", addonPrivate)
     function state.fire(event) state.event(nil, event) end
     function state.command(arg) env.SlashCmdList.BJARKISOFTDARK(arg) end
     state.fire("PLAYER_LOGIN")
@@ -344,8 +347,15 @@ test("Enter restoration exception does not disable later recovery", function()
     end})
     env.EditModeManagerFrame.editModeActive = true
     local ok, err = pcall(s.callbacks["EditMode.Enter"])
-    assert(not ok and tostring(err):find("temporary native method lookup refusal", 1, true),
-        "unexpected restoration error remains visible")
+    assert(ok, tostring(err))
+    color(t, .53664, .39216, .21156, .7, "denied color restore remains pending")
+    near(t.saturation, .2, "other property still restores")
+    -- An unexpected exception outside the individual property operations
+    -- must still reset the callback guard before propagating.
+    env.pairs = function() error("unexpected traversal error") end
+    ok, err = pcall(s.callbacks["EditMode.Enter"])
+    env.pairs = nil
+    assert(not ok and tostring(err):find("unexpected traversal error", 1, true))
     setmetatable(t, nil); t.SetVertexColor = setter
     env.EditModeManagerFrame.editModeActive = false
     s.recover(); tinted(t, "recovery after callback exception")

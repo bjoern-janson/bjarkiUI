@@ -233,16 +233,18 @@ do
         C_Timer = {After = function() error("timer unavailable") end},
     }
     local queue, state = isolated(code,
-        "local queuedFrames = _G.queuedFrames\nlocal applyVisualOrder = _G.applyVisualOrder",
+        section(party,"local function isSecret(","local function safeBool(") ..
+            "\nlocal queuedFrames = _G.queuedFrames\nlocal applyVisualOrder = _G.applyVisualOrder",
         "queueVisualOrder, queuedFrames", env)
     queue(frame)
     eq(state[frame], nil, "failed timer clears queued state")
     eq(actualRuns, 0, "never synchronously refresh protected frames")
     env.C_Timer.After = function(_, fn) schedules = schedules + 1; callback = fn end
     queue(frame)
+    local pending = state[frame]
     queue(frame)
     eq(schedules, 1, "coalesced future repair")
-    eq(state[frame], true, "queued until next tick")
+    eq(pending ~= nil and state[frame] == pending, true, "same request queued until next tick")
     callback()
     eq(actualRuns, 1, "deferred repair executes")
     eq(state[frame], nil, "completed repair clears state")
@@ -310,7 +312,7 @@ end
 
 -- Class-color guard must recover whether preparation or the writer throws.
 do
-    local code = section(ui, "local function setHealthColor(bar, ...)",
+    local code = section(ui, "local function writeStatusBarColor(",
         "local function setNativePlayerClassColor(bar, unit)")
     local state = {writes = setmetatable({}, {__mode = "k"})}
     local restores = 0
@@ -321,12 +323,15 @@ do
             eq(state.writes[bar], nil, "clear color guard before restoring")
         end,
     }
-    local env = {nativeHealthStyle = state.native, healthColorWrites = state.writes}
+    state.native.states = {}
+    local env = {nativeHealthStyle = state.native, healthColorWrites = state.writes,
+        readableColor = function() return nil end, isSecret = function() return false end}
     local setColor = isolated(code,
         "local nativeHealthStyle = _G.nativeHealthStyle\n" ..
         "local healthColorWrites = _G.healthColorWrites",
         "setHealthColor", env)
     local bar = {SetStatusBarColor = function() end}
+    state.native.states[bar] = {}
     eq(setColor(bar, 1, 0, 0, 1), false, "prepare failure is contained")
     eq(state.writes[bar], nil, "preparation exception clears guard")
     eq(restores, 1, "restoration attempted")
@@ -345,31 +350,29 @@ end
 
 -- Exception during native restoration must not strand the ownership guard.
 do
-    local code = section(ui, "function nativeHealthStyle.Restore(bar)",
+    local code = section(ui, "local function writeHealthStyle(",
         "function nativeHealthStyle.Prepare(bar)")
-    local bar, texture = {}, {}
-    local state = {applied = true, texture = texture, colorable = "status",
-        originalAtlas = "base", nativeColor = nil}
+    local bar, texture = {}, {GetAtlas=function() error("recycled frame") end}
+    local material = {atlasOwned=true,colorable="status",originalAtlas="base"}
+    local state = {owned={[texture]=material}, tintOwned=true}
+    material.owner=state
     local env = {
-        nativeHealthStyle = {states = {[bar] = state}},
+        nativeHealthStyle = {states = {[bar] = state}, materials={[texture]=material}},
         healthColorWrites = {},
         isSecret = function() return false end,
-        currentHealthTexture = function() error("recycled frame") end,
     }
     local restore = isolated(code,
         "local nativeHealthStyle = _G.nativeHealthStyle\n" ..
         "local healthColorWrites = _G.healthColorWrites\n" ..
-        "local currentHealthTexture = function(bar) return _G.currentHealthTexture(bar) end\n" ..
         "local isSecret = _G.isSecret",
         "nativeHealthStyle.Restore", env)
     restore(bar)
     eq(env.healthColorWrites[bar], nil, "exception releases restore guard")
-    eq(state.applied, true, "exception retains retry state")
-    env.currentHealthTexture = function() return texture end
+    eq(state.owned[texture], material, "exception retains retry state")
     texture.GetAtlas = function() return "status" end
     texture.SetAtlas = function() end
     restore(bar)
-    eq(state.applied, false, "later successful restoration closes state")
+    eq(state.owned[texture], nil, "later successful restoration closes state")
 end
 
 verify(ui:find('if unit == "Blizzard_CompactUnitFrame" then', 1, true) ~= nil,

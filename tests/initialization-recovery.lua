@@ -3,6 +3,9 @@
 local file = assert(io.open('bjarkiUI.lua', 'rb'))
 local source = assert(file:read('*a')); file:close()
 local assertions, failures, scenarios = 0, 0, 0
+local addonPrivate = {}
+local loadPrecision = loadfile("NativePrecision.lua")
+if loadPrecision then loadPrecision("bjarkiUI", addonPrivate) end
 local function eq(actual, expected, label)
     assert(actual == expected, label .. ': got ' .. tostring(actual) .. ', expected ' .. tostring(expected))
     assertions = assertions + 1
@@ -75,7 +78,7 @@ local function fixture()
     local loader
     if loadstring then loader = assert(loadstring(source, '@initialization-recovery/bjarkiUI.lua')); setfenv(loader, e)
     else loader = assert(load(source, '@initialization-recovery/bjarkiUI.lua', 't', e)) end
-    loader()
+    loader("bjarkiUI", addonPrivate)
     function e.event(event, ...)
         for _, frame in ipairs(e.frames) do
             if frame.events[event] == true and frame.scripts.OnEvent then frame.scripts.OnEvent(frame, event, ...) end

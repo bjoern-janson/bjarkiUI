@@ -97,7 +97,7 @@ local function styleCooldown(cooldown, formatter)
     if pcall(setter, cooldown, formatter) then applied[cooldown] = true end
 end
 
-local function styleButton(button, formatter)
+local function styleButton(button, formatter, petIndex)
     if not button or isSecret(button) then return end
     for _, field in ipairs(COOLDOWN_FIELDS) do
         local ok, cooldown = pcall(function() return button[field] end)
@@ -108,36 +108,80 @@ local function styleButton(button, formatter)
     -- One-time native digit-cell installation; no per-tick layout or font work.
     local digitCells = bjarkiUINativeDigitCells
     if digitCells and type(digitCells.InstallAction) == "function" then
-        digitCells.InstallAction(button)
+        digitCells.InstallAction(button,petIndex)
     end
 end
 
-local function applyCooldownSeconds()
+local stockVisibilityHooked
+local function observeStockVisibility()
+    if stockVisibilityHooked or type(hooksecurefunc)~="function"
+        or type(ActionButton_UpdateCooldownNumberHidden)~="function" then return end
+    local ok,result=pcall(hooksecurefunc,_G,"ActionButton_UpdateCooldownNumberHidden",function(button)
+        local cells=bjarkiUINativeDigitCells
+        if cells and cells.StockCountdownVisibilityChanged then cells.StockCountdownVisibilityChanged(button) end
+    end)
+    stockVisibilityHooked=ok and not isSecret(result) and result~=false
+end
+local function applyCooldownSeconds(petOnly)
     if not outsideCombat() then return end
+    observeStockVisibility()
     local formatter = getFormatter()
     if not formatter then return end
     for _, spec in ipairs(BUTTON_GROUPS) do
-        for index = 1, spec[2] do
-            local name = spec[1] .. index
-            styleButton(_G[name], formatter)
-            -- Some versions expose global cooldown regions rather than
-            -- instance fields; both paths are idempotent via the weak cache.
-            styleCooldown(_G[name .. "Cooldown"], formatter)
-            styleCooldown(_G[name .. "ChargeCooldown"], formatter)
+        local isPet=spec[1]=="PetActionButton"
+        if not petOnly or isPet then
+            for index = 1, spec[2] do
+                local name = spec[1] .. index
+                styleButton(_G[name],formatter,isPet and index or nil)
+                -- Some versions expose global cooldown regions rather than
+                -- instance fields; both paths are idempotent via the weak cache.
+                styleCooldown(_G[name .. "Cooldown"], formatter)
+                styleCooldown(_G[name .. "ChargeCooldown"], formatter)
+            end
         end
     end
 end
 
 local events = CreateFrame("Frame")
+local pendingPreferenceRefresh
 for _, event in ipairs({
     "PLAYER_LOGIN", "PLAYER_ENTERING_WORLD", "EDIT_MODE_LAYOUTS_UPDATED",
     "PLAYER_REGEN_ENABLED", "ADDON_LOADED", "CVAR_UPDATE",
+    "PET_BAR_UPDATE", "PET_UI_UPDATE", "UNIT_PET",
 }) do
     events:RegisterEvent(event)
 end
 events:SetScript("OnEvent", function(_, event, addon)
+    if event=="PET_BAR_UPDATE" or event=="PET_UI_UPDATE" or event=="UNIT_PET" then
+        if event~="UNIT_PET" or (not isSecret(addon) and addon=="player") then applyCooldownSeconds(true) end
+        return
+    end
     if event == "CVAR_UPDATE" then
         if type(addon) ~= "string" or addon:lower() ~= "countdownforcooldowns" then return end
+        local cells = bjarkiUINativeDigitCells
+        local getter = C_CVar and C_CVar.GetCVarBool or GetCVarBool
+        local ok, enabled = pcall(getter, "countdownForCooldowns")
+        if not ok or isSecret(enabled) or enabled ~= true then
+            pendingPreferenceRefresh = nil
+            if cells and cells.StopActionNumbers then cells.StopActionNumbers() end
+            return
+        end
+        -- Blizzard's own CVar callback may restore stock visibility later in
+        -- the same dispatch. Reacquire existing buttons after that handoff.
+        if pendingPreferenceRefresh then return end
+        local function refreshPreference()
+            if pendingPreferenceRefresh ~= refreshPreference then return end
+            pendingPreferenceRefresh = nil
+            if cells and cells.ResumeOwnedActionNumbers then cells.ResumeOwnedActionNumbers() end
+            applyCooldownSeconds()
+        end
+        pendingPreferenceRefresh = refreshPreference
+        if C_Timer and type(C_Timer.After) == "function" then
+            local scheduled,result = pcall(C_Timer.After, 0, refreshPreference)
+            if scheduled and not isSecret(result) and result ~= false then return end
+        end
+        refreshPreference()
+        return
     elseif event == "ADDON_LOADED" then
         if addon ~= "Blizzard_ActionBar" and addon ~= "Blizzard_MultiActionBars"
             and addon ~= "Blizzard_PetActionBar"

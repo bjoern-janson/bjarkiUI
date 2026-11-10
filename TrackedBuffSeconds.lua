@@ -4,13 +4,18 @@
 local viewerName = "BuffIconCooldownViewer"
 local installed = setmetatable({}, {__mode = "k"})
 local configured = setmetatable({}, {__mode = "k"})
+local activePass
 
 local function readable(value)
     if type(issecretvalue) == "function" then
         local ok, secret = pcall(issecretvalue, value)
-        if not ok or secret then return false end
+        if not ok or secret ~= false then return false end
     end
     return value ~= nil
+end
+
+local function hookAccepted(ok, result)
+    return ok and (type(result) == "nil" or (readable(result) and result ~= false))
 end
 
 local function member(object, key)
@@ -30,8 +35,7 @@ local function accessible(object)
     return true
 end
 
-local setTenths
-setTenths = function(item)
+local function itemCooldown(item)
     if not accessible(item) then return end
     local cooldown = member(item, "Cooldown")
     local get = member(item, "GetCooldownFrame")
@@ -39,39 +43,61 @@ setTenths = function(item)
         local ok, value = pcall(get, item)
         if ok and readable(value) then cooldown = value end
     end
-    if not accessible(cooldown) then return end
+    if accessible(cooldown) then return cooldown end
+end
+
+local function applyThreshold(cooldown, state, observed)
+    if state.writing then return end
+    local get = member(cooldown, "GetCountdownMillisecondsThreshold")
+    if type(get) == "function" then
+        local ok, threshold = pcall(get, cooldown)
+        if ok and readable(threshold) and threshold == 10 then return end
+    elseif readable(observed) and observed == 10 then
+        return
+    end
     local set = member(cooldown, "SetCountdownMillisecondsThreshold")
     if type(set) ~= "function" then return end
-    local state = configured[cooldown]
-    if not state then state = {}; configured[cooldown] = state end
-    if state.writing then return end
     state.writing = true
     pcall(set, cooldown, 10)
     state.writing = false
+end
+
+local function setTenths(item, pass)
+    local cooldown = itemCooldown(item)
+    if not cooldown then return end
+    local state = configured[cooldown]
+    if not state then state = {}; configured[cooldown] = state end
+    state.item, state.pass = item, pass
     -- A reused item's native setup can reset this AFTER RefreshLayout. Hook
-    -- this one widget's setter, not a global duration function or update loop.
+    -- the receiver once; its owning item can change during layout.
     if not state.hooked and type(hooksecurefunc) == "function" then
-        local ok = pcall(hooksecurefunc, cooldown, "SetCountdownMillisecondsThreshold", function()
-            if not state.writing then setTenths(item) end
+        local ok, result = pcall(hooksecurefunc, cooldown, "SetCountdownMillisecondsThreshold", function(_, value)
+            if not state.writing and state.pass == activePass and activePass.viewer == member(_G, viewerName)
+                and itemCooldown(state.item) == cooldown then
+                applyThreshold(cooldown, state, value)
+            end
         end)
-        if ok then state.hooked = true end
+        state.hooked = hookAccepted(ok, result)
     end
+    applyThreshold(cooldown, state)
 end
 
 local function updateViewer(viewer)
-    if not accessible(viewer) then return end
+    if not accessible(viewer) or viewer ~= member(_G, viewerName) then return end
     local pool = member(viewer, "itemFramePool")
     local enumerate = member(pool, "EnumerateActive")
     if type(enumerate) ~= "function" then return end
     -- ObjectPoolMixin returns the complete iterator/state/initial-key triple.
     local ok, iterator, state, initial = pcall(enumerate, pool)
     if not ok or type(iterator) ~= "function" then return end
+    local pass = {viewer = viewer}
+    activePass = pass
     pcall(function()
         local count = 0
         for item in iterator, state, initial do
-            count = count + 1; if count > 128 then break end
+            count = count + 1; if count > 128 or pass ~= activePass then break end
             -- An inaccessible or recycling item must not abort the other items.
-            pcall(setTenths, item)
+            pcall(setTenths, item, pass)
         end
     end)
 end
@@ -81,8 +107,7 @@ local function setup()
     if not accessible(viewer) then return end
     if not installed[viewer] and type(hooksecurefunc) == "function"
         and type(member(viewer, "RefreshLayout")) == "function" then
-        local ok = pcall(hooksecurefunc, viewer, "RefreshLayout", updateViewer)
-        if ok then installed[viewer] = true end
+        installed[viewer] = hookAccepted(pcall(hooksecurefunc, viewer, "RefreshLayout", updateViewer))
     end
     updateViewer(viewer)
 end

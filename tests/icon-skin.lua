@@ -54,6 +54,11 @@ local function scenario(config)
   function t:Hide()self.shown=false;self.writes=self.writes+1 end
   function t:ClearAllPoints()self.points={};self.writes=self.writes+1 end
   function t:SetAllPoints(o)self.allPoints=o end
+  function t:GetNumPoints()return self.allPoints and 2 or #self.points end
+  function t:GetPoint(i)
+   if self.allPoints then local k=i==1 and 'TOPLEFT' or 'BOTTOMRIGHT';return k,self.allPoints,k,0,0 end
+   if self.points[i] then return table.unpack(self.points[i],1,5) end
+  end
   function t:SetPoint(...)
    local point={...}
    for i,p in ipairs(self.points) do if p[1]==point[1] then self.points[i]=point;return end end
@@ -195,7 +200,95 @@ test('public unprotected combat icon can be decorated',function()
 end)
 test('already native masked icon is left alone without duplicate overlay',function()
  local e=scenario();local m=e.texture(30,30,'MaskTexture');m.atlas=MASK;e.b.Icon.masks={m};local t=e.b:CreateTexture(nil,'OVERLAY');t.atlas=FRAME
+ e.b.Icon:SetAllPoints(e.b);t:SetPoint('TOPLEFT',e.b,'TOPLEFT',-8,7);t:SetPoint('BOTTOMRIGHT',e.b,'BOTTOMRIGHT',8,-7)
  assert(e.apply());eq(#e.b.Icon.masks,1);eq(#e.b.textures,1);eq(m.writes,0)
+end)
+test('only a visible native rim framing the current icon replaces a working rim',function()
+ local e=scenario();function e.b:Update() end
+ local mask=e.texture(30,30,'MaskTexture');mask.atlas=MASK;e.b.Icon:AddMaskTexture(mask)
+ assert(e.apply());local owned=e.overlay()
+ local native=e.b:CreateTexture(nil,'OVERLAY');native:SetAtlas(FRAME)
+ native:SetAllPoints(e.b.Icon);native:Hide()
+ e.b:Update();eq(owned.shown,true,'hidden native rim')
+ native:Show();native:SetAlpha(0);assert(e.apply());eq(owned.shown,true,'transparent native rim')
+ native:SetAlpha(1);native:SetAllPoints(e.texture());e.b:Update()
+ eq(owned.shown,true,'rim belonging to a different icon')
+ native:SetAllPoints(e.b.Icon);e.b:Update();eq(owned.shown,false,'one visible native rim')
+ native:Hide();e.b:Update();eq(owned.shown,true,'native relinquished rim')
+ eq(#e.b.Icon.masks,1);eq(e.b.Icon.masks[1],mask);eq(#e.b.textures,2)
+end)
+test('initially stock-only skin follows later native rim visibility and geometry on owner Update',function()
+ for _,aura in ipairs({true,false}) do
+  local e=scenario();function e.b:Update() end
+  local icon=e.b.Icon;local mask=e.texture(30,30,'MaskTexture');mask.atlas=MASK;icon:AddMaskTexture(mask)
+  local native=e.b:CreateTexture(nil,'OVERLAY');native:SetAtlas(FRAME);native:SetAllPoints(icon)
+  assert(e.apply(aura));eq(#e.b.textures,1);eq(#e.b.masks,0)
+  eq(e.skin.GetDiagnostics().native,1,'read-only diagnostic sees the visible native owner')
+  local originalWrites=native.writes
+  for i=1,3 do e.b:Update() end
+  eq(#e.b.textures,1,'stable native skin needs no new regions');eq(native.writes,originalWrites)
+  native:Hide()
+  eq(e.skin.GetDiagnostics().native,0);eq(#e.b.textures,1,'inspection cannot repair withdrawn art')
+  e.b:Update()
+  eq(#e.b.textures,2,'first native withdrawal supplies one owned rim')
+  local own=e.b.textures[2];eq(own.shown,true);eq(#e.b.masks,0)
+  native:Show();e.b:Update();eq(own.shown,false,'native visible again')
+  native:SetAlpha(0);e.b:Update();eq(own.shown,true)
+  native:SetAlpha(1);native:SetAllPoints(e.texture());e.b:Update();eq(own.shown,true)
+  native:SetAllPoints(icon);e.b:Update();eq(own.shown,false)
+  eq(icon.masks[1],mask);eq(#e.b.textures,2)
+ end
+end)
+test('tracked item RefreshData keeps one rim for either initial stock state',function()
+ for _,initiallyShown in ipairs({false,true}) do
+  local e=scenario();local b=e.b;local icon=b.Icon
+  function b:RefreshData() self.Icon:SetTexture(136222) end
+  icon:SetAllPoints(b)
+  local mask=e.texture(30,30,'MaskTexture');mask.atlas=MASK;icon:AddMaskTexture(mask)
+  local stock=b:CreateTexture(nil,'OVERLAY');stock:SetAtlas(FRAME)
+  stock:SetPoint('TOPLEFT',b,'TOPLEFT',-8,7);stock:SetPoint('BOTTOMRIGHT',b,'BOTTOMRIGHT',8,-7)
+  stock:SetShown(initiallyShown)
+  assert(e.apply(false));eq(#b.textures,initiallyShown and 1 or 2)
+  stock:Hide();b:RefreshData();eq(#b.textures,2,'tracked refresh replaces hidden rim')
+  local owned=b.textures[2];eq(owned.shown,true)
+  local writes=0
+  for _,region in ipairs({icon,owned}) do
+   for _,method in ipairs({'SetTexCoord','SetDrawLayer','SetDesaturated','SetVertexColor','SetAlpha','SetShown'}) do
+    local setter=region[method]
+    region[method]=function(self,...) writes=writes+1;return setter(self,...) end
+   end
+  end
+  for _=1,10 do b:RefreshData() end
+  eq(writes,0,'settled tracked item leaves its crop and rim alone')
+  if initiallyShown then
+   function owned:IsDesaturated() return self.desaturated end
+  else
+   function owned:GetDesaturation() return self.desaturated and 1 or 0 end
+  end
+  icon.coords={.1,.9,.1,.9};owned.alpha=.4;owned.shown=false;owned.desaturated=true
+  b:RefreshData();eq(icon.coords[1],0);eq(icon.coords[2],1);eq(owned.alpha,1);eq(owned.shown,true)
+  eq(owned.desaturated,false,'restore the neutral rim when a readable saturation changes')
+  stock:Show();b:RefreshData();eq(owned.shown,false,'stock rim restored')
+  eq(#icon.masks,1);eq(icon.masks[1],mask);eq(#b.textures,2)
+ end
+end)
+test('first observation of an already hidden borrowed-mask owner waits for OnShow',function()
+ local e=scenario();local visible=false;function e.b:IsVisible()return visible end
+ local mask=e.texture(30,30,'MaskTexture');mask.atlas=MASK;e.b.Icon:AddMaskTexture(mask)
+ local native=e.b:CreateTexture(nil,'OVERLAY');native:SetAtlas(FRAME);native:SetAllPoints(e.b.Icon);native:Hide()
+ assert(not e.apply());eq(e.skin.GetDiagnostics().missing,0);eq(#e.b.textures,1)
+ visible=true;e.b.scripts.OnShow(e.b);eq(#e.b.textures,2);eq(e.b.textures[2].shown,true)
+end)
+test('hidden stock-only owner is observed without cosmetic writes until it is shown',function()
+ local e=scenario();function e.b:Update() end
+ local visible=true;function e.b:IsVisible()return visible end
+ local icon=e.b.Icon;local mask=e.texture(30,30,'MaskTexture');mask.atlas=MASK;icon:AddMaskTexture(mask)
+ local native=e.b:CreateTexture(nil,'OVERLAY');native:SetAtlas(FRAME);native:SetAllPoints(icon)
+ assert(e.apply());visible=false;native:Hide()
+ local writes=native.writes;e.b:Update();e.skin.GetDiagnostics();e.apply()
+ eq(#e.b.textures,1,'hidden owner remains wholly native');eq(native.writes,writes)
+ visible=true;assert(e.b.scripts.OnShow,'owner visibility recovery installed');e.b.scripts.OnShow(e.b)
+ eq(#e.b.textures,2);eq(e.b.textures[2].shown,true);eq(#icon.masks,1)
 end)
 test('unrelated existing mask is not removed or doubled',function()
  local e=scenario();local m=e.texture(30,30,'MaskTexture');m.atlas='some-circular-mask';e.b.Icon.masks={m}
@@ -273,15 +366,105 @@ test('skin diagnostic retains presentation failure stage without native data',fu
  eq(d.failed,1);eq(d.lastFailure,'geometry')
  e.b.Icon.width=30;e.b.Icon:SetPoint('TOP',e.b,'TOP',0,0);d=e.skin.GetDiagnostics();eq(d.failed,0);eq(d.framed,1)
 end)
-test('retired addon overlay cannot masquerade as a native border for a new icon',function()
- local e=scenario();assert(e.apply());local retired=e.overlay()
+test('the owner rim follows a replacement with a borrowed native mask',function()
+ local e=scenario();assert(e.apply());local rim=e.overlay()
  e.b.Icon=e.texture();e.b.Icon.texture=136222
  local m=e.texture(30,30,'MaskTexture');m.atlas=MASK;e.b.Icon.masks={m}
- assert(e.apply());eq(retired.shown,false)
- local found=false
- for _,t in ipairs(e.b.textures)do if t~=retired and t.atlas==FRAME and t.shown then found=true end end
- assert(found,'new masked icon must have its own visible rim')
- eq(#e.b.Icon.masks,1)
+ assert(e.apply());eq(rim.shown,true);eq(rim.points[1][2],e.b.Icon)
+ eq(#e.b.textures,1);eq(#e.b.Icon.masks,1);eq(e.b.Icon.masks[1],m)
+end)
+test('alternating physical icons reuses decoration and observers',function()
+ local e=scenario();local a=e.b.Icon;local b=e.texture()
+ assert(e.apply());e.b.Icon=b;assert(e.apply());local hooks=e.hooks
+ for i=1,12 do
+  local active,old=a,b
+  if i%2==0 then active,old=b,a end
+  e.b.Icon=active;assert(e.apply());local rim=e.overlay()
+  eq(rim.points[1][2],active);eq(rim.points[2][2],active)
+  eq(#active.masks,1);eq(active.masks[1].allPoints,active);eq(#old.masks,0)
+  local writes=rim.writes;old:Hide();eq(rim.writes,writes,'inactive icon callback')
+  active:Show();eq(rim.shown,true)
+ end
+ eq(#e.b.textures,1);eq(#e.b.masks,1);eq(e.hooks,hooks)
+end)
+test('a temporarily unresolved current icon keeps its working mask, rim and observers',function()
+ local e=scenario();local icon=e.b.Icon;assert(e.apply());local rim=e.overlay()
+ for _,reason in ipairs({'unresolved','restricted'}) do
+  local unresolved
+  if reason=='restricted' then unresolved=e.secret end
+  assert(not e.skin.Apply(e.b,unresolved,true))
+  eq(#icon.masks,1,'keep the confirmed icon attachment');eq(rim.shown,true)
+  icon:Hide();eq(rim.shown,false);icon:Show();eq(rim.shown,true)
+ end
+end)
+test('a recycled owner repaints only its current donors and reuses returning alpha observers',function()
+ local e=scenario();local first=e.b.Icon
+ local firstDonor=e.border('DebuffBorder','ui-debuff-border-magic-noicon');assert(e.apply())
+ for i=1,50 do
+  e.b.Icon=e.texture();e.border('DebuffBorder','ui-debuff-border-magic-noicon')
+  assert(e.apply())
+ end
+ local hooks=e.hooks
+ e.b.Icon,e.b.DebuffBorder=first,firstDonor;assert(e.apply());eq(e.hooks,hooks,'no duplicate returning hooks')
+ local visits=0
+ e.pairs=function(t)
+  return function(tableValue,key)
+   local k,v=next(tableValue,key)
+   if type(v)=='table' and rawget(v,'region')~=nil then visits=visits+1 end
+   return k,v
+  end,t,nil
+ end
+ first:SetWidth(28)
+ assert(visits<=2,'one repaint scanned '..visits..' donor entries')
+ firstDonor:SetAlpha(.45);eq(e.overlay().alpha,.45,'returning hook observes newest native alpha')
+ eq(firstDonor.alpha,0)
+ e.b.Icon=e.texture();e.b.DebuffBorder=nil;assert(e.apply())
+ eq(firstDonor.alpha,.45,'release restores external native alpha')
+end)
+test('a denied retired donor remains owned until its alpha is restored',function()
+ local e=scenario();local donor=e.border('DebuffBorder','ui-debuff-border-magic-noicon');assert(e.apply())
+ local setter=donor.SetAlpha
+ donor.SetAlpha=function()return false end
+ e.b.Icon=e.texture();e.b.DebuffBorder=nil
+ assert(not e.apply());eq(donor.alpha,0);eq(#e.b.Icon.masks,0)
+ donor.SetAlpha=setter;assert(e.apply())
+ eq(donor.alpha,1,'keep cleanup pending across failed release');eq(#e.b.Icon.masks,1)
+end)
+test('a rejected external alpha request cannot cancel the pending donor restore',function()
+ local e=scenario();local donor=e.border('DebuffBorder','ui-debuff-border-magic-noicon')
+ local setter,deny=donor.SetAlpha,false
+ donor.SetAlpha=function(self,value)
+  if deny and value~=0 then return false end
+  return setter(self,value)
+ end
+ assert(e.apply());eq(donor.alpha,0)
+ e.b.Icon=e.texture();e.b.DebuffBorder=nil;deny=true
+ assert(not e.apply());eq(donor:SetAlpha(.4),false);eq(donor.alpha,0)
+ deny=false;assert(e.apply());eq(donor.alpha,1,'recover despite rejected external request')
+end)
+test('denied old mask removal can retry without sharing it between icons',function()
+ local e=scenario();local a=e.b.Icon;local b=e.texture()
+ assert(e.apply());local remove=a.RemoveMaskTexture
+ a.RemoveMaskTexture=function()error('old mask detach denied')end
+ e.b.Icon=b;assert(not e.apply());eq(#b.masks,0);eq(e.overlay().shown,false)
+ local writes=e.overlay().writes;a:Show();eq(e.overlay().writes,writes)
+ a.RemoveMaskTexture=remove;assert(e.apply())
+ eq(#a.masks,0);eq(#b.masks,1);eq(e.overlay().points[1][2],b)
+ eq(#e.b.textures,1);eq(#e.b.masks,1)
+end)
+test('reparenting the same physical icon releases its former owner',function()
+ local e=scenario();local a=e.b;local icon=a.Icon
+ local b={};for key,value in pairs(a)do b[key]=value end
+ b.textures,b.masks,b.scripts={},{},{}
+ local parent=a
+ function icon:GetParent()return parent end
+ assert(e.apply());local oldRim=e.overlay()
+ parent=b;assert(e.skin.Apply(b,icon,true))
+ eq(oldRim.shown,false);eq(#icon.masks,1);eq(icon.masks[1],b.masks[1])
+ assert(not e.apply(),'a stale button cannot retake the moved icon')
+ local writes=oldRim.writes;icon:SetWidth(14);eq(oldRim.writes,writes)
+ parent=a;assert(e.apply());eq(#a.textures,1);eq(#b.textures,1)
+ eq(#a.masks,1);eq(#b.masks,1);eq(icon.masks[1],a.masks[1]);eq(b.textures[1].shown,false)
 end)
 test('missing atlas is visible in diagnostics even before a skin state exists',function()
  local e,cfg=scenario({noAtlas=true});assert(not e.apply());local d=e.skin.GetDiagnostics()
@@ -397,5 +580,80 @@ test('diagnostic retains unreadable-indicator path without leaking secret values
  e.SlashCmdList.BJARKIUIBORDERS();assert(e.messages[#e.messages]:find('indicator=1',1,true));eq(r.alpha,1)
 end)
 
+test('same physical icon recovers its missing mask and respects an external replacement',function()
+ local e=scenario();local icon=e.b.Icon;assert(e.apply());local mask=icon.masks[1]
+ icon:RemoveMaskTexture(mask);assert(e.apply());eq(#icon.masks,1);eq(icon.masks[1],mask)
+ local foreign=e.texture(30,30,'MaskTexture');foreign.atlas='other-mask'
+ icon:AddMaskTexture(foreign);assert(not e.apply());eq(#icon.masks,1);eq(icon.masks[1],foreign)
+ eq(e.overlay().shown,false);icon:RemoveMaskTexture(foreign)
+ assert(e.apply());eq(icon.masks[1],mask);eq(#e.b.masks,1);eq(#e.b.textures,1)
+end)
+test('a matching borrowed mask can replace an owned mask on the same icon',function()
+ local e=scenario();local icon=e.b.Icon;assert(e.apply());local own=icon.masks[1]
+ local borrowed=e.texture(30,30,'MaskTexture');borrowed.atlas=MASK
+ icon:RemoveMaskTexture(own);icon:AddMaskTexture(borrowed)
+ assert(e.apply());eq(#icon.masks,1);eq(icon.masks[1],borrowed)
+ icon:RemoveMaskTexture(borrowed);assert(e.apply());eq(icon.masks[1],own);eq(borrowed.writes,0)
+end)
+test('a denied native dispel glyph restoration retains a visible rim and retries',function()
+ local e=scenario();local donor=e.border('DebuffBorder','ui-debuff-border-magic-noicon')
+ assert(e.apply());eq(donor.alpha,0)
+ local setter=donor.SetAlpha
+ donor.SetAlpha=function(self,value) if value~=0 then return false end;return setter(self,value) end
+ donor:SetAtlas('ui-debuff-border-magic-icon')
+ eq(e.overlay().shown,true);eq(e.overlay().colour[1],1);eq(e.overlay().colour[2],1)
+ local pending=e.skin.GetDiagnostics();eq(pending.native,0);eq(pending.framed,0)
+ donor.SetAlpha=setter;assert(e.apply());eq(donor.alpha,1);eq(e.overlay().shown,false)
+end)
+test('readable native alpha decides a silent or post-write restore failure',function()
+ local e=scenario();local donor=e.border('DebuffBorder','ui-debuff-border-magic-noicon')
+ assert(e.apply());local setter=donor.SetAlpha
+ donor.SetAlpha=function()end
+ donor:SetAtlas('ui-debuff-border-magic-icon')
+ eq(donor.alpha,0);eq(e.overlay().shown,true);eq(e.skin.GetDiagnostics().native,0)
+ donor.SetAlpha=function(self,v)setter(self,v);error('after write')end
+ assert(e.apply());eq(donor.alpha,1);eq(e.overlay().shown,false);eq(e.skin.GetDiagnostics().native,1)
+end)
+test('read-only diagnostics refuse to certify a missing or unreadable mask',function()
+ local e=scenario();local icon=e.b.Icon;local donor=e.border('DispelBorder','ui-debuff-border-magic-icon')
+ assert(e.apply());local own=icon.masks[1];eq(e.skin.GetDiagnostics().native,1)
+ icon:RemoveMaskTexture(own)
+ local d=e.skin.GetDiagnostics();eq(d.native,0);eq(d.missing,1);eq(#icon.masks,0)
+ donor:Hide();d=e.skin.GetDiagnostics();eq(d.framed,0);eq(d.missing,1)
+ local count=icon.GetNumMaskTextures;icon.GetNumMaskTextures=function()return e.secret end
+ assert(not e.apply());eq(#icon.masks,0);eq(e.skin.GetDiagnostics().framed,0)
+ icon.GetNumMaskTextures=count;assert(e.apply());eq(icon.masks[1],own)
+end)
+test('outer native owner update reconciles completed mask swaps in either order',function()
+ local e=scenario();local icon=e.b.Icon
+ local foreign=e.texture(30,30,'MaskTexture');foreign.atlas='external'
+ local borrowed=e.texture(30,30,'MaskTexture');borrowed.atlas=MASK
+ function e.b:UpdateAuraType() end
+ function e.b:Update(remove,add)
+  if remove then icon:RemoveMaskTexture(remove) end
+  self:UpdateAuraType()
+  if remove then eq(#icon.masks,0,'no mask is written during an intermediate owner update') end
+  if add then icon:AddMaskTexture(add) end
+ end
+ assert(e.apply());local own=icon.masks[1];local rim=e.overlay()
+ e.b:Update(own,foreign);eq(icon.masks[1],foreign);eq(rim.shown,false)
+ e.b:Update(foreign,borrowed);eq(icon.masks[1],borrowed);eq(rim.shown,true)
+ e.b:Update(borrowed,nil);eq(icon.masks[1],own);eq(rim.shown,true)
+ e.b:Update(nil,borrowed);eq(#icon.masks,1);eq(icon.masks[1],borrowed)
+ e.b:Update(nil,own);eq(#icon.masks,1);eq(icon.masks[1],borrowed)
+ e.b:Update(borrowed,foreign);eq(icon.masks[1],foreign);eq(rim.shown,false)
+ e.b:Update(foreign,nil);eq(icon.masks[1],own);eq(#e.b.masks,1);eq(#e.b.textures,1)
+ eq(borrowed.writes,0);eq(foreign.writes,0)
+end)
+test('rejected physical attachment or removal cannot report a completed mask handoff',function()
+ local e=scenario();local icon=e.b.Icon;local add=icon.AddMaskTexture
+ icon.AddMaskTexture=function()end
+ assert(not e.apply());eq(e.skin.GetDiagnostics().framed,0);eq(#icon.masks,0)
+ icon.AddMaskTexture=add;assert(e.apply());local own=icon.masks[1]
+ local remove=icon.RemoveMaskTexture;icon.RemoveMaskTexture=function()end
+ local nextIcon=e.texture();e.b.Icon=nextIcon
+ assert(not e.apply());eq(#nextIcon.masks,0);eq(icon.masks[1],own)
+ icon.RemoveMaskTexture=remove;assert(e.apply());eq(#icon.masks,0);eq(nextIcon.masks[1],own)
+end)
 print(string.format('TOTAL: %d passed, %d failed',passed,failed))
 if failed>0 then error('icon skin tests failed')end

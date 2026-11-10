@@ -6,6 +6,9 @@ local file = assert(io.open("bjarkiUI.lua", "rb"))
 local source = file:read("*a"); file:close()
 local first = assert(source:find("local healthColorWrites =", 1, true))
 local last = assert(source:find("local function repairMissingUnitName(unit)", first, true))
+local addonPrivate = {}
+local loadPrecision = loadfile("NativePrecision.lua")
+if loadPrecision then loadPrecision("bjarkiUI", addonPrivate) end
 local code = source:sub(first, last - 1) ..
     "\nreturn nativeHealthStyle, applyHealthColor, setHealthColor, installDerivedColorHook"
 local native = "UI-HUD-UnitFrame-Target-PortraitOn-Bar-Health"
@@ -89,8 +92,8 @@ local function fixture(route, desaturate, unit)
     local chunk
     if loadstring then chunk=assert(loadstring(code,"health-color-observer")); setfenv(chunk,env)
     else chunk=assert(load(code,"health-color-observer","t",env)) end
-    f.style,f.apply,f.set,f.derived=chunk()
-    f.bar,f.texture=bar,texture
+    f.style,f.apply,f.set,f.derived=chunk("bjarkiUI", addonPrivate)
+    f.bar,f.texture,f.env=bar,texture,env
     function f:install(mode)
         self.registration=mode
         env.hooksecurefunc=register
@@ -122,6 +125,156 @@ local function fixture(route, desaturate, unit)
 end
 local cases = {}
 local function test(name, body) cases[#cases+1]={name,body} end
+local beforeHalf = .5 - 2^-25
+local normalizedByte = 8421505 * 2^-24 -- nearest float to 128/255
+for _, row in ipairs({
+    {"refused upward adjacent float", beforeHalf, .5, false},
+    {"refused downward adjacent float", .5, beforeHalf, false},
+    {"refused halfway request rounds away from odd neighbor", beforeHalf, .5 - 2^-26, false},
+    {"accepted halfway request rounds to even", .5, .5 - 2^-26, true},
+    {"accepted request shares lower float", beforeHalf, beforeHalf + 2^-27, true},
+    {"accepted request normalized through a byte", normalizedByte, .5, true},
+    {"refused neighbor of normalized byte", normalizedByte - 2^-24, .5, false},
+    {"refused nonzero neighbor of subnormal tie", 2^-149, 2^-150, false},
+}) do
+    for _, delayed in ipairs({"none","addon","external"}) do
+        test(row[1].." / delayed "..delayed,function()
+            local physical,requested,accept=row[2],row[3],row[4]
+            local f=fixture("fallback",false)
+            local getter,setter=f.bar.GetStatusBarColor,f.bar.SetStatusBarColor
+            local stage="addon"
+            function f.bar:GetStatusBarColor()
+                if stage==delayed and self.writes>0 then error("readback unavailable") end
+                return getter(self)
+            end
+            function f.bar:SetStatusBarColor(r,g,b,a)
+                if stage=="external" then
+                    if not accept then return false end
+                    r=physical
+                end
+                return setter(self,r,g,b,a)
+            end
+            f:install("success");assert(f.set(f.bar,physical,.25,.75,1))
+            stage="external";f.bar:SetStatusBarColor(requested,.25,.75,1)
+            stage="restore";f.mode="pet";f.apply(f.bar,"target")
+            if accept then f:checkNative(physical,.25,.75,1) else f:checkNative(.1,.8,.1,.7) end
+        end)
+    end
+end
+test("a successful external tint in the same float bin owns the stored color",function()
+    local f=fixture("fallback",false);local setter=f.bar.SetStatusBarColor
+    function f.bar:SetStatusBarColor(r,g,b,a)
+        if r==.250000001 or r==.25 then r,g,b=.25,.7799999713897705,.9200000166893005 end
+        return setter(self,r,g,b,a)
+    end
+    f:install("success");assert(f.apply(f.bar,"target"))
+    f.bar:SetStatusBarColor(.250000001,.78,.92,1)
+    f.mode="pet";f.apply(f.bar,"target");color(f.bar,.25,.7799999713897705,.9200000166893005,1)
+end)
+test("declined external color after unavailable addon readback retains native baseline",function()
+    local f=fixture("fallback",false);local setter,getter=f.bar.SetStatusBarColor,f.bar.GetStatusBarColor
+    local unreadable,decline=false,false
+    function f.bar:SetStatusBarColor(r,...)
+        if decline then return false end
+        setter(self,r,...)
+        if r==.25 then unreadable=true end
+    end
+    function f.bar:GetStatusBarColor()if unreadable then error("post-write read denied") end;return getter(self) end
+    f:install("success");assert(f.apply(f.bar,"target"))
+    unreadable=false;decline=true;f.bar:SetStatusBarColor(.9,.1,.9,1);decline=false
+    f.mode="pet";f.apply(f.bar,"target");f:checkNative(.1,.8,.1,.7)
+end)
+for _,decline in ipairs({true,false}) do
+    test("only an applied external RGB write supplies a new native baseline: "..tostring(decline),function()
+        local f=fixture("fallback",false)
+        local setter=f.bar.SetStatusBarColor
+        local refuse=false
+        function f.bar:SetStatusBarColor(r,...)
+            if refuse then return false end
+            return setter(self,r,...)
+        end
+        f:install("success");assert(f.apply(f.bar,"target"))
+        refuse=decline
+        f.bar:SetStatusBarColor(.64,.23,.42,.57)
+        refuse=false
+        f.mode="pet";f.apply(f.bar,"target")
+        if decline then f:checkNative(.1,.8,.1,.7) else f:checkNative(.64,.23,.42,.57) end
+    end)
+end
+test("atlas ownership waits for its observer and can retry",function()
+    local f=fixture("fallback",false)
+    local register=f.env.hooksecurefunc
+    f.env.hooksecurefunc=function(obj, method, callback)
+        if method=="SetAtlas" then return false end
+        return register(obj,method,callback)
+    end
+    f.style.Install(f.bar,"target");f.apply(f.bar,"target")
+    f:checkNative(.1,.8,.1,.7)
+    f:install("success");assert(f.apply(f.bar,"target"));f:checkTint()
+    f.texture:SetAtlas(colorable)
+    f.mode="pet";f.apply(f.bar,"target")
+    expect(f.texture.atlas==colorable,"same-value external atlas assignment was overwritten")
+end)
+test("same requested external tint survives native precision differences",function()
+    local f=fixture("fallback",false)
+    local set=f.bar.SetStatusBarColor
+    function f.bar:SetStatusBarColor(r,g,b,a)
+        local function rounded(x) return math.floor(x*255+.5)/255 end
+        return set(self,rounded(r),rounded(g),rounded(b),rounded(a))
+    end
+    f:install("success");assert(f.apply(f.bar,"target"))
+    local expected=f.bar.color
+    f.bar:SetStatusBarColor(.25,.78,.92,1)
+    f.mode="pet";f.apply(f.bar,"target")
+    color(f.bar,unpack(expected))
+end)
+test("inaccessible native RGB getter during an external write yields to stock",function()
+    local f=fixture("fallback",false)
+    f:install("success");assert(f.apply(f.bar,"target"))
+    f.bar.GetStatusBarColor=nil
+    setmetatable(f.bar,{__index=function(_,name)
+        if name=="GetStatusBarColor" then error("getter access denied") end
+    end})
+    f.bar:SetStatusBarColor(.12,.34,.56,.78)
+    f.mode="pet";f.apply(f.bar,"target")
+    f:checkNative(.12,.34,.56,.78)
+end)
+for _, accepted in ipairs({true,false}) do
+    test("a public color write with delayed readback recovers: "..tostring(accepted),function()
+        local f=fixture("fallback",false)
+        local getter,setter=f.bar.GetStatusBarColor,f.bar.SetStatusBarColor
+        local denied=false
+        function f.bar:GetStatusBarColor()
+            if denied then error("temporarily unavailable") end
+            return getter(self)
+        end
+        function f.bar:SetStatusBarColor(...)
+            if denied and not accepted then return false end
+            return setter(self,...)
+        end
+        f:install("success");assert(f.apply(f.bar,"target"));denied=true
+        f.bar:SetStatusBarColor(.61,.32,.13,.7)
+        f.mode="pet";f.apply(f.bar,"target")
+        if accepted then color(f.bar,.61,.32,.13,.7) else color(f.bar,.25,.78,.92,1) end
+        denied=false;f.mode="eligible"
+        assert(f.apply(f.bar,"target"),"a normal refresh should recover without a new setter")
+        f:checkTint();f.mode="pet";f.apply(f.bar,"target")
+        if accepted then f:checkNative(.61,.32,.13,.7) else f:checkNative(.1,.8,.1,.7) end
+    end)
+end
+for _,desaturate in ipairs({false,true}) do
+    test("declined health tint releases the prepared material",function()
+        local f=fixture("fallback",desaturate)
+        local set=f.bar.SetStatusBarColor
+        function f.bar:SetStatusBarColor(r,...)
+            if r==.25 then return false end
+            return set(self,r,...)
+        end
+        f:install("success")
+        expect(f.apply(f.bar,"target")==false,"declined tint reported success")
+        f:checkNative(.1,.8,.1,.7)
+    end)
+end
 for _, route in ipairs({"fallback","npc","opaque"}) do
     for _, failure in ipairs({"missing","throw","false"}) do
         for _, desaturate in ipairs({false,true}) do
@@ -216,6 +369,169 @@ for _, unit in ipairs({"targettarget","focustarget"}) do
         end)
     end
 end
+for _,desaturate in ipairs({false,true}) do
+    test("recycled native health texture restores its own material",function()
+        local f=fixture("fallback",desaturate)
+        local a=f.texture
+        local b={atlas=native, desaturated=false}
+        for _,method in ipairs({"GetAtlas","SetAtlas","IsDesaturated","SetDesaturated"}) do
+            b[method]=a[method]
+        end
+        f:install("success"); f.apply(f.bar,"target"); f:checkTint()
+        f.bar.GetStatusBarTexture=function() return b end
+        f:install("success"); f.apply(f.bar,"target")
+        expect(a.atlas==native and a.desaturated==false,"detached A still contains custom material")
+        f.bar.GetStatusBarTexture=function() return a end
+        f.mode="pet"; f.apply(f.bar,"target"); f:checkNative(.1,.8,.1,.7)
+        expect(b.atlas==native and b.desaturated==false,"detached B still contains custom material")
+    end)
+end
+test("a superseding material survives release of a detached texture",function()
+    local f=fixture("fallback",false)
+    f:install("success"); f.apply(f.bar,"target"); f:checkTint()
+    f.bar.GetStatusBarTexture=function() return nil end
+    f.texture:SetAtlas("NewNativeMaterial")
+    f.mode="pet"; f.apply(f.bar,"target")
+    expect(f.texture.atlas=="NewNativeMaterial","detached native art was overwritten")
+    color(f.bar,.1,.8,.1,.7)
+end)
+for _,denial in ipairs({"atlas read","missing atlas","atlas restore","declined atlas restore","desaturation restore"}) do
+    test("detached "..denial.." cannot block a readable replacement",function()
+        local desaturate=denial=="desaturation restore"
+        local f=fixture("fallback",desaturate)
+        local a=f.texture
+        local b={atlas=native,desaturated=false}
+        for _,method in ipairs({"GetAtlas","SetAtlas","IsDesaturated","SetDesaturated"}) do
+            b[method]=a[method]
+        end
+        f:install("success");f.apply(f.bar,"target");f:checkTint()
+        local blocked=true
+        if denial=="atlas read" then
+            a.GetAtlas=function(self)if blocked then error("detached atlas protected") end;return self.atlas end
+        elseif denial=="missing atlas" then
+            a.GetAtlas=function(self)if not blocked then return self.atlas end end
+        elseif desaturate then
+            a.SetDesaturated=function(self,v)if blocked then error("detached desaturation protected") end;self.desaturated=v end
+        elseif denial=="declined atlas restore" then
+            a.SetAtlas=function(self,v)if blocked then return false end;self.atlas=v end
+        else
+            a.SetAtlas=function(self,v)if blocked then error("detached atlas protected") end;self.atlas=v end
+        end
+        f.bar.GetStatusBarTexture=function()return b end
+        f.bar:SetStatusBarColor(.44,.52,.61,.8)
+        f:install("success");f.apply(f.bar,"target")
+        color(f.bar,.25,.78,.92,1)
+        expect(desaturate and b.desaturated or not desaturate and b.atlas==colorable,
+            "readable replacement B did not acquire its own material")
+        f.mode="pet";f.apply(f.bar,"target")
+        color(f.bar,.44,.52,.61,.8)
+        expect(b.atlas==native and not b.desaturated,"B cannot be restored while A is pending")
+        blocked=false;f.apply(f.bar,"target")
+        expect(a.atlas==native and not a.desaturated,"detached A lost restoration ownership")
+        color(f.bar,.44,.52,.61,.8)
+    end)
+end
+test("a physical texture moves between bars without transferring native bar RGB",function()
+    local f=fixture("fallback",false)
+    f:install("success");f.apply(f.bar,"target")
+    local texture=f.texture
+    local timers={}
+    f.env.C_Timer={After=function(_,callback)timers[#timers+1]=callback end}
+    texture:SetAtlas(native) -- scheduled while the texture still belongs to the first bar
+    f.bar.GetStatusBarTexture=function() return nil end
+    local receiver={unit="focus",color={.31,.42,.53,.64}}
+    function receiver:GetStatusBarTexture()return texture end
+    function receiver:GetStatusBarColor()return unpack(self.color) end
+    function receiver:SetStatusBarColor(...)self.color={...} end
+    f.env.healthBar=function(unit) return unit=="focus" and receiver or f.bar end
+    f.style.Install(receiver,"focus")
+    expect(f.set(receiver,.8,.3,.4,1),"new bar failed to take readable texture")
+    f.style.Restore(f.bar)
+    color(f.bar,.1,.8,.1,.7);color(receiver,.8,.3,.4,1)
+    expect(texture.atlas==colorable,"old bar restored new owner's texture")
+    texture:SetAtlas(native)
+    expect(#timers==1,"transfer installed duplicate observers or queued duplicate repaint")
+    timers[1]()
+    expect(texture.atlas==colorable,"pending native atlas change was dispatched to the former bar")
+    color(receiver,.25,.78,.92,1)
+    expect(f.style.Restore(receiver),"new owner failed to restore texture")
+    color(receiver,.31,.42,.53,.64)
+    expect(texture.atlas==native,"last owner lost original atlas")
+end)
+for _,mode in ipairs({"pet","eligible"}) do
+    test("atlas-only replacement releases owned desaturation: "..mode,function()
+        local f=fixture("fallback",true)
+        f:install("success");f.apply(f.bar,"target");f:checkTint()
+        f.texture:SetAtlas("DifferentNativeMaterial")
+        f.mode=mode;f.apply(f.bar,"target")
+        expect(f.texture.atlas=="DifferentNativeMaterial","newer atlas overwritten")
+        expect(f.texture.desaturated==false,"addon left its grayscale on the replacement")
+    end)
+end
+test("external saturation write on replacement atlas is retained",function()
+    local f=fixture("fallback",true)
+    f:install("success");f.apply(f.bar,"target")
+    f.texture:SetAtlas("DifferentNativeMaterial");f.texture:SetDesaturated(true)
+    f.mode="pet";f.apply(f.bar,"target")
+    expect(f.texture.desaturated==true,"new owner's explicit grayscale overwritten")
+end)
+for _,mode in ipairs({"atlas","boolean saturation","fractional saturation"}) do
+    test("a declined native "..mode.." write retains restoration ownership",function()
+        local f=fixture("fallback",mode~="atlas")
+        local texture=f.texture
+        local method, request, original
+        if mode=="atlas" then
+            method,request="SetAtlas","DifferentNativeMaterial"
+        elseif mode=="boolean saturation" then
+            method,request="SetDesaturated",false
+        else
+            original=.35
+            texture.level=original
+            function texture:GetDesaturation()return self.level end
+            function texture:SetDesaturation(value)self.level=value end
+            method,request="SetDesaturation",.5
+        end
+        local set=texture[method]
+        local reject=false
+        texture[method]=function(self,value,...)
+            if reject then return false end
+            return set(self,value,...)
+        end
+        f:install("success");f.apply(f.bar,"target")
+        reject=true;expect(texture[method](texture,request)==false,"fixture should decline native write");reject=false
+        f.mode="pet";f.apply(f.bar,"target");f:checkNative(.1,.8,.1,.7)
+        if original then expect(texture.level==original,"fractional saturation restoration was lost") end
+    end)
+end
+test("an unavailable atlas cannot block independent saturation restoration",function()
+    local f=fixture("fallback",true)
+    f:install("success");f.apply(f.bar,"target")
+    f.texture.GetAtlas=function() error("atlas inaccessible") end
+    f.mode="pet";f.apply(f.bar,"target")
+    expect(f.texture.desaturated==false,"readable owned grayscale was not released")
+end)
+test("fractional saturation is restored after a fallback",function()
+    local f=fixture("fallback",true)
+    local level=.35
+    f.texture.GetDesaturation=function()return level end
+    f.texture.SetDesaturation=function(_,v)level=v end
+    f.texture.IsDesaturated=function()return level>0 end
+    f.texture.SetDesaturated=function(_,v)level=v and 1 or 0 end
+    f:install("success");f.apply(f.bar,"target")
+    expect(level==1,"fallback did not desaturate")
+    f.texture:SetAtlas("DifferentNativeMaterial");f.mode="pet";f.apply(f.bar,"target")
+    expect(level==.35,"baseline saturation level was lost")
+end)
+test("recovered colorable atlas releases only the earlier saturation override",function()
+    local f=fixture("fallback",true);f:install("success");f.apply(f.bar,"target")
+    expect(f.texture.desaturated,"fallback failed")
+    f.env.C_Texture.GetAtlasInfo=function()return {} end
+    f.apply(f.bar,"target")
+    expect(f.texture.atlas==colorable and not f.texture.desaturated,"unnecessary gray survived atlas recovery")
+    f.texture:SetAtlas(colorable)
+    f.mode="pet";f.apply(f.bar,"target")
+    expect(f.texture.atlas==colorable,"new explicit atlas choice was undone")
+end)
 local failed=0
 for _, case in ipairs(cases) do
     local ok,err=pcall(case[2])

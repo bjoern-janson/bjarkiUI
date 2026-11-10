@@ -1,6 +1,7 @@
 -- Cosmetic-only adjustments to native status labels and the player combat icon.
 -- Do not alter FontString text,
 -- visibility, button behavior, shared Font objects, or surrounding frame layout.
+local _, uiPrivate = ...
 local LEVEL_OUTWARD, LEVEL_DOWN, BAG_FONT_INCREASE = 4, 1, 3
 -- Mirror the combat glyph's *center* across the portrait from PlayerLevelText.
 -- Keep the icon's native TOPLEFT anchor type: changing it to CENTER would
@@ -21,6 +22,7 @@ local function field(object, key)
     if not readable(object) or object == nil then return nil end
     local ok, value = pcall(function() return object[key] end)
     if ok and readable(value) then return value end
+    return nil
 end
 
 local function finite(value)
@@ -77,24 +79,49 @@ local function pointOf(text)
     return { point, relative, relativePoint, x, y }
 end
 
-local function samePoint(a, b)
+local function matchesNumber(actual, requested, allowFloat)
+    if actual == requested then return true end
+    if not allowFloat then return false end
+    -- The first receipt can be the exact nearest binary32 value. Once read,
+    -- compare the stored tuple exactly, including on precise native backends.
+    return actual == uiPrivate.RoundToFloat32(requested)
+end
+
+local function samePoint(a, b, allowFloat)
     if not a or not b then return false end
-    for i = 1, 5 do if a[i] ~= b[i] then return false end end
-    return true
+    return a[1] == b[1] and a[2] == b[2] and a[3] == b[3]
+        and matchesNumber(a[4], b[4], allowFloat) and matchesNumber(a[5], b[5], allowFloat)
+end
+
+local function ownsReceipt(state, current, matches)
+    if state.applied then return matches(current, state.applied) end
+    if state.requested and matches(current, state.requested, true) then
+        state.applied, state.requested = current, nil
+        return true
+    end
+    return false
+end
+
+local function recordReceipt(state, requested, stored, matches)
+    state.applied, state.requested = nil, nil
+    if not stored then state.requested = requested
+    elseif matches(stored, requested, true) then state.applied = stored end
 end
 
 local function moveLevel(text, state)
     if state.applying or not outsideCombat() or not accessible(text) then return end
     local point = pointOf(text)
     local setter = field(text, "SetPoint")
-    if not point or type(setter) ~= "function" or samePoint(point, state.applied) then return end
+    if not point or type(setter) ~= "function" or ownsReceipt(state, point, samePoint) then return end
     -- A new native anchor becomes the baseline. A lifecycle refresh that sees
     -- our last applied anchor is a no-op, so the offset never accumulates.
     local shifted = { point[1], point[2], point[3], point[4] + state.dx, point[5] - LEVEL_DOWN }
     state.applying = true
     local ok, result = pcall(setter, text, shifted[1], shifted[2], shifted[3], shifted[4], shifted[5])
     state.applying = false
-    if ok and result ~= false then state.applied = shifted end
+    if ok and readable(result) and result ~= false then
+        recordReceipt(state, shifted, pointOf(text), samePoint)
+    end
 end
 
 local function installLevel(text, dx)
@@ -102,8 +129,12 @@ local function installLevel(text, dx)
     local state = levels[text]
     if not state then state = { dx = dx }; levels[text] = state end
     moveLevel(text, state)
-    hookOnce(text, state, "SetPoint", function(self)
+    hookOnce(text, state, "SetPoint", function(self, p, relative, rp, x, y)
         if state.applying then return end
+        if state.requested and not (readable(p) and readable(relative) and readable(rp)
+            and finite(x) and finite(y) and samePoint({p, relative, rp, x, y}, state.requested)) then
+            state.requested = nil
+        end
         moveLevel(self, state)
         -- The mirrored icon must follow a later native level-label reanchor,
         -- including the additional outward level adjustment above.
@@ -190,7 +221,8 @@ local function moveCombatIcon(texture, state)
     local x, y = mirroredCombatAnchor(state.level, portrait, texture)
     if not x then state.lastResult = "level geometry unreadable"; return end
     local desired = { "TOPLEFT", portrait, "CENTER", x, y }
-    if point and samePoint(point, desired) then
+    if point and (samePoint(point, desired) or
+        (samePoint(state.desired, desired) and ownsReceipt(state, point, samePoint))) then
         state.lastResult = "level mirror applied"; return
     end
     local setter = field(texture, "SetPoint")
@@ -199,8 +231,9 @@ local function moveCombatIcon(texture, state)
     local success, result = pcall(setter, texture,
         desired[1], desired[2], desired[3], desired[4], desired[5])
     state.applying = false
-    if success and result ~= false then
-        state.applied = desired
+    if success and readable(result) and result ~= false then
+        state.desired = desired
+        recordReceipt(state, desired, point and pointOf(texture), samePoint)
         state.fallbackApplied = not point
         state.lastResult = "level mirror applied"
     else
@@ -231,22 +264,29 @@ refreshCombatIcon = function()
     if state then moveCombatIcon(icon, state) end
 end
 
-local function enlargeCount(text, state)
-    if state.applying or not outsideCombat() or not accessible(text) then return end
-    local getter, setter = field(text, "GetFont"), field(text, "SetFont")
-    if type(getter) ~= "function" or type(setter) ~= "function" then return end
-    local ok, face, size, flags = pcall(getter, text)
+local function fontOf(text)
+    local ok, face, size, flags = pcall(field(text, "GetFont"), text)
     if not ok or not readable(face) or type(face) ~= "string" or face == ""
         or not finite(size) or size <= 0 or not readable(flags)
         or (flags ~= nil and type(flags) ~= "string") then return end
-    if size == state.appliedSize then return end
-    -- Only a native size distinct from our previous write starts a new baseline.
-    -- Keep the current native face/flags; do not change the global font template.
-    local newSize = size + BAG_FONT_INCREASE
+    return {face, size, flags or ""}
+end
+
+local function sameFont(a, b, allowFloat)
+    return a[1] == b[1] and a[3] == b[3] and matchesNumber(a[2], b[2], allowFloat)
+end
+
+local function enlargeCount(text, state)
+    if state.applying or not outsideCombat() or not accessible(text) then return end
+    local font, setter = fontOf(text), field(text, "SetFont")
+    if not font or type(setter) ~= "function" or ownsReceipt(state, font, sameFont) then return end
+    local requested = {font[1], font[2] + BAG_FONT_INCREASE, font[3]}
     state.applying = true
-    local success, result = pcall(setter, text, face, newSize, flags or "")
+    local success, result = pcall(setter, text, requested[1], requested[2], requested[3])
     state.applying = false
-    if success and result ~= false then state.appliedSize = newSize end
+    if success and readable(result) and result ~= false then
+        recordReceipt(state, requested, fontOf(text), sameFont)
+    end
 end
 
 local function installCount(text)
@@ -254,9 +294,21 @@ local function installCount(text)
     local state = counts[text]
     if not state then state = {}; counts[text] = state end
     enlargeCount(text, state)
-    local function refresh(self) enlargeCount(self, state) end
-    hookOnce(text, state, "SetFont", refresh)
-    hookOnce(text, state, "SetFontObject", refresh)
+    hookOnce(text, state, "SetFont", function(self, face, size, flags)
+        if state.applying then return end
+        if state.requested and not (readable(face) and finite(size) and readable(flags)
+            and sameFont({face, size, flags or ""}, state.requested)) then
+            state.requested = nil
+        end
+        enlargeCount(self, state)
+    end)
+    hookOnce(text, state, "SetFontObject", function(self)
+        if state.applying then return end
+        -- Rebinding a shared native template installs a fresh baseline even
+        -- when its face, flags and size match the previous local override.
+        state.applied, state.requested = nil, nil
+        enlargeCount(self, state)
+    end)
 end
 
 local function apply()
@@ -311,7 +363,8 @@ SlashCmdList.BJARKIUI_COMBATICON = function()
     local portrait = field(field(_G.PlayerFrame, "PlayerFrameContainer"), "PlayerPortrait")
     local relative = point and (point[2] == portrait and point[3] == "CENTER" and "portrait center" or "other") or "unreadable"
     local result = state and state.lastResult or (icon and "not installed" or "icon inaccessible")
-    local x, y = icon and portrait and mirroredCombatAnchor(_G.PlayerLevelText, portrait, icon)
+    local x, y
+    if icon and portrait then x, y = mirroredCombatAnchor(_G.PlayerLevelText, portrait, icon) end
     print("bjarkiUI combat-icon: " .. tostring(result)
         .. " | point=" .. where .. " | relative=" .. relative .. " | mirrored="
         .. (x and tostring(x) .. "," .. tostring(y) or "unreadable"))

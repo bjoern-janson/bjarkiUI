@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.309-native-spacing-castbar"
+local BJARKI_UI_VERSION = "0.2.323"
 -- Standalone PRD treatment is retained. Unit-frame resource bars stay native.
 local PRD_MANA_R, PRD_MANA_G, PRD_MANA_B = 0.10, 0.25, 1.00
 local WORLD_TEXT_SCREEN_Y = "0.0430"
@@ -748,6 +748,7 @@ local function fallbackPlayerHealthColor(unit)
 end
 
 local healthColorWrites = setmetatable({}, { __mode = "k" })
+local _, uiPrivate = ...
 
 -- Native health artwork has a baked-in green color. Multiplying that image by
 -- a class RGB produced the olive bars seen in .210. Use only the corresponding
@@ -755,7 +756,9 @@ local healthColorWrites = setmetatable({}, { __mode = "k" })
 -- untouched. If the variant is absent, desaturate the same native texture.
 local nativeHealthStyle = {
     states = setmetatable({}, { __mode = "k" }),
+    materials = setmetatable({}, { __mode = "k" }),
     textureHooks = setmetatable({}, { __mode = "k" }),
+    saturationHooks = setmetatable({}, { __mode = "k" }),
     colorHooks = setmetatable({}, { __mode = "k" }),
 }
 local COLORABLE_HEALTH_ATLASES = {
@@ -770,44 +773,170 @@ local function currentHealthTexture(bar)
     if ok and not isSecret(texture) then return texture end
 end
 
-local function readableColor(bar)
-    if type(bar.GetStatusBarColor) ~= "function" then return nil end
-    local ok, r, g, b, a = pcall(bar.GetStatusBarColor, bar)
+local function readStatusBarColor(bar)
+    return bar:GetStatusBarColor()
+end
+
+local function readableColor(bar, color)
+    local ok, r, g, b, a = pcall(readStatusBarColor, bar)
     if not ok or isSecret(r) or isSecret(g) or isSecret(b) or isSecret(a)
         or type(r) ~= "number" or type(g) ~= "number" or type(b) ~= "number" then return nil end
-    return {r, g, b, type(a) == "number" and a or 1}
+    color = color or {}
+    color[1], color[2], color[3], color[4] = r, g, b, type(a) == "number" and a or 1
+    return color
+end
+
+do
+local function writeHealthStyle(setter, object, ...)
+    local ok, result = pcall(setter, object, ...)
+    return ok and not isSecret(result) and result ~= false
+end
+
+local function readHealthProperty(texture, getter)
+    return texture[getter](texture)
+end
+
+local function matchesColor(color, r, g, b, a)
+    return color and color[1] == r and color[2] == g and color[3] == b and color[4] == a
+end
+
+local function matchesNativeChannel(current, requested)
+    if type(requested) ~= "number" or requested ~= requested then return false end
+    if current == requested or current == uiPrivate.RoundToFloat32(requested) then return true end
+    if requested < 0 or requested > 1 then return false end
+    local byte = math.floor(requested * 255 + .5) / 255
+    return current == byte or current == uiPrivate.RoundToFloat32(byte)
+end
+
+local function matchesRequest(color, r, g, b, a)
+    return matchesNativeChannel(color[1], r) and matchesNativeChannel(color[2], g)
+        and matchesNativeChannel(color[3], b) and matchesNativeChannel(color[4], a)
+end
+
+function nativeHealthStyle.ObserveColor(bar, state, r, g, b, a)
+    local current = readableColor(bar)
+    if not current then
+        local pending = state.pendingColor or {}
+        pending[1], pending[2], pending[3], pending[4] = r, g, b, a
+        state.pendingColor = pending
+        return false
+    end
+    state.pendingColor = nil
+    if state.tintOwned and not matchesRequest(current, r, g, b, a)
+        and (r ~= state.tintR or g ~= state.tintG or b ~= state.tintB or a ~= state.tintA) then
+        -- A positive read of our own stored result is strongest. If that
+        -- read was denied, check the public tint we last sent to the bar.
+        if matchesColor(state.appliedColor, unpack(current)) or
+            (not state.appliedColor and matchesRequest(current, state.tintR, state.tintG, state.tintB, state.tintA)) then
+            return true
+        end
+    end
+    state.tintOwned, state.nativeColor, state.appliedColor = false, current, nil
+    return true
+end
+
+local function settleNativeColor(bar, state)
+    return not state.pendingColor or nativeHealthStyle.ObserveColor(bar, state, unpack(state.pendingColor))
+end
+
+-- A secure post-hook also runs when a writer declines a request. A readable
+-- contradiction lets us retain the override for its eventual restoration.
+function nativeHealthStyle.OverrideStillApplied(texture, getter, requested, applied)
+    if isSecret(requested) or requested == applied then return false end
+    local ok, current = pcall(readHealthProperty, texture, getter)
+    return ok and not isSecret(current) and current == applied
+end
+
+local function observeHealthSaturation(texture)
+    local hooks = nativeHealthStyle.saturationHooks[texture]
+    if not hooks then
+        hooks = {}
+        nativeHealthStyle.saturationHooks[texture] = hooks
+    end
+    for _, name in ipairs({"SetDesaturated", "SetDesaturation"}) do
+        if not hooks[name] and type(texture[name]) == "function" then
+            local numeric = name == "SetDesaturation"
+            local getter, applied = numeric and "GetDesaturation" or "IsDesaturated", numeric and 1 or true
+            local ok, result = pcall(hooksecurefunc, texture, name, function(self, requested)
+                local material = nativeHealthStyle.materials[self]
+                if material and material.desaturated and not material.writingSaturation then
+                    material.desaturated = nativeHealthStyle.OverrideStillApplied(self, getter, requested, applied)
+                end
+            end)
+            if not ok or isSecret(result) or result == false then return false end
+            hooks[name] = true
+        end
+    end
+    return true
+end
+
+local function writeHealthSaturation(texture, state, value)
+    local setter = texture[type(value) == "number" and "SetDesaturation" or "SetDesaturated"]
+    state.writingSaturation = true
+    local ok = writeHealthStyle(setter, texture, value)
+    state.writingSaturation = false
+    return ok
+end
+
+local function restoreHealthSaturation(texture, state)
+    if not state.desaturated then return true end
+    local numeric = type(state.originalDesaturated) == "number"
+    local got, value = pcall(readHealthProperty, texture, numeric and "GetDesaturation" or "IsDesaturated")
+    if not got or isSecret(value) or type(value) ~= type(state.originalDesaturated) then return false end
+    if value == (numeric and 1 or true) and not writeHealthSaturation(texture, state, state.originalDesaturated) then
+        return false
+    end
+    state.desaturated = false
+    return true
+end
+
+local function restoreHealthMaterial(texture, state)
+    -- Atlas and saturation are independent properties, including when stock
+    -- replaces the atlas while we still own the gray tint on this texture.
+    if state.atlasOwned then
+        local got, atlas = pcall(readHealthProperty, texture, "GetAtlas")
+        if got and not isSecret(atlas) and type(atlas) == "string" then
+            if atlas ~= state.colorable or writeHealthStyle(texture.SetAtlas, texture, state.originalAtlas, false) then
+                state.atlasOwned = false
+            end
+        end
+    end
+    return restoreHealthSaturation(texture, state) and not state.atlasOwned
+end
+local function releaseHealthMaterials(state, keep)
+    local complete = true
+    for texture, material in pairs(state.owned) do
+        if texture ~= keep then
+            local ok, restored = pcall(restoreHealthMaterial, texture, material)
+            if ok and restored then
+                nativeHealthStyle.materials[texture], state.owned[texture] = nil, nil
+            else
+                complete = false
+            end
+        end
+    end
+    return complete
 end
 
 function nativeHealthStyle.Restore(bar)
     local state = nativeHealthStyle.states[bar]
-    if not state or not state.applied then return end
+    if not state then return end
     healthColorWrites[bar] = true
     -- Setter failures must retain restoration authority just like exceptions.
     local restored = true
     local ok = pcall(function()
-        if state.texture == currentHealthTexture(bar) then
-            local got, atlas = pcall(state.texture.GetAtlas, state.texture)
-            if not got or isSecret(atlas) then
-                restored = false
-            elseif atlas == state.colorable then
-                if not pcall(state.texture.SetAtlas, state.texture, state.originalAtlas, false) then
-                    restored = false
-                end
-            end
-            if state.desaturated
-                and not pcall(state.texture.SetDesaturated, state.texture, state.originalDesaturated) then
-                restored = false
-            end
-        end
-        if state.nativeColor
-            and not pcall(bar.SetStatusBarColor, bar, unpack(state.nativeColor)) then
+        restored = releaseHealthMaterials(state)
+        if not settleNativeColor(bar, state) then
             restored = false
+        elseif state.tintOwned then
+            if not state.nativeColor or writeHealthStyle(bar.SetStatusBarColor, bar, unpack(state.nativeColor)) then
+                state.tintOwned, state.appliedColor = false, nil
+            else
+                restored = false
+            end
         end
     end)
     healthColorWrites[bar] = nil
-    if ok and restored then
-        state.applied, state.desaturated = false, false
-    end
     return ok and restored
 end
 function nativeHealthStyle.Prepare(bar)
@@ -819,55 +948,96 @@ function nativeHealthStyle.Prepare(bar)
     local ok, atlas = pcall(texture.GetAtlas, texture)
     if not ok or isSecret(atlas) or type(atlas) ~= "string" then return false end
     local state = nativeHealthStyle.states[bar]
-    if not state or state.texture ~= texture then
-        local colorable = COLORABLE_HEALTH_ATLASES[atlas]
-        -- Decline unknown materials rather than put old artwork on a new frame.
-        if not colorable then return false end
-        -- A replacement texture inherits the bar's current modulation. If we
-        -- still own that tint, do not record our former class RGB as native.
-        local originalColor = state and state.applied and state.nativeColor or readableColor(bar)
-        if not originalColor then return false end
-        state = {texture=texture, originalAtlas=atlas, colorable=colorable,
-            nativeColor=originalColor, applied=false}
+    if state then releaseHealthMaterials(state, texture) end
+    local material = nativeHealthStyle.materials[texture]
+    if material and atlas ~= material.originalAtlas and atlas ~= material.colorable then
+        material.atlasOwned = false
+        if not restoreHealthMaterial(texture, material) then return false end
+        material.owner.owned[texture], nativeHealthStyle.materials[texture] = nil, nil
+        material = nil
+    end
+    if not material and not COLORABLE_HEALTH_ATLASES[atlas] then return false end
+    if not state then
+        local color = readableColor(bar)
+        if not color then return false end
+        state = {nativeColor=color, owned=setmetatable({}, {__mode="k"})}
         nativeHealthStyle.states[bar] = state
-    elseif atlas ~= state.originalAtlas and atlas ~= state.colorable then
-        return false
     end
     -- An unreadable native write revoked restoration authority. Do not take
     -- its tint over again until a readable native write supplies a snapshot.
-    if not state.nativeColor then return false end
+    if not settleNativeColor(bar, state) or not state.nativeColor then return false end
+    if not material then
+        material = {originalAtlas=atlas, colorable=COLORABLE_HEALTH_ATLASES[atlas]}
+        nativeHealthStyle.materials[texture] = material
+    elseif material.owner ~= state then
+        -- Reparented texture: its old bar must never undo its new owner's work.
+        material.owner.owned[texture] = nil
+    end
+    material.owner, state.owned[texture] = state, material
     local validAtlas = false
     if C_Texture and type(C_Texture.GetAtlasInfo) == "function" then
-        local found, info = pcall(C_Texture.GetAtlasInfo, state.colorable)
+        local found, info = pcall(C_Texture.GetAtlasInfo, material.colorable)
         validAtlas = found and not isSecret(info) and type(info) == "table"
     end
-    if validAtlas and type(texture.SetAtlas) == "function" then
-        if atlas ~= state.colorable then
-            if not pcall(texture.SetAtlas, texture, state.colorable, false) then return false end
+    if (validAtlas or atlas == material.colorable) and type(texture.SetAtlas) == "function" then
+        if not restoreHealthSaturation(texture, material) then return false end
+        if atlas ~= material.colorable then
+            local observer = nativeHealthStyle.textureHooks[texture]
+            if not observer or observer.bar ~= bar then return false end
+            material.atlasOwned = true
+            if not writeHealthStyle(texture.SetAtlas, texture, material.colorable, false) then return false end
         end
     else
         -- A texture's source desaturation is different from the StatusBar's
         -- post-tint desaturation flag: retain the class color in the final tint.
-        if type(texture.IsDesaturated) ~= "function" or type(texture.SetDesaturated) ~= "function" then return false end
-        if not state.desaturated then
-            local got, value = pcall(texture.IsDesaturated, texture)
-            if not got or isSecret(value) or type(value) ~= "boolean" then return false end
-            state.originalDesaturated = value
+        local numeric = type(texture.GetDesaturation) == "function" and type(texture.SetDesaturation) == "function"
+        if not numeric and (type(texture.IsDesaturated) ~= "function" or type(texture.SetDesaturated) ~= "function") then return false end
+        if not observeHealthSaturation(texture) then return false end
+        if not material.desaturated then
+            local getter = numeric and texture.GetDesaturation or texture.IsDesaturated
+            local got, value = pcall(getter, texture)
+            if not got or isSecret(value) or type(value) ~= (numeric and "number" or "boolean") then return false end
+            material.originalDesaturated = value
         end
-        if not pcall(texture.SetDesaturated, texture, true) then return false end
-        state.desaturated = true
+        material.desaturated = true
+        if not writeHealthSaturation(texture, material, numeric and 1 or true) then return false end
     end
-    state.applied = true
+    state.tintOwned = true
     return true
+end
+end
+
+local function writeStatusBarColor(bar, r, g, b, a)
+    local result = bar:SetStatusBarColor(r, g, b, a)
+    if not isSecret(result) and result ~= false then
+        local state = nativeHealthStyle.states[bar]
+        -- Keep only public input. A same-value external write can request
+        -- this value even when the native getter rounded it.
+        if not isSecret(r) and not isSecret(g) and not isSecret(b) and not isSecret(a) then
+            if not state.appliedColor or r ~= state.tintR or g ~= state.tintG
+                or b ~= state.tintB or (a or 1) ~= state.tintA then
+                state.appliedColor = readableColor(bar, state.appliedColor)
+            end
+            state.tintR, state.tintG, state.tintB, state.tintA = r, g, b, a or 1
+        else
+            state.appliedColor = readableColor(bar, state.appliedColor)
+            state.tintR, state.tintG, state.tintB, state.tintA = nil, nil, nil, nil
+        end
+    end
+    return result
 end
 
 local function setHealthColor(bar, ...)
     healthColorWrites[bar] = true
     local ran, prepared = pcall(nativeHealthStyle.Prepare, bar)
-    local ok = ran and prepared == true and pcall(bar.SetStatusBarColor, bar, ...)
+    local accepted = false
+    if ran and prepared == true then
+        local ok, result = pcall(writeStatusBarColor, bar, ...)
+        accepted = ok and not isSecret(result) and result ~= false
+    end
     healthColorWrites[bar] = nil
-    if not ok then pcall(nativeHealthStyle.Restore, bar) end
-    return ok
+    if not accepted then pcall(nativeHealthStyle.Restore, bar) end
+    return accepted
 end
 
 local function setNativePlayerClassColor(bar, unit)
@@ -973,29 +1143,41 @@ function nativeHealthStyle.Install(bar, unit)
             if healthColorWrites[self] then return end
             local state = nativeHealthStyle.states[self]
             if not state then return end
-            -- Any external write supersedes the former native snapshot. If its
-            -- components are unreadable, leave that native owner in place on
-            -- fallback rather than restoring an obsolete readable color.
-            state.nativeColor = nil
-            if not isSecret(r) and not isSecret(g) and not isSecret(b) and not isSecret(a)
-                and type(r) == "number" and type(g) == "number" and type(b) == "number" then
-                state.nativeColor = {r, g, b, type(a) == "number" and a or 1}
+            -- The post-hook cannot see the setter result. Take the actual
+            -- displayed color, and yield ownership on unreadable writes.
+            if isSecret(r) or isSecret(g) or isSecret(b) or isSecret(a)
+                or type(r) ~= "number" or type(g) ~= "number" or type(b) ~= "number" then
+                state.tintOwned, state.nativeColor, state.appliedColor, state.pendingColor = false, nil, nil, nil
+                return
             end
+            nativeHealthStyle.ObserveColor(self, state, r, g, b, a or 1)
         end)
-        nativeHealthStyle.colorHooks[bar] = ok and result ~= false
+        nativeHealthStyle.colorHooks[bar] = ok and not isSecret(result) and result ~= false
     end
     local texture = currentHealthTexture(bar)
-    if not texture or nativeHealthStyle.textureHooks[texture] or type(texture.SetAtlas) ~= "function" then return end
-    local pending = false
-    nativeHealthStyle.textureHooks[texture] = pcall(hooksecurefunc, texture, "SetAtlas", function()
-        if healthColorWrites[bar] or pending or not C_Timer or type(C_Timer.After) ~= "function" then return end
-        pending = true
+    if not texture then return end
+    local observer = nativeHealthStyle.textureHooks[texture]
+    if observer then
+        observer.bar, observer.unit = bar, unit
+        return
+    end
+    if type(texture.SetAtlas) ~= "function" then return end
+    observer = {bar=bar, unit=unit}
+    local ok, result = pcall(hooksecurefunc, texture, "SetAtlas", function(changed, requested)
+        if healthColorWrites[observer.bar] then return end
+        local material = nativeHealthStyle.materials[changed]
+        if material and material.atlasOwned then
+            material.atlasOwned = nativeHealthStyle.OverrideStillApplied(changed, "GetAtlas", requested, material.colorable)
+        end
+        if observer.pending or not C_Timer or type(C_Timer.After) ~= "function" then return end
+        observer.pending = true
         local scheduled = pcall(C_Timer.After, 0, function()
-            pending = false
-            if currentHealthTexture(bar) == texture then applyHealthColor(bar, unit) end
+            observer.pending = false
+            if currentHealthTexture(observer.bar) == changed then applyHealthColor(observer.bar, observer.unit) end
         end)
-        if not scheduled then pending = false end
+        if not scheduled then observer.pending = false end
     end)
+    if ok and not isSecret(result) and result ~= false then nativeHealthStyle.textureHooks[texture] = observer end
 end
 
 local derivedColorHooks = setmetatable({}, { __mode = "k" })

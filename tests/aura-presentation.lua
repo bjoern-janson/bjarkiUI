@@ -80,8 +80,8 @@ local function scenario(cfg)
             local obj={}
             function obj:FormatRemainingDuration(formatter,modifier)
                 if cfg.formatFails then error('format inaccessible') end
-                equal(modifier,e.Enum.DurationTimeModifier.BaseTime,'native time modifier')
-                local n = generation / e.modRate
+                equal(modifier, e.Enum.DurationTimeModifier and e.Enum.DurationTimeModifier.RealTime or nil,'native time modifier')
+                local n = (modifier == nil or modifier == e.Enum.DurationTimeModifier.RealTime) and generation / e.modRate or generation
                 local s = render(formatter,n)
                 return cfg.plainText and s or secret(s)
             end
@@ -164,8 +164,17 @@ local function scenario(cfg)
     e.cvars=cvars; e.SlashCmdList={}
     e.DEFAULT_CHAT_FRAME={AddMessage=function(_,s)e.messages[#e.messages+1]=s end}
     e.C_Timer={After=function(_,fn)e.queued=fn end}
+    function e.fire(name,unit,...)
+        for _,f in ipairs(e.frames) do
+            local registered=f.events[name]
+            if f.scripts.OnEvent and (registered==true or
+                    type(registered)=='table' and (unit==registered[1] or unit==registered[2])) then
+                f.scripts.OnEvent(f,name,unit,...)
+            end
+        end
+    end
     function e.event(name,...)
-        for _,f in ipairs(e.frames) do if f.events[name] and f.scripts.OnEvent then f.scripts.OnEvent(f,name,...) end end
+        e.fire(name,...)
         local fn=e.queued;e.queued=nil;if fn then fn() end
     end
     function e.button(id,kind)
@@ -181,7 +190,10 @@ local function scenario(cfg)
         function b.Duration:SetFormattedText(fmt,n) self.text=string.format(fmt,n);self.writes=self.writes+1 end
         function b.Duration:SetText(s) self.text=unwrap(s);self.writes=self.writes+1 end
         function b:UpdateDuration(t)
-            self.Duration.text=nativeText(t);self.Duration.shown=e.durationShown~=false
+            -- Blizzard's native method hides Duration for nil time even when
+            -- buffDurations is enabled; a shared reader can change that flag.
+            self.Duration.shown=t~=nil and e.durationShown~=false
+            if self.Duration.shown then self.Duration.text=nativeText(t) end
         end
         function b:UpdateExpirationTime(info)
             if info.permanent then self.Duration.shown=false;self:SetScript('OnUpdate',nil)
@@ -204,6 +216,94 @@ local function scenario(cfg)
     return e
 end
 
+test('a burst of target changes discovers late target icons without touching player or focus rows',function()
+    local e=scenario()
+    local writes, targetScans, focusScans=0,0,0
+    for i=1,20 do
+        for _,row in ipairs({e.BuffFrame,e.DebuffFrame}) do
+            local b=row.auraFrames[i] or e.button(300+i,row==e.BuffFrame and 'Buff' or 'Debuff')
+            row.auraFrames[i]=b
+            local set=b.SetAlpha
+            function b:SetAlpha(a) writes=writes+1;set(self,a) end
+        end
+    end
+    function e.TargetFrame.Auras:GetChildren() targetScans=targetScans+1;return table.unpack(self.children) end
+    e.FocusFrame={Auras={GetChildren=function() focusScans=focusScans+1 end}}
+    e.load();e.combat=true;writes,targetScans,focusScans=0,0,0
+    for _=1,4 do e.fire('UNIT_AURA','target') end
+    local late=e.button(333);e.TargetFrame.Auras.children[2]=late
+    assert(e.queued,'deferred discovery');e.queued()
+    equal(writes,0,'unrelated player opacity writes');equal(focusScans,0,'unrelated focus scans')
+    equal(targetScans,1,'coalesced target discovery');equal(#late.Icon.masks,1,'late target discovered')
+end)
+test('compact aura rows follow their own auras and binding changes',function()
+    local e=scenario()
+    assert(loadfile(addon..'/UnitAuraStyling.lua','t',e))()
+    local rowByButton, calls = {}, {target=0,focus=0}
+    e.FocusFrame={}
+    for unit,name in pairs({target='TargetFrame',focus='FocusFrame'}) do
+        local prefix=name..'ToT'
+        e[name].totFrame={GetName=function()return prefix end}
+        for i=1,4 do
+            local button=e.button(200+i,'Debuff')
+            e[prefix..'Debuff'..i]=button;rowByButton[button]=unit
+        end
+    end
+    e.load()
+    local apply=e.bjarkiUIIconSkin.Apply
+    e.bjarkiUIIconSkin.Apply=function(button,...)
+        local unit=rowByButton[button]
+        if unit then calls[unit]=calls[unit]+1 end
+        return apply(button,...)
+    end
+    local function flush()
+        local callback=e.queued;e.queued=nil
+        if callback then callback() end
+    end
+    for _=1,4 do e.fire('UNIT_AURA','target');e.fire('UNIT_AURA','focus') end
+    equal(e.queued,nil,'native parent rows need no deferred discovery')
+    flush();equal(calls.target,0,'unchanged ToT');equal(calls.focus,0,'unchanged ToF')
+    e.fire('UNIT_AURA','targettarget');e.fire('UNIT_TARGET','target')
+    flush();equal(calls.target,4,'one ToT pass');equal(calls.focus,0)
+    e.event('UNIT_AURA','focustarget');equal(calls.focus,4)
+    e.fire('PLAYER_TARGET_CHANGED');e.fire('PLAYER_FOCUS_CHANGED');flush()
+    equal(calls.target,8,'parent rebind updates ToT');equal(calls.focus,8,'parent rebind updates ToF')
+end)
+test('player rediscovery only repairs opacity that changed',function()
+    local e=scenario();e.load();local writes=0
+    for _,b in ipairs({e.buff,e.debuff}) do
+        local set=b.SetAlpha
+        function b:SetAlpha(a) writes=writes+1;set(self,a) end
+    end
+    e.debuff.alpha=.3;e.event('UNIT_AURA','player')
+    equal(writes,1,'only faded row repaired');equal(e.debuff.alpha,1)
+    e.event('UNIT_AURA','vehicle');equal(writes,1,'settled opacity preserved')
+end)
+test('mixed unit events retain each pending aura and cast refresh',function()
+    local e=scenario();e.FocusFrame={Auras={}};e.load()
+    e.fire('UNIT_AURA','vehicle');e.fire('UNIT_AURA','target');e.fire('UNIT_AURA','focus')
+    e.fire('UNIT_SPELLCAST_START','focus')
+    local player=e.button(101);local target=e.button(200);local focus=e.button(201)
+    local cast=e.button(202);e.FocusFrameSpellBar=cast
+    e.BuffFrame.auraFrames[2]=player;e.TargetFrame.Auras.children[2]=target;e.FocusFrame.buffs={focus}
+    assert(e.queued);e.queued()
+    for _,b in ipairs({player,target,focus,cast}) do equal(#b.Icon.masks,1,'pending icon discovered') end
+    e.tick(player,3.7);equal(player.Duration.text,'3.7')
+end)
+test('regen prepares current safe owners and catches a button installed by a later event handler',function()
+    local e=scenario();e.load();local first=e.button(101);e.BuffFrame.auraFrames[2]=first
+    e.fire('PLAYER_REGEN_ENABLED');e.tick(first,3.7);equal(first.Duration.text,'3.7','safe immediate preparation')
+    local late=e.button(101);e.BuffFrame.auraFrames[3]=late
+    if e.queued then e.queued() end
+    e.tick(late,3.6);equal(late.Duration.text,'3.6','later regen handler allocation discovered')
+end)
+test('missing or rejected timer scheduling still discovers the affected unit',function()
+    for _,timer in ipairs({{}, {After=function() error('rejected timer') end}, {After=function() return false end}}) do
+        local e=scenario();e.load();e.C_Timer=timer
+        local b=e.button(202);e.TargetFrame.buffs={b};e.fire('UNIT_AURA','target')
+        equal(#b.Icon.masks,1)
+    end
+end)
 test('restricted short buff uses native duration formatting',function()
     local e=scenario();e.load();e.tick(e.buff,e.secret(2.83));equal(e.buff.Duration.text,'2.8')
 end)
@@ -326,7 +426,9 @@ test('vehicle-unit handoff cannot reuse player duration object',function()
     e.tick(e.buff,e.secret(4.24));equal(e.buff.Duration.text,'4.2');equal(e.requests,2)
 end)
 test('nil timeLeft does not revive cached duration text',function()
-    local e=scenario();e.load();e.tick(e.buff,e.secret(2.83));e.buff:UpdateDuration(nil);equal(e.buff.Duration.text,'')
+    local e=scenario();e.load();e.tick(e.buff,e.secret(2.83))
+    local writes=e.buff.Duration.writes;e.buff:UpdateDuration(nil)
+    equal(e.buff.Duration.shown,false);equal(e.buff.Duration.writes,writes,'no cached text sent to hidden stock')
 end)
 test('post-success access failure keeps current native text, not previous tenths',function()
     local cfg={};local e=scenario(cfg);e.load();e.tick(e.buff,e.secret(2.83));cfg.formatFails=true
@@ -494,10 +596,11 @@ test('retry window does not query on every rendered frame',function()
     equal(e.requests,1);cfg.getFails=false;e.now=.25;e.tick(e.buff,e.secret(2.83))
     equal(e.requests,2);equal(e.buff.Duration.text,'2.8')
 end)
-test('persistent failure is capped at three acquisitions per binding',function()
+test('persistent native failure is rate-limited but remains recoverable',function()
     local e=scenario({getFails=true});e.load()
     for i=0,100 do e.now=i/10;e.tick(e.buff,e.secret(2.83)) end
-    equal(e.requests,3);equal(e.buff.Duration.text,'2 s')
+    equal(e.requests,8,'bounded retry rate over ten native seconds')
+    equal(e.buff.Duration.text,'2 s')
 end)
 test('a replacement aura cannot inherit a failed aura retry',function()
     local cfg={getFails=true};local e=scenario(cfg);e.load();e.tick(e.buff,e.secret(2.83))
@@ -555,5 +658,930 @@ test('post-success transient failure recovers with current native duration',func
     equal(e.buff.Duration.text,'1.2');equal(e.requests,2)
 end)
 
+test('modified aura follows real-time duration rather than unmodified base seconds',function()
+    local e=scenario();e.modRate=2;e.load();e.tick(e.buff,e.secret(1.415))
+    equal(e.buff.Duration.text,'1.4','real-time accelerated aura')
+end)
+test('persistent failure uses progressively longer bounded retry intervals',function()
+    local cfg={getFails=true};local e=scenario(cfg);e.load()
+    for _,t in ipairs({0,.25,.5,.75,1.5}) do e.now=t;e.tick(e.buff,e.secret(2.83)) end
+    equal(e.requests,3,'three acquisition attempts through 1.5 seconds')
+    e.now=1.75;e.tick(e.buff,e.secret(2.83))
+    equal(e.requests,4,'fourth attempt after progressive delay')
+end)
+test('current aura refresh immediately resets an obsolete retry window',function()
+    local cfg={getFails=true};local e=scenario(cfg);e.load()
+    for _,t in ipairs({0,.25,.75}) do e.now=t;e.tick(e.buff,e.secret(2.83)) end
+    cfg.getFails=false;e.now=.8
+    e.buff:Update({auraInstanceID=101, auraType='Buff'})
+    e.tick(e.buff,e.secret(2.83))
+    equal(e.buff.Duration.text,'2.8','same binding refreshed without stale retry delay')
+end)
+test('public enchant expiration honors a readable time modifier',function()
+    local e=scenario();local enchant=e.button(nil,'TempEnchant')
+    enchant.buttonInfo={expirationTime=2.4,timeMod=2, auraType='TempEnchant'}
+    e.BuffFrame.auraFrames[#e.BuffFrame.auraFrames+1]=enchant
+    e.load();e.now=.4;e.tick(enchant,e.secret(1))
+    equal(enchant.Duration.text,'1.0','scaled public enchant duration')
+end)
+test('secret enchant rate does not cause duration arithmetic or guessed text',function()
+    local e=scenario();local enchant=e.button(nil,'TempEnchant')
+    enchant.buttonInfo={expirationTime=2.4,timeMod=e.secret(2), auraType='TempEnchant'}
+    e.BuffFrame.auraFrames[#e.BuffFrame.auraFrames+1]=enchant
+    e.load();e.now=.4;e.tick(enchant,e.secret(1))
+    equal(enchant.Duration.text,'1 s','unsafe time modifier preserves native text')
+end)
+
+test('slowed aura uses the same real-time modifier as native seconds',function()
+    local e=scenario();e.modRate=.5;e.load();e.tick(e.buff,e.secret(5.66))
+    equal(e.buff.Duration.text,'5.7','slowed aura display')
+end)
+test('RealTime uses the documented default when the enum is unavailable',function()
+    local e=scenario();e.modRate=2;e.Enum.DurationTimeModifier=nil;e.load()
+    e.tick(e.buff,e.secret(1.415))
+    equal(e.buff.Duration.text,'1.4','default modifier')
+end)
+test('persistent API outage eventually heals without extra events or polling',function()
+    local cfg={getFails=true};local e=scenario(cfg);e.load()
+    for i=0,30 do e.now=i/10;e.tick(e.buff,e.secret(2.83)) end
+    cfg.getFails=false;e.now=3.8;e.tick(e.buff,e.secret(2.83))
+    equal(e.buff.Duration.text,'2.8','late recovery')
+end)
+
+test('zero native enchant time modifier leaves public expiration unscaled',function()
+    local e=scenario();local enchant=e.button(nil,'TempEnchant')
+    enchant.buttonInfo={expirationTime=2.4,timeMod=0,auraType='TempEnchant'}
+    e.BuffFrame.auraFrames[#e.BuffFrame.auraFrames+1]=enchant
+    e.load();e.now=.4;e.tick(enchant,e.secret(2))
+    equal(enchant.Duration.text,'2.0','zero modifier follows native calculation')
+end)
+
+test('read-only diagnostics distinguish live retry from unsupported private aura',function()
+    local cfg={getFails=true};local e=scenario(cfg);e.load()
+    e.tick(e.buff,e.secret(2.83));e.SlashCmdList.BJARKIUITIMERS()
+    local pending=e.messages[#e.messages]
+    assert(pending:find('retry-pending=1',1,true),pending)
+    assert(pending:find('fallback-buttons=1',1,true),pending)
+    assert(not pending:find('2.83',1,true),pending)
+    cfg.getFails=false;e.now=.25;e.tick(e.buff,e.secret(2.83))
+    e.SlashCmdList.BJARKIUITIMERS()
+    local healed=e.messages[#e.messages]
+    assert(healed:find('retry-pending=0',1,true),healed)
+    assert(healed:find('fallback-buttons=0',1,true),healed)
+end)
+
+test('stable buff cells take over only after native text was cleared',function()
+    local e=scenario();local seen={prepared=0,updated=0}
+    e.bjarkiUINativeDigitCells={
+        PrepareBuff=function(label) seen.prepared=seen.prepared+1;return true end,
+        ShowBuff=function(label,deci)
+            equal(label.text,'','original text must be blank before showing split glyphs')
+            seen.updated=seen.updated+1;equal(deci,87);return true
+        end,
+        ClearBuff=function() seen.cleared=true end,
+    }
+    e.load();assert(seen.prepared>=1,'no native buff preparation')
+    e.tick(e.buff,8.7)
+    equal(e.buff.Duration.text,'','no double countdown text')
+    equal(seen.updated,1,'readable buff moved to digit cells')
+    e.tick(e.buff,10)
+    equal(e.buff.Duration.text,'10 s','native text restored above ten')
+    equal(seen.cleared,true,'old split digits cleared')
+end)
+test('restricted buff falls back to native formatting, without split overlay',function()
+    local e=scenario();local cleared=0;local shown=0
+    e.bjarkiUINativeDigitCells={
+        PrepareBuff=function() return true end,
+        ShowBuff=function()shown=shown+1;return true end,
+        ClearBuff=function()cleared=cleared+1 end,
+    }
+    e.load();e.tick(e.buff,e.secret(2.83))
+    equal(e.buff.Duration.text,'2.8','native restricted duration retained')
+    equal(shown,0,'no guessed split digits from secret duration')
+    assert(cleared>0,'stale split glyphs not cleared')
+end)
+
+test('recycled permanent aura clears the independent glyphs without another timer tick',function()
+    local e=scenario()
+    local glyph
+    e.bjarkiUINativeDigitCells={
+        ShowBuff=function(_,deci) glyph=deci; return true end,
+        ClearBuff=function() glyph=nil end,
+    }
+    e.load()
+    e.tick(e.buff,3.7)
+    equal(glyph,37)
+    e.buff:Update({permanent=true,auraType='Buff'})
+    equal(e.buff.scripts.OnUpdate,nil)
+    equal(glyph,nil,'old glyphs survive with no remaining timer writer')
+    e.buff:Update({auraInstanceID=101,auraType='Buff'})
+    e.tick(e.buff,1.2)
+    equal(glyph,12,'recycled timer resumes')
+end)
+local function splitScene()
+    local e=scenario()
+    local visible={}
+    e.bjarkiUINativeDigitCells={
+        ShowBuff=function(label,deci)visible[label]=deci;return true end,
+        ClearBuff=function(label)if label then visible[label]=nil end;return true end,
+    }
+    function e.buff:UpdateAuraType(kind) self.auraType=kind end
+    e.load();e.tick(e.buff,3.7)
+    equal(visible[e.buff.Duration],37)
+    return e,visible
+end
+test('native Edit Mode preview retires digits before its own duration write',function()
+    local e,visible=splitScene()
+    e.buff.isExample=true
+    e.buff:UpdateAuraType('Buff')
+    e.buff.Duration:SetFormattedText('%d s',60)
+    equal(visible[e.buff.Duration],nil)
+    equal(e.buff.Duration.text,'60 s')
+    e.buff.isExample=false;e.tick(e.buff,4.2)
+    equal(visible[e.buff.Duration],42)
+end)
+test('replaced duration releases old digits on a permanent assignment',function()
+    local e,visible=splitScene()
+    local original=e.buff.Duration
+    e.buff.Duration=e.button(456).Duration
+    e.buff:Update({permanent=true,auraType='Buff'})
+    equal(visible[original],nil);equal(e.buff.Duration.shown,false)
+    e.buff:Update({auraInstanceID=456,auraType='Buff'});e.tick(e.buff,4.2)
+    equal(visible[e.buff.Duration],42)
+end)
+test('replaced native label and forbidden current label release the last positive',function()
+    local e,visible=splitScene()
+    local previous=e.buff.Duration;e.buff.Duration=e.button(456).Duration
+    e.tick(e.buff,6.4)
+    equal(visible[previous],nil);equal(visible[e.buff.Duration],64)
+    function e.buff.Duration:IsForbidden()return true end
+    e.tick(e.buff,5.4)
+    equal(visible[e.buff.Duration],nil)
+end)
+test('denied native clear leaves just the native presenter',function()
+    local e,visible=splitScene()
+    function e.buff.Duration:SetText()error('native clear denied')end
+    e.tick(e.buff,4.2)
+    equal(visible[e.buff.Duration],nil);equal(e.buff.Duration.text,'4.2')
+end)
+test('a current label field restriction cannot borrow a stale lowercase alias',function()
+    local e,visible=splitScene()
+    local previous=e.buff.Duration
+    e.buff.duration=previous;e.buff.Duration=e.secret({})
+    -- Discover the changed binding without giving the fixture a protected
+    -- text sink to write from its stand-in native duration method.
+    e.event('EDIT_MODE_LAYOUTS_UPDATED')
+    equal(visible[previous],nil)
+end)
+test('a failed previous-label cleanup delays takeover until it can be concealed',function()
+    local e,visible=splitScene()
+    local previous=e.buff.Duration;e.buff.Duration=e.button(456).Duration
+    local normalClear=e.bjarkiUINativeDigitCells.ClearBuff
+    e.bjarkiUINativeDigitCells.ClearBuff=function(label)
+        if label==previous then return false end
+        return normalClear(label)
+    end
+    e.tick(e.buff,4.2)
+    equal(visible[e.buff.Duration],nil)
+    e.bjarkiUINativeDigitCells.ClearBuff=normalClear;e.tick(e.buff,4.1)
+    equal(visible[previous],nil);equal(visible[e.buff.Duration],41)
+end)
+local function realGlyphScene(initialFont)
+    local e=scenario();local a,b=e.buff,e.debuff
+    local all={}
+    local function equip(font,parent)
+        font.parent=parent
+        function font:GetParent()return self.parent end
+        function font:GetText()return self.text end
+        function font:SetParent(owner)self.parent=owner end
+        function font:GetFont()self.fontReads=(self.fontReads or 0)+1;return 'fixture.ttf',self.size or 12,'' end
+        function font:SetFontObject(name)self.size=name=='Small2' and 11 or 15 end
+        function font:GetVertexColor()return 1,1,1,1 end
+        function font:SetVertexColor()end
+    end
+    local function create(owner)
+        local f={text='',shown=true}
+        equip(f,owner);all[#all+1]=f
+        function f:SetText(value)
+            if self.denyClear and value=='' then error('clear denied') end
+            self.text=value
+        end
+        function f:GetStringWidth()return self.size*.50*#self.text end
+        function f:Hide()if self.denyClear then error('hide denied') end;self.shown=false end
+        function f:Show()self.shown=true end
+        function f:SetFont(_,size)self.size=size end
+        function f:SetSize(w,h)self.w,self.h=w,h end
+        function f:SetPoint(_,anchor,_,x,y)self.anchor,self.x,self.y=anchor,x,y end
+        f.ClearAllPoints=function()end;f.SetJustifyH=f.ClearAllPoints
+        return f
+    end
+    local function visible(owner)
+        local s=''
+        for _,f in ipairs(all) do if f.parent==owner and f.shown then s=s..f.text end end
+        return s
+    end
+    equip(a.Duration,a);equip(b.Duration,b)
+    if initialFont then a.Duration:SetFontObject(initialFont) end
+    a.CreateFontString=create;b.CreateFontString=create;e.UIParent={CreateFontString=create}
+    assert(loadfile(addon..'/NativeDigitCells.lua','t',e))();e.load()
+    return e,a,b,all,visible
+end
+test('former button cleanup cannot clear digits after a real cross-button transfer',function()
+    local e,a,b,all,visible=realGlyphScene()
+    e.tick(a,3.7);equal(visible(a),'3.7')
+    local x,y=a.Duration,b.Duration
+    a.Duration=y;y.parent=a;b.Duration=x;x.parent=b
+    local first
+    for _,f in ipairs(all) do if f.parent==a then first=f;break end end
+    first.denyClear=true;a:Update({permanent=true})
+    first.denyClear=false
+    assert(e.bjarkiUINativeDigitCells.PrepareBuff(x))
+    e.tick(b,4.2);equal(visible(b),'4.2')
+    a:Update({permanent=true}) -- retry A's old, previously rejected cleanup
+    equal(visible(b),'4.2','former owner cannot clear newly presented digits')
+    equal(b.Duration.text,'','new owner still has exactly one presenter')
+end)
+for _,operation in ipairs({'show','clear'}) do
+    for _,timing in ipairs({'before','after'}) do
+        test('a transferred buff wins during child '..operation..' '..timing..' its native write',function()
+            local e,a,b,all,visible=realGlyphScene()
+            e.tick(a,3.7)
+            local child
+            for _,f in ipairs(all) do if f.parent==a then child=f;break end end
+            local write=child.SetText
+            child.SetText=function(self,value)
+                child.SetText=write
+                if timing=='after' then write(self,value) end
+                local x,y=a.Duration,b.Duration
+                a.Duration=y;y.parent=a;b.Duration=x;x.parent=b
+                assert(e.bjarkiUINativeDigitCells.PrepareBuff(x))
+                x.shown=true;e.tick(b,4.2)
+                if timing=='before' then write(self,value) end
+            end
+            if operation=='show' then e.tick(a,5.9) else a:Update({permanent=true}) end
+            equal(visible(b),'4.2','newest fixed presenter after older setter returns')
+            equal(b.Duration.text,'','only the new presenter is visible')
+            e.tick(b,4.2);equal(visible(b),'4.2','same cached tenth remains accurate')
+            e.tick(b,4.1);equal(visible(b),'4.1','ordinary next tenth remains functional')
+        end)
+    end
+end
+test('late native locale font updates refresh existing buff geometry',function()
+    local e,a,_,all,visible=realGlyphScene('Small2')
+    local cell
+    for _,f in ipairs(all) do if f.parent==a then cell=f;break end end
+    local count=#all
+    local oldX=cell.x
+    -- Forever zhTW calls UpdateDuration first, then selects the font object.
+    e.tick(a,4.2);a.Duration:SetFontObject('NormalSmall')
+    equal(visible(a),'4.2');equal(cell.size,15,'current native font height')
+    equal(cell.h,19);assert(cell.x<oldX,'digit spacing increases with the new font')
+    equal(#all,count,'geometry updates reuse the same physical regions')
+    local reads=a.Duration.fontReads
+    for i=1,5 do e.tick(a,4.2);a.Duration:SetFontObject('NormalSmall') end
+    equal(a.Duration.fontReads,reads,'stable native setter and repeated tenth do not poll the font')
+    e.InCombatLockdown=function()return true end
+    a.Duration:SetFontObject('Small2')
+    equal(visible(a),'','a changed font defers layout in combat');equal(a.Duration.text,'4.2')
+    e.tick(a,4.1);equal(a.Duration.text,'4.1');equal(visible(a),'')
+    e.InCombatLockdown=function()return false end
+    e.event('PLAYER_REGEN_ENABLED');e.tick(a,4.0)
+    equal(visible(a),'4.0');equal(cell.size,11);equal(cell.x,oldX);equal(#all,count)
+end)
+test('a transient font denial at takeover keeps current native text and retries safely',function()
+    local e,a,_,all,visible=realGlyphScene('Small2')
+    local font=a.Duration.GetFont
+    a.Duration.GetFont=function()error('font temporarily unavailable')end
+    e.tick(a,4.2)
+    equal(visible(a),'');equal(a.Duration.text,'4.2','native return after font denial')
+    a.Duration.GetFont=font;e.event('UI_SCALE_CHANGED');e.tick(a,4.1)
+    equal(visible(a),'4.1');equal(a.Duration.text,'')
+end)
+test('a newer permanent assignment wins during a transferred child write',function()
+    local e,a,b,all,visible=realGlyphScene()
+    e.tick(a,3.7)
+    local first
+    for _,f in ipairs(all) do if f.parent==a then first=f;break end end
+    local write=first.SetText
+    first.SetText=function(self,value)
+        first.SetText=write
+        local x,y=a.Duration,b.Duration
+        a.Duration=y;y.parent=a;b.Duration=x;x.parent=b
+        assert(e.bjarkiUINativeDigitCells.PrepareBuff(x))
+        e.tick(b,4.2);b:Update({permanent=true})
+        write(self,value)
+    end
+    e.tick(a,5.9)
+    equal(visible(b),'');equal(b.Duration.shown,false)
+end)
+for _,final in ipairs({'number','clear'}) do
+    test('persistent nested child writes have bounded stack and retain final '..final,function()
+        local e,a,_,all,visible=realGlyphScene()
+        e.tick(a,3.7)
+        local child
+        for _,f in ipairs(all) do if f.parent==a then child=f;break end end
+        local write=child.SetText
+        local depth,maxDepth,calls=0,0,0
+        child.SetText=function(self,value)
+            calls=calls+1
+            depth=depth+1;maxDepth=math.max(maxDepth,depth)
+            if calls<=12 then
+                if final=='clear' and calls>=2 then a:Update({permanent=true})
+                else e.tick(a,4.2) end
+            end
+            write(self,value);depth=depth-1
+        end
+        e.tick(a,5.9)
+        equal(maxDepth,1,'owned child writers are serialized')
+        assert(calls<10,'persistent writes yield to stock within a bounded number of calls')
+        if final=='clear' then equal(visible(a),'');equal(a.Duration.shown,false)
+        else equal(visible(a)..a.Duration.text,'4.2','single current split or native presenter') end
+    end)
+end
+test('an explicit false child write or clear defers to one usable presenter',function()
+    local e,a,_,all,visible=realGlyphScene()
+    e.tick(a,3.7)
+    local child
+    for _,f in ipairs(all) do if f.parent==a then child=f;break end end
+    local write=child.SetText
+    child.SetText=function(self,value)if value=='4' or value=='' then return false end;return write(self,value) end
+    e.tick(a,4.2)
+    equal(visible(a),'');equal(a.Duration.text,'4.2')
+    child.SetText=write;e.tick(a,4.1)
+    equal(visible(a),'4.1');equal(a.Duration.text,'')
+end)
+test('an explicit false native formatter after glyph failure still restores current public text',function()
+    local e,a,_,all,visible=realGlyphScene()
+    e.tick(a,3.7)
+    local native=a.Duration.SetFormattedText
+    function a.Duration:SetFormattedText(fmt,...)
+        if fmt=='%.1f' then return false end
+        return native(self,fmt,...)
+    end
+    for _,f in ipairs(all) do if f.parent==a then
+        local put=f.SetText
+        f.SetText=function(self,v)if v=='4' then return false end;return put(self,v) end
+        break
+    end end
+    e.tick(a,4.2);equal(visible(a),'');equal(a.Duration.text,'4.2')
+end)
+test('a rejected font on one existing child revokes partial geometry until a safe retry',function()
+    local e,a,_,all,visible=realGlyphScene('Small2')
+    e.tick(a,4.2)
+    local child
+    for _,f in ipairs(all) do if f.parent==a then child=f;break end end
+    local set=child.SetFont
+    child.SetFont=function()return false end
+    a.Duration:SetFontObject('NormalSmall')
+    equal(visible(a),'');equal(a.Duration.text,'4.2')
+    child.SetFont=set;e.event('PLAYER_REGEN_ENABLED');e.tick(a,4.1)
+    equal(visible(a),'4.1');equal(child.size,15)
+end)
+for _,operation in ipairs({'update','raw-refusal','long','opaque','clear'}) do
+    for _,order in ipairs({'before','after'}) do
+        test('the final stock formatter honors a newer '..operation..' '..order..' its write',function()
+            local e,a,_,all,visible=realGlyphScene()
+            e.tick(a,3.7)
+            if operation=='raw-refusal' then
+                local put=a.Duration.SetText
+                a.Duration.SetText=function(self,text)if text=='6.4' then return false end;return put(self,text) end
+            end
+            local child
+            for _,f in ipairs(all) do if f.parent==a then child=f;break end end
+            local glyph=child.SetText;local changes=0
+            child.SetText=function(self,text)
+                if text~='' and changes<3 then changes=changes+1;e.tick(a,4.2) end
+                return glyph(self,text)
+            end
+            local stock=a.Duration.SetFormattedText;local fired=false
+            a.Duration.SetFormattedText=function(self,fmt,...)
+                if fmt~='%.1f' or fired then return stock(self,fmt,...) end
+                fired=true
+                if order=='after' then stock(self,fmt,...) end
+                if operation=='update' or operation=='raw-refusal' then e.tick(a,6.4)
+                elseif operation=='long' then e.tick(a,17)
+                elseif operation=='opaque' then e.tick(a,e.secret(2.83))
+                else a:Update({permanent=true}) end
+                if order=='before' then stock(self,fmt,...) end
+            end
+            e.tick(a,5.9)
+            equal(changes,3);equal(fired,true)
+            local native=a.Duration.shown and a.Duration.text or ''
+            equal(visible(a)..native,({update='6.4',['raw-refusal']='6.4',long='17 s',opaque='2.8',clear=''})[operation])
+        end)
+    end
+end
+for _,outside in ipairs({true,false}) do
+    for _,order in ipairs({'incoming-first','old-alias-first'}) do
+        test('native duration reparent '..order..' out of combat '..tostring(outside),function()
+            local e,a,b,_,visible=realGlyphScene()
+            e.tick(a,3.7)
+            local x=a.Duration
+            e.combat=not outside
+            b.Duration=x;x:SetParent(b) -- A temporarily retains the same region field.
+            equal(visible(a),'','release old siblings at the physical ownership change')
+            if order=='old-alias-first' then e.tick(a,6.4) end
+            e.tick(b,4.2)
+            equal(visible(b)..x.text,'4.2','incoming timer takes over before a layout scan')
+            e.tick(a,6.4)
+            equal(visible(a),'');equal(visible(b)..x.text,'4.2','stock old-alias write cannot cover B')
+            e.combat=false;e.event('PLAYER_REGEN_ENABLED');e.tick(b,4.1)
+            equal(visible(b),'4.1');equal(x.text,'')
+        end)
+    end
+end
+test('one inaccessible native parent never blanks the first readable tenth',function()
+    local e,a,_,_,visible=realGlyphScene()
+    local parent=a.Duration.GetParent;local reads=0
+    a.Duration.GetParent=function(self)
+        reads=reads+1;if reads==1 then error('temporarily unavailable parent') end
+        return parent(self)
+    end
+    e.tick(a,4.2);equal(visible(a)..a.Duration.text,'4.2')
+    e.tick(a,4.1);equal(visible(a),'4.1');equal(a.Duration.text,'')
+    local settled=reads
+    e.tick(a,4.1);e.tick(a,4.0);e.tick(a,3.9)
+    equal(reads,settled,'settled timers do not poll the parent')
+end)
+for _,order in ipairs({'old-first','inside-clear','new-first'}) do
+    test('implicit transfer during first buff presentation honors '..order,function()
+        local e,a,b,_,visible=realGlyphScene()
+        local x,y=a.Duration,b.Duration;e.tick(b,1.3)
+        local function transfer() b.Duration=x;x.parent=b end
+        if order=='inside-clear' then
+            local clear=x.SetText
+            x.SetText=function(self,text) x.SetText=clear;clear(self,text);transfer() end
+        else
+            transfer()
+            if order=='new-first' then e.tick(b,4.2) end
+        end
+        e.tick(a,5.9)
+        equal(visible(a),'','former button cannot retain the clock')
+        equal(visible(b)..x.text,order=='new-first' and '4.2' or '',
+              'old native write and replaced Y lease are both reconciled')
+        e.tick(b,4.1);equal(visible(b)..x.text,'4.1')
+    end)
+end
+for _,denial in ipairs({'once','sustained'}) do
+    test('late zhTW native font ownership refusal preserves the visible tenth '..denial,function()
+        local e,a,_,all,visible=realGlyphScene('Small2')
+        local x=a.Duration;local get=x.GetParent
+        e.tick(a,4.2)
+        local refused=0
+        x.GetParent=function(self)
+            refused=refused+1
+            if denial=='sustained' or refused==1 then error('late font parent unavailable') end
+            return get(self)
+        end
+        x:SetFontObject('NormalSmall') -- Native OnUpdate applies its locale font after UpdateDuration.
+        equal(visible(a)..x.text,'4.2','a late font callback cannot blank the completed native update')
+        e.tick(a,4.1)
+        if denial=='sustained' then equal(visible(a),'');equal(x.text,'4 s')
+        else equal(visible(a)..x.text,'4.1') end
+        x.GetParent=get;e.now=1;e.tick(a,3.9);equal(visible(a)..x.text,'3.9')
+    end)
+end
+test('displaced native clear preserves already committed clocks on both owners',function()
+    local e,a,b,_,visible=realGlyphScene()
+    local x,y=a.Duration,b.Duration;local put=x.SetText
+    x.SetText=function(self,text)
+        x.SetText=put;put(self,text)
+        b.Duration=x;x.parent=b;a.Duration=y;y.parent=a
+        e.tick(a,2.3);e.tick(b,4.2)
+    end
+    e.tick(a,5.9)
+    equal(visible(a)..y.text,'2.3','new A lease survives completion of its old callback')
+    equal(visible(b)..x.text,'4.2','new B lease survives completion of A callback')
+end)
+test('an unreadable post-clear parent returns the opaque stock text unchanged',function()
+    local e,a,_,_,visible=realGlyphScene()
+    local x=a.Duration;local raw=x.SetText
+    x.GetText=function(self)return self.text=='' and '' or e.secret(self.text) end
+    x.SetText=function(self,text)
+        if type(text)=='string' and text=='' then
+            x.GetParent=function()error('parent became unavailable as stock cleared')end
+        end
+        return raw(self,text)
+    end
+    e.tick(a,4.2);equal(visible(a),'');equal(x.text,'4 s','opaque native string can be restored even without geometry')
+end)
+test('a denied original-text receipt keeps the native decimal without retrying every frame',function()
+    local e,a,_,_,visible=realGlyphScene()
+    local x=a.Duration;local get=x.GetText;local reads=0
+    x.GetText=function()reads=reads+1;error('original text unavailable')end
+    for _=1,20 do e.tick(a,4.2) end
+    equal(visible(a),'');equal(x.text,'4.2');equal(reads,1,'one refusal per displayed tenth')
+    x.GetText=get;e.tick(a,4.1);equal(visible(a),'4.1');equal(x.text,'')
+end)
+test('opaque enchant samples with a public expiry keep the same fixed-digit lease',function()
+    local e,a,_,_,visible=realGlyphScene()
+    a.auraType='TempEnchant';a.buttonInfo.expirationTime=4.2;a.buttonInfo.timeMod=1
+    local x=a.Duration;local get=x.GetParent;local reads=0
+    x.GetParent=function(self)reads=reads+1;return get(self)end
+    for i=1,6 do
+        e.now=i/1000;e.tick(a,e.secret(4.2))
+        equal(visible(a),'4.2');equal(x.text,'')
+    end
+    assert(reads<=2,'same rounded enchant does not continually reacquire its clock')
+    a.buttonInfo.timeMod=e.secret(2);e.tick(a,e.secret(4.2))
+    equal(visible(a),'');equal(x.text,'4 s','unreadable modifier yields to stock')
+    a.buttonInfo.timeMod=1;e.tick(a,e.secret(4.2));equal(visible(a),'4.2')
+    a.buttonInfo.expirationTime=270;e.tick(a,e.secret(270));equal(visible(a),'');equal(x.text,'5 m')
+end)
+for _,denial in ipairs({'once','sustained'}) do
+    test('combat locale font change cannot blank an already displayed number after '..denial..' restoration denial',function()
+        local e,a,_,_,visible=realGlyphScene('Small2')
+        local x=a.Duration;local get=x.GetParent
+        e.tick(a,4.2);e.combat=true
+        local n=0
+        x.GetParent=function(self)
+            n=n+1;if n==2 or (denial=='sustained' and n>=2) then error('late stock restoration parent') end
+            return get(self)
+        end
+        x:SetFontObject('NormalSmall');equal(visible(a)..x.text,'4.2')
+        e.tick(a,4.1)
+        if denial=='once' then equal(visible(a)..x.text,'4.1') else equal(visible(a),'');assert(x.text~='') end
+        x.GetParent=get;e.combat=false;e.event('PLAYER_REGEN_ENABLED');e.tick(a,3.9)
+        equal(visible(a),'3.9');equal(x.text,'')
+    end)
+end
+for _,order in ipairs({'before','after'}) do
+    for _,nextTime in ipairs({6.4,14}) do
+        test('combat font restoration honors a '..nextTime..'s update '..order..' the stock write',function()
+            local e,a,_,_,visible=realGlyphScene('Small2')
+            local x=a.Duration;local put=x.SetFormattedText
+            e.tick(a,4.2);e.combat=true
+            x.SetFormattedText=function(self,format,value)
+                self.SetFormattedText=put
+                if order=='after' then put(self,format,value) end
+                e.tick(a,nextTime)
+                if order=='before' then put(self,format,value) end
+            end
+            x:SetFontObject('NormalSmall')
+            equal(visible(a)..x.text,nextTime==14 and '14 s' or '6.4','exactly one current presenter')
+        end)
+    end
+    test('a permanent native assignment '..order..' the first stock clear cancels pending glyphs',function()
+        local e,a,_,_,visible=realGlyphScene()
+        local x=a.Duration;local put=x.SetText
+        x.SetText=function(self,t)
+            x.SetText=put
+            if order=='after' then put(self,t) end
+            a:Update({permanent=true})
+            if order=='before' then put(self,t) end
+        end
+        e.tick(a,4.2);equal(x.shown,false);equal(a.scripts.OnUpdate,nil)
+        equal(visible(a),'','late return cannot publish the expired 4.2')
+        e.event('EDIT_MODE_LAYOUTS_UPDATED');equal(visible(a),'')
+        a:Update({auraInstanceID=102});e.tick(a,2.3);equal(visible(a),'2.3')
+    end)
+end
+test('late unknown font ownership is retired by a real move before another timer update',function()
+    local e,a,b,_,visible=realGlyphScene('Small2')
+    local x=a.Duration;local parent=x.GetParent
+    e.tick(a,4.2);x.GetParent=function()error('no parent')end;x:SetFontObject('NormalSmall')
+    equal(visible(a)..x.text,'4.2')
+    b.Duration=x;x:SetParent(b);equal(visible(a),'','old siblings retire at the actual move')
+    x.GetParent=parent;e.now=1;e.tick(b,3.7);equal(visible(b)..x.text,'3.7')
+end)
+test('inactive split timers do not poll a previously denied parent or clock',function()
+    for _,case in ipairs({'long','hidden-short','secret','short'}) do
+        local e,a,_,_,visible=realGlyphScene()
+        local x=a.Duration;local denied=true;local get=x.GetParent
+        local parents,clocks=0,0
+        x.GetParent=function(self)parents=parents+1;if denied then error('unavailable') end;return get(self) end
+        local time=e.GetTime;e.GetTime=function()clocks=clocks+1;return time() end
+        e.tick(a,4.2);parents,clocks=0,0
+        e.durationShown=case~='hidden-short'
+        for i=1,120 do
+            e.now=i/60
+            e.tick(a,case=='long' and 1800 or case=='secret' and e.secret(2.83) or 4.1)
+        end
+        if case=='short' or case=='secret' then assert(parents>0 and parents<=9,'visible decimal timers have a bounded recovery path')
+        else equal(parents,0,case..' parent reads');equal(clocks,0,case..' clock reads') end
+        denied=false;e.durationShown=true;e.now=3;e.tick(a,3.8)
+        equal(visible(a)..x.text,'3.8','the next public short sample can recover')
+    end
+end)
+test('native decimal formatting recovers on a visible opaque timer after parent access returns',function()
+    local e,a,_,_,visible=realGlyphScene()
+    local x=a.Duration;local get=x.GetParent
+    x.GetParent=function()error('temporarily unavailable') end
+    e.tick(a,4.2)
+    x.GetParent=get;e.now=1
+    e.tick(a,e.secret(2.83))
+    equal(visible(a),'','opaque value stays on native text')
+    equal(x.text,'2.8','native formatter recovers without a public time sample')
+end)
+test('persistent parent denial leaves stock intact and rate-limits recovery',function()
+    local e,a,b,_,visible=realGlyphScene()
+    local x=a.Duration;local parent=x.GetParent;local denied=true;local reads=0
+    x.GetParent=function(self)reads=reads+1;if denied then error('denied') end;return parent(self) end
+    e.tick(a,4.2);equal(visible(a),'');equal(x.text,'4 s','untouched original during uncertainty')
+    for _=1,20 do e.tick(a,4.2) end
+    assert(reads<=3,'denied parent was polled on every native tick')
+    -- An actual new owner arrives during denial. A's earlier identity cannot authorize a write.
+    b.Duration=x;x:SetParent(b);e.tick(a,3.7);equal(visible(a),'');equal(x.text,'3 s')
+    denied=false;e.now=1;e.tick(b,4.1);equal(visible(b),'4.1');equal(x.text,'')
+    e.tick(a,3.6);equal(visible(b),'4.1');equal(x.text,'')
+end)
+for _,sample in ipairs({'none','public','restricted'}) do
+    test('a physical label returns to a previous owner with a new '..sample..' sample',function()
+        local e,a,b,_,visible=realGlyphScene()
+        local x,y=a.Duration,b.Duration
+        e.tick(a,3.7);b.Duration=x;x:SetParent(b);e.tick(b,4.2)
+        b.Duration=y;x:SetParent(a);e.tick(a,7.4);e.tick(b,1.3)
+        b.Duration=x;x:SetParent(b)
+        if sample=='public' then e.tick(b,1.2) end
+        if sample=='restricted' then e.tick(b,e.secret(7.21)) end
+        e.tick(a,6.4)
+        equal(visible(a),'')
+        equal(visible(b)..x.text,({none='',public='1.2',restricted='7.2'})[sample])
+        e.tick(b,1.1);equal(visible(b),'1.1');equal(x.text,'')
+    end)
+end
+test('incoming owner discovers an implicit reparent before another layout event',function()
+    local e,a,b,_,visible=realGlyphScene()
+    e.tick(a,3.7)
+    local x,y=a.Duration,b.Duration
+    a.Duration=y;y.parent=a;b.Duration=x;x.parent=b
+    e.tick(b,4.2)
+    equal(visible(a),'');equal(visible(b),'4.2');equal(x.text,'')
+end)
+test('a foreign reader cannot erase a native timer on its initial physical owner',function()
+    local e,a,b,_,visible=realGlyphScene();local x=a.Duration
+    e.tick(a,14);b.Duration=x;e.tick(b,6.3);equal(visible(a)..x.text,'14 s')
+    e.tick(a,e.secret(4.2));e.tick(b,6.2);equal(visible(a)..x.text,'2.8')
+    a:Update({permanent=true});e.tick(b,5.9);equal(visible(a)..(x.shown and x.text or ''),'')
+end)
+test('a shared owner can reproduce secret stock output without a public aura identity',function()
+    local e,a,b,_,visible=realGlyphScene();local x=a.Duration
+    a:Update({auraInstanceID=e.secret(102)});e.tick(a,e.secret(15.2))
+    equal(x.text,'15 s');b.Duration=x;e.tick(b,6.3)
+    equal(visible(a)..x.text,'15 s','stale reader cannot substitute its own stock text')
+end)
+for _,sample in ipairs({'long','opaque','short'}) do
+    test('a nil-time foreign reader cannot hide an enabled '..sample..' clock',function()
+        local e,a,b,_,visible=realGlyphScene();local x=a.Duration
+        e.tick(a,sample=='long' and 14 or (sample=='short' and 4.2 or e.secret(15.2)))
+        b.Duration=x;b:UpdateDuration(nil)
+        equal(x.shown,true);equal(visible(a)..x.text,({long='14 s',opaque='2.8',short='4.2'})[sample])
+        e.durationShown=false;b:UpdateDuration(nil);equal(x.shown,false)
+    end)
+end
+for _,nextSample in ipairs({'public-stock','fixed','opaque','opaque-denied','permanent'}) do
+    test('an old denied opaque replay yields to a newer '..nextSample..' event',function()
+        local e,a,b,_,visible=realGlyphScene();local x=a.Duration
+        a:Update({auraInstanceID=e.secret(102)});e.tick(a,e.secret(15.2));b.Duration=x
+        local real=a.UpdateDuration
+        a.UpdateDuration=function(self,t)
+            self.UpdateDuration=real
+            if nextSample=='opaque-denied' then x.GetText=function()error('new receipt denied')end end
+            if nextSample=='permanent' then self:Update({permanent=true})
+            else real(self,nextSample=='public-stock' and 17 or (nextSample=='fixed' and 5.4 or e.secret(12))) end
+            error('older secret replay rejected after a new event')
+        end
+        e.tick(b,6.3)
+        equal(visible(a)..(x.shown and x.text or ''),({['public-stock']='17 s',fixed='5.4',opaque='12 s',['opaque-denied']='12 s',permanent=''})[nextSample])
+    end)
+end
+test('denied visible stock reads retry on native updates and keep a valid owner receipt',function()
+    local e,a,b,_,visible=realGlyphScene();local x=a.Duration;local get=x.GetText
+    a:Update({auraInstanceID=e.secret(102)});e.tick(a,e.secret(15.2))
+    local reads,deny=0,true
+    x.GetText=function(self)reads=reads+1;if deny then error('receipt restricted')end;return get(self)end
+    for i=1,60 do e.now=i/60;e.tick(a,e.secret(15.2)) end
+    assert(reads<=5,'a failed GetText must not be retried on every native tick')
+    local normal=a.UpdateDuration
+    a.UpdateDuration=function()error('opaque replay denied')end;b.Duration=x;e.tick(b,6.3)
+    equal(visible(a)..x.text,'15 s','valid physical-owner receipt survives a temporary denial')
+    a.UpdateDuration=normal;deny=false;e.now=3;e.tick(a,e.secret(12))
+    a.UpdateDuration=function()error('opaque replay denied')end;e.tick(b,6.3)
+    equal(visible(a)..x.text,'12 s','a readable receipt recovers on the next eligible native update')
+    a.UpdateDuration=normal;deny=true;a:Update({auraInstanceID=e.secret(103)});e.tick(a,e.secret(8.5))
+    a.UpdateDuration=function()error('opaque replay denied')end;e.tick(b,6.3)
+    equal(visible(a)..x.text,'','an unreadable new assignment cannot inherit the old receipt')
+end)
+test('stock receipt denial recovers without a readable clock and expires stale evidence',function()
+    local e,a,b,_,visible=realGlyphScene();local x=a.Duration
+    a:Update({auraInstanceID=e.secret(102)});b.Duration=x
+    e.tick(a,e.secret(15.2));local normal=a.UpdateDuration;local get=x.GetText;local reads=0
+    x.GetText=function()reads=reads+1;error('receipt unavailable')end
+    e.now=.01;e.tick(a,e.secret(14));e.now=2.1
+    a.UpdateDuration=function()error('direct replay denied')end;e.tick(b,6.3)
+    equal(visible(a)..x.text,'','a continuously unreadable aura cannot replay an expired receipt')
+    a.UpdateDuration=normal;e.GetTime=function()error('clock inaccessible')end
+    reads=0;for _=1,60 do e.tick(a,e.secret(12)) end
+    assert(reads>0 and reads<10,'bounded retries use existing native updates without a timing API')
+    x.GetText=get;for _=1,9 do e.tick(a,e.secret(11)) end
+    a.UpdateDuration=function()error('direct replay denied')end;e.tick(b,6.3)
+    equal(visible(a)..x.text,'11 s','stock receipt returns after clockless retry')
+end)
+test('an undated denied stock receipt cannot survive a clock recovery without an owner update',function()
+    local e,a,b,_,visible=realGlyphScene();local x=a.Duration
+    a:Update({auraInstanceID=e.secret(102)});e.tick(a,e.secret(15.2));b.Duration=x
+    local clock,update,read=e.GetTime,a.UpdateDuration,x.GetText
+    e.GetTime=function()error('clock unavailable at first denial')end
+    x.GetText=function()error('stock text inaccessible')end;e.tick(a,e.secret(14))
+    e.GetTime=clock;e.now=10
+    a.UpdateDuration=function()error('direct native replay denied')end;e.tick(b,6.3)
+    equal(visible(a)..x.text,'','an undatable former 15 s receipt does not return')
+    a.UpdateDuration=update;x.GetText=read;e.tick(a,e.secret(3.1))
+    a.UpdateDuration=function()error('direct native replay denied')end;e.tick(b,6.3)
+    equal(visible(a)..x.text,'3 s','a new same-owner receipt is immediately usable')
+end)
+test('a new native info table cannot inherit the previous stock receipt',function()
+    local e,a,b,_,visible=realGlyphScene();local x=a.Duration
+    a:Update({auraInstanceID=e.secret(102)});e.tick(a,e.secret(15.2));b.Duration=x
+    a.buttonInfo={auraInstanceID=e.secret(103)};x.GetText=function()error('new stock receipt denied')end
+    e.tick(a,e.secret(12));a.UpdateDuration=function()error('direct replay denied')end;e.tick(b,6.3)
+    equal(visible(a)..x.text,'','same physical parent with changed aura metadata has no valid former receipt')
+end)
+for _,receipt in ipairs({'available','denied'}) do
+    test('a denied opaque replay uses the physical owner stock receipt '..receipt,function()
+        local e,a,b,_,visible=realGlyphScene();local x=a.Duration
+        a:Update({auraInstanceID=e.secret(102)})
+        if receipt=='denied' then x.GetText=function()error('stock text inaccessible')end end
+        e.tick(a,e.secret(15.2));equal(x.text,'15 s')
+        a.UpdateDuration=function()error('direct secret replay denied')end
+        b.Duration=x;e.tick(b,6.3)
+        equal(visible(a)..x.text,receipt=='available' and '15 s' or '','a foreign numeric value never survives')
+    end)
+end
+for _,mode in ipairs({'refused','superseded'}) do
+    test('a disputed opaque receipt uses the native stock writer after '..mode,function()
+        local e,a,b,_,visible=realGlyphScene();local x=a.Duration
+        a:Update({auraInstanceID=e.secret(102)});e.tick(a,e.secret(15.2))
+        local normal=a.UpdateDuration
+        a.UpdateDuration=function(self,t)if e.issecretvalue(t)then error('direct replay denied')end;return normal(self,t)end
+        local put=x.SetText
+        x.SetText=function(self,text)
+            if text=='15 s' then
+                if mode=='refused' then return false end
+                self.SetText=put;e.tick(a,17)
+            end
+            return put(self,text)
+        end
+        b.Duration=x;e.tick(b,6.3);equal(visible(a)..x.text,mode=='refused' and '15 s' or '17 s')
+    end)
+end
+test('a hidden disputed label does no parent or native owner work and recovers when shown',function()
+    local e,a,b,_,visible=realGlyphScene();local x=a.Duration
+    e.durationShown=false;e.tick(a,14);b.Duration=x
+    local get,update=x.GetParent,a.UpdateDuration;local parentReads,replays=0,0
+    x.GetParent=function(self)parentReads=parentReads+1;return get(self)end
+    a.UpdateDuration=function(self,...)replays=replays+1;return update(self,...)end
+    for _=1,60 do e.tick(b,15) end
+    equal(parentReads,0);equal(replays,0)
+    x.parent=b;e.durationShown=true;e.tick(b,6.2);equal(visible(b),'6.2');equal(x.text,'')
+end)
+test('a hidden disputed label retires live cells once and respects a sealed visibility flag',function()
+    local e,a,b,_,visible=realGlyphScene();local x=a.Duration;e.tick(a,4.2);b.Duration=x
+    e.durationShown=false;x.IsShown=function(self)return e.secret(self.shown)end
+    e.tick(b,14);equal(visible(a),'','former visible cells were retired')
+    local get,update=x.GetParent,a.UpdateDuration;local parentReads,replays=0,0
+    x.GetParent=function(self)parentReads=parentReads+1;return get(self)end
+    a.UpdateDuration=function(self,...)replays=replays+1;return update(self,...)end
+    for _=1,60 do e.tick(b,14) end
+    equal(parentReads,0);equal(replays,0)
+    x.parent=b;e.durationShown=true;e.tick(b,5.4);equal(visible(b),'5.4')
+end)
+for _,phase in ipairs({'deny-first','deny-second','new-first','new-second','transfer-first'}) do
+    test('stock receipt validates the newest native owner/update at '..phase,function()
+        local e,a,b,_,visible=realGlyphScene();local x=a.Duration;e.tick(a,5.9)
+        local raw,get=x.SetText,x.GetParent;local reads=0
+        x.SetText=function(self,value)
+            self.SetText=raw;e.tick(a,14);raw(self,value)
+            self.GetParent=function(s)
+                reads=reads+1
+                if (phase=='deny-first' and reads==1) or (phase=='deny-second' and reads==2) then error('one parent denial') end
+                if (phase=='new-first' and reads==1) or (phase=='new-second' and reads==2) then e.tick(a,17) end
+                if phase=='transfer-first' and reads==1 then b.Duration=x;x:SetParent(b);e.tick(b,6.4) end
+                return get(s)
+            end
+        end
+        e.tick(a,4.2)
+        if phase=='transfer-first' then equal(visible(a),'');equal(visible(b)..x.text,'6.4')
+        else equal(visible(a)..x.text,phase:find('deny') and '14 s' or '17 s') end
+    end)
+end
+for _,sample in ipairs({'short','long','opaque'}) do
+    test('a blocked receipt still restores the current '..sample..' native update',function()
+        local e,a,_,_,visible=realGlyphScene();local x=a.Duration
+        e.tick(a,5.9)
+        local put=x.SetText
+        x.SetText=function(self,t)
+            self.SetText=put
+            self.GetText=function()error('stock text unreadable')end
+            e.tick(a,sample=='long' and 14 or (sample=='short' and 6.4 or e.secret(3.1)))
+            put(self,t)
+        end
+        e.tick(a,4.2);equal(visible(a)..x.text,({short='6.4',long='14 s',opaque='2.8'})[sample])
+    end)
+end
+test('a previously rejected reader can become the physical owner without a scan',function()
+    local e,a,b,_,visible=realGlyphScene();local x=a.Duration
+    e.tick(a,4.2);b.Duration=x;e.tick(b,6.3);equal(visible(a),'4.2')
+    x.parent=b;e.tick(b,6.2);equal(visible(a),'');equal(visible(b),'6.2');equal(x.text,'')
+    local parent=x.GetParent;local reads=0
+    x.GetParent=function(self)reads=reads+1;return parent(self)end
+    for _=1,10 do e.tick(b,6.1) end
+    equal(reads,0,'settled owner does not poll its parent')
+end)
+for _,order in ipairs({'before','after'}) do
+    for _,assign in ipairs({true,false}) do
+        for _,sample in ipairs({'short','long','opaque'}) do
+            test('original native clear honors '..sample..' '..order..' newer assignment='..tostring(assign),function()
+                local e,a,_,_,visible=realGlyphScene();local x=a.Duration;local put=x.SetText
+                x.SetText=function(self,t)
+                    self.SetText=put
+                    if order=='after' then put(self,t) end
+                    if assign then a:Update({auraInstanceID=102}) end
+                    e.tick(a,sample=='short' and 6.4 or (sample=='long' and 14 or e.secret(3.1)))
+                    if order=='before' then put(self,t) end
+                end
+                e.tick(a,4.2)
+                local want=sample=='short' and '6.4' or (sample=='long' and '14 s' or (assign and '3 s' or '2.8'))
+                equal(visible(a)..x.text,want,'single latest timer')
+                e.tick(a,2.3);equal(visible(a),'2.3');equal(x.text,'')
+            end)
+        end
+    end
+end
+test('a parent round trip during denial cannot revive a previously valid sample',function()
+    local e,a,b,_,visible=realGlyphScene()
+    local x=a.Duration;e.tick(a,3.7);b.Duration=x;x:SetParent(b);e.tick(b,4.2)
+    local parent=x.GetParent
+    x.GetParent=function()error('both ownership notifications are restricted') end
+    x:SetParent(a);x:SetParent(b);x.GetParent=parent
+    e.tick(a,6.4);equal(visible(b)..x.text,'','old physical period was invalidated by uncertainty')
+    e.tick(b,1.1);equal(visible(b)..x.text,'1.1')
+end)
+test('the last native clear can transfer a label after a successful readiness check',function()
+    local e,a,b,_,visible=realGlyphScene()
+    local x=a.Duration;local clear=x.SetText
+    x.SetText=function(self,value)
+        x.SetText=clear;clear(self,value)
+        b.Duration=x;x:SetParent(b);e.tick(b,4.2)
+    end
+    e.tick(a,3.7)
+    equal(visible(a),'');equal(visible(b),'4.2');equal(x.text,'')
+end)
+test('a stale alias cannot replace a long, restricted or permanently retired native buff',function()
+    local e,a,b,_,visible=realGlyphScene()
+    e.tick(a,3.7)
+    local x=a.Duration;b.Duration=x;x:SetParent(b)
+    e.tick(b,17);e.tick(a,5.9)
+    equal(visible(b)..x.text,'17 s')
+    e.tick(b,e.secret(7.21));e.tick(a,5.9)
+    equal(visible(b)..x.text,'7.2')
+    b:Update({permanent=true});e.tick(a,5.9)
+    equal(visible(b)..(x.shown and x.text or ''),'','former alias cannot revive the retired clock')
+end)
+for _,later in ipairs({'none','lowercase','clear-in-writer','newer-split','newer-native','newer-clear','new-owner'}) do
+    test('exhausted stock writers settle once and respect '..later,function()
+        local e,a,b,all,visible=realGlyphScene()
+        e.tick(a,3.7)
+        local queued={};e.C_Timer.After=function(_,fn)queued[#queued+1]=fn end
+        local child
+        for _,f in ipairs(all) do if f.parent==a then child=f;break end end
+        local glyph=child.SetText;local changes=0
+        child.SetText=function(self,text)
+            if text~='' and changes<3 then changes=changes+1;e.tick(a,4.2) end
+            return glyph(self,text)
+        end
+        local x=a.Duration
+        local fmt,raw=x.SetFormattedText,x.SetText
+        local n=0
+        local function supersede()
+            n=n+1
+            if n==1 then e.tick(a,5.4)
+            elseif n==2 then e.tick(a,6.4)
+            elseif n==3 then
+                if later=='clear-in-writer' then a:Update({permanent=true}) else e.tick(a,7.4) end
+            end
+        end
+        x.SetFormattedText=function(self,format,...)
+            if format=='%.1f' then supersede() end
+            return fmt(self,format,...)
+        end
+        x.SetText=function(self,text)
+            if text~='' then supersede() end
+            return raw(self,text)
+        end
+        e.tick(a,5.9)
+        equal(n,3);equal(#queued,1,'one deferred settlement after a finite burst')
+        if later=='lowercase' then a.duration=x;a.Duration=nil
+        elseif later=='newer-split' then e.tick(a,2.2)
+        elseif later=='newer-native' then e.tick(a,14)
+        elseif later=='newer-clear' then a:Update({permanent=true})
+        elseif later=='new-owner' then b.Duration=x;x:SetParent(b);e.tick(b,1.3) end
+        queued[1]();equal(#queued,1,'deferred settlement never polls')
+        local owner=later=='new-owner' and b or a
+        local expected=({none='7.4',lowercase='7.4',['clear-in-writer']='',['newer-split']='2.2',
+                         ['newer-native']='14 s',['newer-clear']='',['new-owner']='1.3'})[later]
+        equal(visible(owner)..(x.shown and x.text or ''),expected)
+    end)
+end
 print(string.format('TOTAL: %d passed, %d failed',passed,failed))
 if failed>0 then error('regression suite failed') end

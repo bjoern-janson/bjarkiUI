@@ -21,7 +21,7 @@ jobs:
           set -euo pipefail
           failures=0
           mapfile -t addon_modules < <(awk '/\.lua[[:space:]]*$/ && $0 !~ /^[[:space:]]*#/ {print $1}' bjarkiUI.toc)
-          test "${#addon_modules[@]}" -eq 9
+          test "${#addon_modules[@]}" -eq 12
           for version in 5.1 5.4; do
             for file in "${addon_modules[@]}" tests/*.lua; do
               if ! "luac${version}" -p "$file"; then
@@ -29,22 +29,13 @@ jobs:
                 failures=$((failures + 1))
               fi
             done
+            test_options=()
+            if [ "$version" = 5.1 ]; then test_options=(-l tests.support.lua51); fi
             for test in tests/*.lua; do
-              case "$test" in
-                tests/aura-presentation.lua|tests/frame-label-tweaks.lua|tests/icon-skin.lua|tests/pet-status-text.lua|tests/unit-aura-retirement.lua|tests/syntax.lua)
-                  if [ "$version" != 5.4 ]; then continue; fi
-                  if ! "lua${version}" "$test" .; then
-                    echo "::error::Regression: $test (Lua $version)"
-                    failures=$((failures + 1))
-                  fi
-                  ;;
-                *)
-                  if ! "lua${version}" "$test"; then
-                    echo "::error::Regression: $test (Lua $version)"
-                    failures=$((failures + 1))
-                  fi
-                  ;;
-              esac
+              if ! "lua${version}" "${test_options[@]}" "$test" .; then
+                echo "::error::Regression: $test (Lua $version)"
+                failures=$((failures + 1))
+              fi
             done
           done
           if [ "$failures" -ne 0 ]; then

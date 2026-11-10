@@ -97,6 +97,42 @@ do
     equal(#written, previous + 1, "closure-only iterator also accepted")
 end
 
+-- A pooled viewer can move or release a previously observed cooldown.
+do
+    local function clock()
+        return {value=0,writes=0,
+            GetCountdownMillisecondsThreshold=function(self) return self.value end,
+            SetCountdownMillisecondsThreshold=function(self,v) self.value=v;self.writes=self.writes+1 end}
+    end
+    local left,right=clock(),clock()
+    local a,b={Cooldown=left},{Cooldown=right}
+    local active={[a]=true,[b]=true}
+    local viewer={RefreshLayout=function()end,itemFramePool={EnumerateActive=function()return pairs(active)end}}
+    local retryHook=true
+    local lifecycle
+    local env={BuffIconCooldownViewer=viewer,
+        CreateFrame=function()return {RegisterEvent=function()end,SetScript=function(_,_,cb)lifecycle=cb end}end,
+        hooksecurefunc=function(o,key,fn)
+            if o==viewer and retryHook then return false end
+            local original=o[key]
+            o[key]=function(self,...) local result=original(self,...);fn(self,...);return result end
+        end}
+    isolated(tracked,"","true",env)
+    retryHook=false;lifecycle(nil,"PLAYER_LOGIN")
+    for i=1,10 do viewer:RefreshLayout() end
+    equal(left.writes,1,"settled tracked cooldown performs no layout rewrites")
+    equal(right.writes,1,"each visible item retains its threshold")
+    a.Cooldown,b.Cooldown=right,left;viewer:RefreshLayout()
+    left:SetCountdownMillisecondsThreshold(0)
+    equal(left.value,10,"correct the recycled receiver instead of its former item")
+    equal(right.writes,1,"the former item's current widget was untouched")
+    local n=left.writes;left:SetCountdownMillisecondsThreshold(10)
+    equal(left.writes,n+1,"a correct external write needs no corrective write")
+    active[b]=nil;viewer:RefreshLayout();left:SetCountdownMillisecondsThreshold(0)
+    equal(left.value,0,"a retired cooldown no longer owns tracked formatting")
+    active[b]=true;viewer:RefreshLayout();equal(left.value,10,"a recycled widget is reacquired")
+end
+
 -- Actual PartyOrder visual functions, with native readable/unreadable states.
 do
     local code = section(party, "local function shown(frame)",
@@ -191,9 +227,9 @@ end
 -- Native color restore must retain state on EVERY required failed setter,
 -- not merely when an outer getter throws.
 do
-    local code = section(ui, "function nativeHealthStyle.Restore(bar)",
+    local code = section(ui, "local function writeHealthStyle(",
         "function nativeHealthStyle.Prepare(bar)")
-    local mode, setterFails, desatFails, colorFails = "color", true, false, false
+    local mode, setterFails, desatFails, colorFails = "color", true, true, true
     local texture = {
         GetAtlas = function() return mode end,
         SetAtlas = function(_, wanted)
@@ -203,19 +239,18 @@ do
         SetDesaturated = function()
             if desatFails then error("desaturation restricted") end
         end,
+        IsDesaturated = function() return true end,
     }
     local bar = {
         SetStatusBarColor = function()
             if colorFails then error("status bar restricted") end
         end,
     }
-    local state = {
-        applied = true, desaturated = true, texture = texture,
-        colorable = "color", originalAtlas = "original",
-        originalDesaturated = false, nativeColor = {1, 1, 1, 1},
-    }
+    local material = {atlasOwned=true, desaturated=true, colorable="color", originalAtlas="original", originalDesaturated=false}
+    local state = {tintOwned=true, nativeColor={1,1,1,1}, owned={[texture]=material}}
+    material.owner=state
     local env = {
-        nativeHealthStyle = {states = {[bar] = state}},
+        nativeHealthStyle = {states = {[bar] = state}, materials={[texture]=material}},
         healthColorWrites = {},
         currentHealthTexture = function() return texture end,
         isSecret = function() return false end,
@@ -228,19 +263,20 @@ do
         "local isSecret = _G.isSecret",
         "nativeHealthStyle.Restore", env)
     equal(restore(bar), false, "native atlas setter failure reported")
-    equal(state.applied, true, "atlas failure retains restoration state")
+    equal(state.owned[texture], material, "atlas failure retains restoration state")
     equal(env.healthColorWrites[bar], nil, "atlas failure clears recursion guard")
     setterFails = false
     desatFails = true
     equal(restore(bar), false, "desaturation failure reported")
-    equal(state.applied, true, "desaturation failure retains restoration state")
+    equal(state.owned[texture], material, "desaturation failure retains restoration state")
     desatFails = false
     colorFails = true
     equal(restore(bar), false, "statusbar setter failure reported")
-    equal(state.applied, true, "statusbar failure retains restoration state")
+    equal(state.tintOwned, true, "statusbar failure retains restoration state")
+    equal(state.owned[texture], nil, "successful material release is independent")
     colorFails = false
     equal(restore(bar), true, "successful restoration acknowledged")
-    equal(state.applied, false, "successful restoration clears ownership")
+    equal(state.tintOwned, false, "successful restoration clears ownership")
     equal(env.healthColorWrites[bar], nil, "success also clears guard")
 end
 

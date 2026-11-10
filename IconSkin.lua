@@ -6,6 +6,7 @@ bjarkiUIIconSkin = Skin
 local MASK = "UI-HUD-CoolDownManager-Mask"
 local OVERLAY = "UI-HUD-CoolDownManager-IconOverlay"
 local states = setmetatable({}, {__mode = "k"})
+local skinByIcon = setmetatable({}, {__mode = "k"})
 local ownedOverlays = setmetatable({}, {__mode = "k"})
 local rejected = setmetatable({}, {__mode = "k"})
 -- Cumulative public presentation outcomes only, one count per skin/path.
@@ -69,22 +70,65 @@ local function read(object, method)
     return nil
 end
 
+local fullCoords = {0,0, 0,1, 1,0, 1,1}
+local white = {1,1,1,1}
+local function matchesValues(expected, ok, ...)
+    if not ok then return false end
+    for i, wanted in ipairs(expected) do
+        local value = select(i, ...)
+        if not public(value) or value ~= wanted then return false end
+    end
+    return true
+end
+
+local function hasValues(region, method, expected)
+    local getter = field(region, method)
+    return type(getter) == "function" and matchesValues(expected, pcall(getter, region))
+end
+
+local function ownerHidden(owner)
+    local visible = read(owner, "IsVisible")
+    if type(visible) == "boolean" then return not visible end
+    return read(owner, "IsShown") == false
+end
+
 local function texture(object)
     return accessible(object) and read(object, "GetObjectType") == "Texture"
 end
 
--- A mask and a rim are separate regions. A native mask by itself is not
--- evidence of an existing border. Inspect only this public owner's regions;
--- do not enumerate any native aura container or protected children.
-local function hasNativeOverlay(owner)
+-- The stock cooldown viewer anchors its rim to the item and stretches its
+-- icon to that item. Other templates anchor the rim directly to the icon.
+local function coversCorners(region, target, exact)
+    local count = read(region, "GetNumPoints")
+    local get = field(region, "GetPoint")
+    if not number(count) or count < 2 or count > 8 or type(get) ~= "function" then return false end
+    local topLeft, bottomRight
+    for i = 1, count do
+        local ok, point, relative, relativePoint, x, y = pcall(get, region, i)
+        if ok and public(point) and public(relative) and public(relativePoint) and number(x) and number(y) then
+            if relative == nil then relative = read(region, "GetParent") end
+            if relative == target and relativePoint == point and (not exact or (x == 0 and y == 0)) then
+                if point == "TOPLEFT" and x <= 0 and y >= 0 then topLeft = true end
+                if point == "BOTTOMRIGHT" and x >= 0 and y <= 0 then bottomRight = true end
+            end
+        end
+    end
+    return topLeft and bottomRight
+end
+
+local function hasNativeOverlay(owner, icon)
     local get = field(owner, "GetRegions")
     if type(get) ~= "function" then return false end
     local ok, regions = pcall(function() return {get(owner)} end)
     if not ok then return false end
     for i = 1, math.min(#regions, 96) do
         local region = regions[i]
-        if texture(region) and not ownedOverlays[region]
-            and read(region, "GetAtlas") == OVERLAY then return true end
+        if texture(region) and not ownedOverlays[region] and read(region, "GetAtlas") == OVERLAY
+            and read(region, "IsShown") == true then
+            local alpha = read(region, "GetAlpha")
+            if number(alpha) and alpha > 0 and (coversCorners(region, icon)
+                or (coversCorners(region, owner) and coversCorners(icon, owner, true))) then return true end
+        end
     end
     return false
 end
@@ -125,16 +169,98 @@ local function nativeColour(region)
 end
 
 local function restore(donor)
-    if donor.suppressed and accessible(donor.region) then
-        if pcall(donor.region.SetAlpha, donor.region, donor.alpha) then donor.suppressed = false end
+    if not donor.suppressed then return true end
+    if not accessible(donor.region) then return false end
+    local ok, result = pcall(field(donor.region, "SetAlpha"), donor.region, donor.alpha)
+    local actual = read(donor.region, "GetAlpha")
+    if number(actual) then
+        -- A setter may return without changing our zero, or raise after the
+        -- native glyph is already visible. A positive readback resolves both.
+        if actual == 0 and donor.alpha ~= 0 then return false end
+    elseif not ok or not public(result) or result == false then
+        return false
     end
+    donor.suppressed = false
+    return true
 end
 
+local function releaseDonor(state, region, donor)
+    if not restore(donor) then return false end
+    if not donor.live then state.donors[region] = nil end
+    return true
+end
+
+local function maskDetached(icon, mask)
+    local count = read(icon, "GetNumMaskTextures")
+    if not number(count) or count < 0 or count > 32 or count % 1 ~= 0 then return false end
+    local get = field(icon, "GetMaskTexture")
+    for i = 1, count do
+        local ok, attached = pcall(get, icon, i)
+        if not ok or not public(attached) or not attached or attached == mask then return false end
+    end
+    return true
+end
+
+-- Inspect the whole attachment list before changing any mask. A public
+-- foreign mask supersedes ours. A matching native mask supplies the shape.
+local function inspectMasks(icon, own)
+    local count = read(icon, "GetNumMaskTextures")
+    if not number(count) or count < 0 or count > 32 or count % 1 ~= 0 then return "mask-query" end
+    if count == 0 then return "missing", false end
+    local get = field(icon, "GetMaskTexture")
+    local hasOwn, nativeCount, nativeAtlas = false, 0, nil
+    for i = 1, count do
+        local ok, mask = pcall(get, icon, i)
+        if not ok or not accessible(mask) then return "mask-query" end
+        if mask == own then
+            hasOwn = true
+        else
+            local got, atlas = pcall(field(mask, "GetAtlas"), mask)
+            if not got or not public(atlas) then return "mask-query" end
+            nativeCount, nativeAtlas = nativeCount + 1, atlas
+        end
+    end
+    if nativeCount == 0 then return "owned", hasOwn end
+    if nativeCount > 1 then return "multiple-native-masks", hasOwn end
+    if nativeAtlas ~= MASK then return "native-mask-preserved", hasOwn end
+    return "borrowed", hasOwn
+end
+
+-- The mask and rim belong to the owner and can move to its next icon. A
+-- mask supplied by Blizzard is never recorded as an attachment we can move.
 local function release(state)
+    state.initialized = false
+    state.trackedNeutral = nil
+    state.nativeOnly = nil
+    state.mode, state.visibilityFallback, state.iconShown = nil, nil, nil
+    state.width, state.height, state.anchorWidth, state.anchorHeight = nil, nil, nil, nil
+    state.iconLayer, state.iconSub = nil, nil
     state.busy = true
-    for _, donor in pairs(state.donors) do restore(donor) end
-    if state.overlay then pcall(state.overlay.Hide, state.overlay) end
+    local complete = true
+    for region, donor in pairs(state.donors) do
+        donor.live = false
+        if not releaseDonor(state, region, donor) then complete = false end
+    end
+    if state.overlay then
+        local ok, result = pcall(field(state.overlay, "Hide"), state.overlay)
+        if not ok or not public(result) or result == false then complete = false end
+    end
+    local old = state.maskIcon
+    if old then
+        pcall(field(old, "RemoveMaskTexture"), old, state.mask)
+        if maskDetached(old, state.mask) then
+            state.maskIcon = nil
+        else
+            complete = false
+        end
+    end
     state.busy = false
+    state.cleanupPending = not complete
+    if complete and state.icon then
+        if skinByIcon[state.icon] == state then skinByIcon[state.icon] = nil end
+        state.icon = nil
+    end
+    return complete
 end
 
 -- This controls addon-owned decoration only. An aura button is the native
@@ -154,7 +280,7 @@ end
 -- any stale custom tint. A rejected fallback write still leaves them native.
 local function recoverRim(state)
     state.busy = true
-    for _, donor in pairs(state.donors) do restore(donor) end
+    for region, donor in pairs(state.donors) do releaseDonor(state, region, donor) end
     local ok = false
     if state.anchorWidth and state.anchorHeight and state.overlay then
         ok = pcall(function()
@@ -169,7 +295,7 @@ local function recoverRim(state)
     state.busy = false
 end
 
-local paint, observeSources
+local paint, observeSources, ownerUpdate
 
 local function hook(state, object, method, callback)
     local done = state.hooks[object]
@@ -178,11 +304,42 @@ local function hook(state, object, method, callback)
     if type(hooksecurefunc) ~= "function" or type(field(object, method)) ~= "function" then return false end
     local ok = pcall(hooksecurefunc, object, method, function(...)
         if states[state.owner] ~= state or state.busy then return end
-        if callback then callback(...) end
+        if callback == ownerUpdate then
+            if state.isAura or state.watchNative then ownerUpdate(state) end
+            return
+        end
+        local donor = state.donors[object]
+        if not state.initialized or (object ~= state.owner and object ~= state.icon
+            and not (donor and donor.live)) then
+            -- A new alpha supersedes a failed restoration even while idle.
+            if donor and donor.suppressed and method == "SetAlpha" and callback then callback(state, ...) end
+            return
+        end
+        -- Tracked RefreshData sets the artwork before finalizing its border.
+        -- A texture-only write with the correct crop has no decoration to repair.
+        if method == "SetTexture" and object == state.icon and not state.isAura and state.trackedNeutral and not state.lastFailure
+            and state.anchorWidth == read(object,"GetWidth") and state.anchorHeight == read(object,"GetHeight")
+            and hasValues(object,"GetTexCoord",fullCoords) then return end
+        if callback then callback(state, ...) end
         paint(state)
     end)
     if ok then done[method] = true end
     return ok
+end
+
+local function externalDonorAlpha(state, region, alpha)
+    -- A retained hook can outlive a donor registration and be reused by a
+    -- later icon. Resolve the registration owned by this presentation.
+    local donor = state.donors[region]
+    if not donor then return end
+    if donor.suppressed and number(alpha) and alpha ~= 0 then
+        -- A post-hook also fires after an explicit refusal. If our zero
+        -- still holds, keep the restoration baseline for the next retry.
+        if read(region, "GetAlpha") == 0 then return end
+    end
+    donor.suppressed = false
+    donor.alpha = number(alpha) and alpha or nil
+    if not donor.live then state.donors[region] = nil end
 end
 
 observeSources = function(state)
@@ -197,12 +354,7 @@ observeSources = function(state)
         for _, name in ipairs({"SetAtlas", "SetTexture", "SetVertexColor", "Show", "Hide", "SetShown"}) do
             if not hook(state, region, name) then observed = false end
         end
-        if not hook(state, region, "SetAlpha", function(_, alpha)
-            -- This callback is only for external writes. Our suppression uses
-            -- the busy guard. Secret alpha is left with its native owner.
-            d.suppressed = false
-            d.alpha = number(alpha) and alpha or nil
-        end) then observed = false end
+        if not hook(state, region, "SetAlpha", externalDonorAlpha) then observed = false end
         d.observed = observed
     end
     source(field(state.owner, "DebuffBorder"), true)
@@ -215,11 +367,14 @@ observeSources = function(state)
 end
 
 paint = function(state)
-    if state.busy or not canWrite(state.owner) or not accessible(state.icon) then return false end
+    if not state.initialized or state.busy or not canWrite(state.owner) or not accessible(state.icon) then return false end
+    if state.watchNative and ownerHidden(state.owner) then return false end
     state.busy = true
     local stage = "geometry"
+    local restorePending = false
     local ok = pcall(function()
         local icon, overlay = state.icon, state.overlay
+        local tracked = state.tracked and not state.isAura
         local w, h = read(icon, "GetWidth"), read(icon, "GetHeight")
         if number(w) and number(h) and w > 0 and h > 0 then
             state.width, state.height = w, h
@@ -234,7 +389,8 @@ paint = function(state)
         local getAtlas = field(icon, "GetAtlas")
         if type(getAtlas) == "function" then
             local got, atlas = pcall(getAtlas, icon)
-            if got and public(atlas) and (atlas == nil or atlas == "") then
+            if got and public(atlas) and (atlas == nil or atlas == "")
+                and (not tracked or not hasValues(icon,"GetTexCoord",fullCoords)) then
                 icon:SetTexCoord(0, 1, 0, 1)
             end
         end
@@ -252,7 +408,13 @@ paint = function(state)
         end
         -- Match Blizzard's nameplate template: the rim is OVERLAY artwork,
         -- not ARTWORK that another icon/backdrop layer can cover.
-        overlay:SetDrawLayer("OVERLAY", layer == "OVERLAY" and math.min(7, sub + 1) or -1)
+        local wantedSub = layer == "OVERLAY" and math.min(7, sub + 1) or -1
+        local matchesLayer = false
+        if tracked then
+            local okLayer, oldLayer, oldSub = pcall(field(overlay,"GetDrawLayer"),overlay)
+            matchesLayer = okLayer and public(oldLayer) and oldLayer == "OVERLAY" and number(oldSub) and oldSub == wantedSub
+        end
+        if not matchesLayer then overlay:SetDrawLayer("OVERLAY", wantedSub) end
         if state.anchorWidth ~= w or state.anchorHeight ~= h then
             -- The two anchor identities never change. SetPoint replaces each
             -- existing anchor; clearing them on every repaint creates a gap
@@ -284,12 +446,12 @@ paint = function(state)
             if not active.suppressed then active.alpha = read(active.region, "GetAlpha") end
             if not number(active.alpha) then r = nil end
         end
-        for _, d in pairs(state.donors) do
-            if d ~= active or r == nil then restore(d) end
+        for region, d in pairs(state.donors) do
+            if (d ~= active or r == nil) and not releaseDonor(state, region, d) then restorePending = true end
         end
         local shown = rimShown(state)
         stage = "border-paint"
-        if r ~= nil then
+        if r ~= nil and not restorePending then
             overlay:SetDesaturated(true)
             overlay:SetVertexColor(r,g,b,a)
             overlay:SetAlpha(active.alpha)
@@ -298,16 +460,23 @@ paint = function(state)
             active.region:SetAlpha(0)
             active.suppressed = true
             state.mode = "framed"
-        elseif (n == 0 and not uncertain) or uncertain then
+        elseif n == 0 or uncertain or restorePending then
             -- Unknown donor visibility/alpha must not turn a plain buff into
             -- a borderless icon. Native donors have been restored above. The
             -- neutral low-sublayer rim is decorative only; it does not guess
             -- their colour or suppress a possibly meaningful indicator.
-            overlay:SetDesaturated(false)
-            overlay:SetVertexColor(1,1,1,1)
-            overlay:SetAlpha(1)
-            overlay:SetShown(shown)
-            state.mode = uncertain and "fallback" or "framed"
+            local neutral = state.trackedNeutral
+            if tracked and type(field(overlay,"IsDesaturated")) == "function" then
+                neutral = read(overlay,"IsDesaturated") == false
+            elseif tracked and type(field(overlay,"GetDesaturation")) == "function" then
+                neutral = read(overlay,"GetDesaturation") == 0
+            end
+            if not tracked or not neutral then overlay:SetDesaturated(false) end
+            if not tracked or not hasValues(overlay,"GetVertexColor",white) then overlay:SetVertexColor(1,1,1,1) end
+            if not tracked or read(overlay,"GetAlpha") ~= 1 then overlay:SetAlpha(1) end
+            if not tracked or read(overlay,"IsShown") ~= shown then overlay:SetShown(shown) end
+            state.trackedNeutral = tracked
+            state.mode = (uncertain or restorePending) and "fallback" or "framed"
         else
             -- Known active glyph/enchant/stealable or unreadable colour: native art wins.
             -- Do not stack the neutral frame over a meaningful indicator.
@@ -320,10 +489,71 @@ paint = function(state)
         state.lastFailure = stage -- fixed presentation stage, never secret values
         note(state, "failure")
         recoverRim(state)
+    elseif restorePending then
+        state.lastFailure = "donor-restore"
+        note(state, "failure")
+        return false
     else
         state.lastFailure = nil
     end
     return ok
+end
+
+ownerUpdate = function(state)
+    local owner = state.owner
+    if state.watchNative and ownerHidden(owner) then return end
+    local icon = field(owner, "Icon") or field(owner, "icon")
+    if not icon then
+        local name = read(owner, "GetName")
+        if type(name) == "string" then icon = field(_G, name .. "Icon") end
+    end
+    icon = icon or read(owner,"GetIcon")
+    if (state.initialized or state.nativeOnly) and icon == state.icon and canWrite(owner) then
+        local masks, hasOwn = inspectMasks(icon,state.mask)
+        if masks == "mask-query" then rejected[owner] = masks; return end
+        local native = masks == "borrowed" and not hasOwn and hasNativeOverlay(owner, icon)
+        if state.nativeOnly and native then rejected[owner] = nil; return end
+        if state.initialized and (masks == "owned" or (masks == "borrowed" and not hasOwn and not native)) then
+            state.maskIcon = hasOwn and icon or nil
+            rejected[owner] = nil
+            observeSources(state)
+            paint(state)
+            return
+        end
+    end
+    Skin.Apply(owner, icon, state.isAura)
+end
+
+local function observeOwner(state)
+    local owner = state.owner
+    local hookScript = field(owner, "HookScript")
+    if type(hookScript) == "function" then
+        for _, name in ipairs({"OnShow", "OnSizeChanged"}) do
+            if not state.scripts[name] and (name == "OnShow" or state.initialized) then
+                local ok = pcall(hookScript, owner, name, function()
+                    if states[owner] ~= state or state.busy then return end
+                    if name == "OnShow" and state.watchNative then ownerUpdate(state)
+                    else paint(state) end
+                end)
+                if ok then state.scripts[name] = true end
+            end
+        end
+    end
+    if state.isAura or state.watchNative then
+        for _, method in ipairs({"Update", "UpdateAuraType"}) do
+            if type(field(owner, method)) == "function" then
+                local boundary = method == "Update" or type(field(owner,"Update")) ~= "function"
+                hook(state, owner, method, boundary and ownerUpdate or observeSources)
+            end
+        end
+    end
+    -- Tracked buff items publish their final spell texture and border here,
+    -- including pool reuse that leaves the item continuously visible.
+    if not state.isAura and type(field(owner, "RefreshData")) == "function" then
+        state.tracked = true
+        state.watchNative = true
+        hook(state, owner, "RefreshData", ownerUpdate)
+    end
 end
 
 function Skin.Apply(owner, icon, isAura)
@@ -332,44 +562,59 @@ function Skin.Apply(owner, icon, isAura)
         rejected[owner] = reason
         return false
     end
-    if not texture(icon) then return reject("icon-access") end
+    local state = states[owner]
+    if state and state.busy then return false end
+    if state and state.watchNative and ownerHidden(owner) then return false end
+    -- A failed lookup is not a positive physical replacement. Keep the
+    -- confirmed attachment and hooks available for native updates.
+    if not texture(icon) then
+        if state and state.cleanupPending then release(state) end
+        return reject("icon-access")
+    end
+    local previous = skinByIcon[icon]
+    if previous and previous ~= state then
+        if previous.busy or read(icon, "GetParent") ~= owner then return reject("icon-owner") end
+        if not canWrite(previous.owner) or not release(previous) then return reject("icon-release") end
+    end
+    if state and (state.cleanupPending or (state.icon and state.icon ~= icon)) then
+        if not release(state) then return reject("icon-release") end
+    end
     local info = field(C_Texture, "GetAtlasInfo")
     if type(info) ~= "function" then return reject("atlas-api") end
     for _, atlas in ipairs({MASK, OVERLAY}) do
         local ok, data = pcall(info, atlas)
         if not ok or not public(data) or type(data) ~= "table" then return reject("atlas-unavailable") end
     end
-    rejected[owner] = nil
-    local state = states[owner]
-    if state and state.icon ~= icon then
-        release(state)
-        if accessible(state.icon) and state.mask and state.ownsMask then
-            pcall(state.icon.RemoveMaskTexture, state.icon, state.mask)
-        end
-        states[owner] = nil; state = nil
+    local masks, hasOwn = inspectMasks(icon,state and state.mask)
+    if masks == "mask-query" then return reject(masks) end
+    if state and state.icon == icon then state.maskIcon = hasOwn and icon or nil end
+    local foreign = masks == "native-mask-preserved" or masks == "multiple-native-masks"
+    local nativeSkin = masks == "borrowed" and hasNativeOverlay(owner, icon)
+    if state and state.icon == icon and (foreign or (nativeSkin and state.initialized) or (masks == "borrowed" and hasOwn)) then
+        if not release(state) then return reject("icon-release") end
     end
+    if foreign then return reject(masks) end
+    rejected[owner] = nil
     if not state then
-        -- Reuse an existing matching native mask. Never add a second copy or
-        -- remove a borrowed mask. Only mask + native overlay is a full skin.
-        local nativeMask
-        local count = read(icon, "GetNumMaskTextures")
-        if not number(count) then return reject("mask-query") end
-        if count > 0 then
-            if count ~= 1 then return reject("multiple-native-masks") end
-            local get = field(icon, "GetMaskTexture")
-            if type(get) ~= "function" then return reject("mask-query") end
-            local ok, mask = pcall(get, icon, 1)
-            if not ok or not accessible(mask) or read(mask, "GetAtlas") ~= MASK then return reject("native-mask-preserved") end
-            if hasNativeOverlay(owner) then return true end
-            nativeMask = mask
-        end
-        state = {owner=owner, icon=icon, mask=nativeMask, ownsMask=false,
-            donors={}, hooks=setmetatable({}, {__mode="k"}), scripts={}}
+        state = {owner=owner, donors={}, hooks=setmetatable({}, {__mode="k"}), scripts={}}
         states[owner] = state
     end
-    if not state.initialized then
+    if isAura then state.trackedNeutral = nil end
+    state.isAura = isAura == true
+    state.icon = icon
+    skinByIcon[icon] = state
+    if nativeSkin or (not state.initialized and masks == "borrowed" and ownerHidden(owner)) then
+        -- Native art can disappear on a later template update. Observe its
+        -- owner without allocating or altering decoration while stock suffices.
+        state.nativeOnly, state.watchNative = true, true
+        observeOwner(state)
+        return nativeSkin
+    end
+    state.nativeOnly = nil
+    if not state.initialized or masks == "missing" then
         -- Keep partial resources for a later safe retry; a rejected API must
         -- not allocate another pair of hidden textures at every aura event.
+        state.busy = true
         local ok = pcall(function()
             if not state.overlay then
                 state.overlay = owner:CreateTexture(nil, "OVERLAY", nil, -1)
@@ -377,20 +622,20 @@ function Skin.Apply(owner, icon, isAura)
             end
             state.overlay:Hide()
             state.overlay:SetAtlas(OVERLAY, false)
-            if not state.mask then
-                state.mask = owner:CreateMaskTexture(nil, "ARTWORK")
-                state.ownsMask = true
-            end
-            if state.ownsMask then
+            if masks == "missing" then
+                if not state.mask then state.mask = owner:CreateMaskTexture(nil, "ARTWORK") end
                 state.mask:SetAtlas(MASK, false)
                 state.mask:SetAllPoints(icon)
-                icon:AddMaskTexture(state.mask)
+                state.maskIcon = icon
+                local result = icon:AddMaskTexture(state.mask)
+                if not public(result) or result == false then error("mask attach rejected") end
+                if inspectMasks(icon,state.mask) ~= "owned" then error("mask attach unconfirmed") end
             end
         end)
+        state.busy = false
         if not ok then
             state.lastFailure = "mask-setup"
             release(state)
-            if state.mask and state.ownsMask then pcall(icon.RemoveMaskTexture, icon, state.mask) end
             return false
         end
         state.initialized = true
@@ -398,27 +643,7 @@ function Skin.Apply(owner, icon, isAura)
     for _, name in ipairs({"SetTexture", "SetTexCoord", "SetAtlas", "SetDrawLayer", "SetSize", "SetWidth", "SetHeight", "SetPoint", "SetAllPoints", "Show", "Hide", "SetShown"}) do
         hook(state, icon, name)
     end
-    local hookScript = field(owner, "HookScript")
-    if type(hookScript) == "function" then
-        for _, name in ipairs({"OnShow", "OnSizeChanged"}) do
-            if not state.scripts[name] then
-                local ok = pcall(hookScript, owner, name, function()
-                    if states[owner] == state then paint(state) end
-                end)
-                if ok then state.scripts[name] = true end
-            end
-        end
-    end
-    state.isAura = isAura == true
-    if state.isAura then
-        -- Update/UpdateAuraType can finish after individual region hooks fire.
-        -- Reconcile the final native state without replacing scripts or polling.
-        for _, method in ipairs({"Update", "UpdateAuraType"}) do
-            if type(field(owner, method)) == "function" then
-                hook(state, owner, method, function() observeSources(state) end)
-            end
-        end
-    end
+    observeOwner(state)
     observeSources(state)
     return paint(state)
 end
@@ -435,11 +660,25 @@ function Skin.GetDiagnostics()
     for owner, state in pairs(states) do
         if state.mode == "fallback" then result.fallback = result.fallback + 1 end
         if state.visibilityFallback then result.visibilityFallback = result.visibilityFallback + 1 end
+        local masks, hasOwn
+        if state.initialized and state.mode then masks, hasOwn = inspectMasks(state.icon,state.mask) end
         if rejected[owner] then
             -- Already counted the latest setup refusal for this same object.
         elseif state.lastFailure then
             result.failed = result.failed + 1
             result.lastFailure = state.lastFailure
+        elseif state.nativeOnly then
+            if not ownerHidden(owner) and read(state.icon,"IsShown") ~= false then
+                local current = inspectMasks(state.icon,state.mask)
+                if current == "borrowed" and hasNativeOverlay(owner,state.icon) then
+                    result.native = result.native + 1
+                elseif current == "missing" then result.missing = result.missing + 1
+                else result.unknown = result.unknown + 1 end
+            end
+        elseif masks == "missing" then
+            result.missing = result.missing + 1
+        elseif masks and masks ~= "owned" and (masks ~= "borrowed" or hasOwn) then
+            result.unknown = result.unknown + 1
         elseif state.mode == "native" then
             result.native = result.native + 1
         elseif state.mode == "framed" or state.mode == "fallback" then

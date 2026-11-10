@@ -2,6 +2,9 @@
 -- Native UI boundaries are doubles; all tint, restore and lifecycle code is real.
 local unpack = table.unpack or unpack
 local passed, failed = 0, {}
+local addonPrivate = {}
+local loadPrecision = loadfile("NativePrecision.lua")
+if loadPrecision then loadPrecision("bjarkiUI", addonPrivate) end
 local function near(got, want, label)
     assert(type(got) == "number" and math.abs(got - want) < 0.0000001,
         label .. ": got " .. tostring(got) .. ", expected " .. tostring(want))
@@ -97,7 +100,7 @@ local function make(extra)
     else
         chunk = assert(load(source, "SoftDark.lua", "t", env))
     end
-    chunk()
+    chunk("bjarkiUI", addonPrivate)
     function state.fire(event, addon) state.event(nil, event, addon) end
     function state.command(arg) env.SlashCmdList.BJARKISOFTDARK(arg) end
     state.fire("PLAYER_LOGIN")
@@ -132,6 +135,116 @@ local function retry(s)
     s.fire("PLAYER_ENTERING_WORLD")
 end
 
+test("rejected initial color write reacquires the current native baseline", function()
+    local t=texture();local b=bag(t);t.failColor=true
+    local _,s=make({CharacterBag0Slot=b})
+    t.failColor=false;t.color={.25,.5,.75,.9}
+    s.hooks[b].UpdateTextures(b)
+    near(t.color[1],.25*.53664,"tint from current red")
+    s.command("off");color(t,.25,.5,.75,.9,"restore current baseline")
+end)
+test("settled bag refresh writes only a changed native property",function()
+    local t=texture();local b=bag(t);local _,s=make({CharacterBag0Slot=b})
+    local c,d=t.colorWrites,t.saturationWrites
+    for i=1,10 do s.hooks[b].UpdateTextures(b) end
+    assert(t.colorWrites==c and t.saturationWrites==d,"unchanged bag refresh rewrote native art")
+    t.color={.25,.5,.75,.9};s.hooks[b].UpdateTextures(b)
+    assert(t.colorWrites==c+1 and t.saturationWrites==d,"repaint only changed color")
+    t.saturation=.8;s.hooks[b].UpdateTextures(b)
+    assert(t.colorWrites==c+1 and t.saturationWrites==d+1,"repaint only changed saturation")
+    s.command("off");color(t,.25,.5,.75,.9,"restore updated native color");near(t.saturation,.8,"restore updated native saturation")
+end)
+test("a dark RGBA8 channel can remain at one byte after the correct native tint",function()
+    local t=texture();local b=bag(t)
+    t.color={1/255,200/255,120/255,1}
+    local put=t.SetVertexColor
+    local function normalized(value)return math.floor(value*255+.5)/255 end
+    t.SetVertexColor=function(self,r,g,b,a)put(self,normalized(r),normalized(g),normalized(b),normalized(a)) end
+    local _,s=make({CharacterBag0Slot=b});local count=t.colorWrites
+    near(t.color[1],1/255,"red stayed at its nearest native byte")
+    s.hooks[b].UpdateTextures(b);assert(t.colorWrites==count,"an already-correct byte did not force another write")
+end)
+test("a partially applied tint retries the remaining channels from the original color",function()
+    for _,mode in ipairs({"red-only","halfway"}) do
+        local t=texture();local b=bag(t);local put=t.SetVertexColor
+        t.SetVertexColor=function(self,r,g,b,a)
+            if mode=="red-only" then put(self,r,self.color[2],self.color[3],a)
+            else put(self,(r+self.color[1])/2,(g+self.color[2])/2,(b+self.color[3])/2,a) end
+        end
+        local _,s=make({CharacterBag0Slot=b})
+        t.SetVertexColor=put
+        s.hooks[b].UpdateTextures(b);tinted(t,"recover complete "..mode.." tint")
+        local count=t.colorWrites
+        s.hooks[b].UpdateTextures(b);assert(t.colorWrites==count,"repaired color stays settled")
+        s.command("off");color(t,1,.8,.5,.7,"restore original channels")
+    end
+end)
+test("a setter that accepted the call without changing the tint still retries",function()
+    local t=texture();local b=bag(t)
+    local colorSetter,saturationSetter=t.SetVertexColor,t.SetDesaturation
+    t.SetVertexColor=function()end;t.SetDesaturation=function()end
+    local _,s=make({CharacterBag0Slot=b})
+    t.SetVertexColor=colorSetter;t.SetDesaturation=saturationSetter
+    s.hooks[b].UpdateTextures(b);tinted(t,"ignored writes recover")
+    local c,d=t.colorWrites,t.saturationWrites
+    s.hooks[b].UpdateTextures(b)
+    assert(t.colorWrites==c and t.saturationWrites==d,"successful retry settles both properties")
+    s.command("off");color(t,1,.8,.5,.7,"pre-write baseline");near(t.saturation,.2,"pre-write level")
+end)
+for _,unreadable in ipairs({false,true}) do
+    test("a tint applied before a setter rejects restores the real baseline; unreadable="..tostring(unreadable), function()
+        local t=texture();local b=bag(t)
+        local setColor,setSaturation=t.SetVertexColor,t.SetDesaturation
+        function t:SetVertexColor(...)
+            setColor(self,...);self.unreadableColor=unreadable
+            return false
+        end
+        function t:SetDesaturation(level)
+            setSaturation(self,level);self.unreadableSaturation=unreadable
+            error("wrapper failed after the write")
+        end
+        local _,s=make({CharacterBag0Slot=b})
+        t.unreadableColor,t.unreadableSaturation=false,false
+        t.SetVertexColor=setColor
+        s.hooks[b].UpdateTextures(b)
+        t.unreadableSaturation=false;t.SetDesaturation=setSaturation
+        s.hooks[b].UpdateTextures(b)
+        tinted(t,"recovery starts from original colors")
+        s.command("off");color(t,1,.8,.5,.7,"original restored");near(t.saturation,.2,"original saturation")
+    end)
+end
+test("refused saturation repaint cannot revive an abandoned baseline", function()
+    for _,mode in ipairs({"off","handoff"}) do
+        local t=texture();local b=bag(t);local _,s=make({CharacterBag0Slot=b})
+        t.saturation=.8;t.failSaturation=true;s.hooks[b].UpdateTextures(b)
+        t.failSaturation=false;t.saturation=.55
+        if mode=="off" then s.command("off") else handoff(s) end
+        near(t.saturation,.55,"external value survives "..mode)
+    end
+end)
+for _,property in ipairs({"color","saturation"}) do
+    test("a different value observed during a refused repaint retires the old "..property.." receipt", function()
+        local t=texture();local b=bag(t);local _,s=make({CharacterBag0Slot=b})
+        local key=property=="color" and "SetVertexColor" or "SetDesaturation"
+        local put=t[key]
+        -- A native refresh has changed this property, so its repaint is
+        -- required even on clients that suppress identical setters.
+        if property=="color" then put(t,.6,.4,.3,.7) else put(t,.7) end
+        local attempted=false
+        t[key]=function(self)
+            attempted=true
+            if property=="color" then put(self,.25,.3,.4,.7) else put(self,.8) end
+            return false
+        end
+        s.hooks[b].UpdateTextures(b)
+        assert(attempted,"the changed native property exercised the refused write")
+        t[key]=put
+        if property=="color" then t:SetVertexColor(.53664,.39216,.21156,.7) else t:SetDesaturation(.55) end
+        s.command("off")
+        if property=="color" then color(t,.53664,.39216,.21156,.7,"current owner")
+        else near(t.saturation,.55,"current owner") end
+    end)
+end
 -- Break: bounded discovery misses the accepted native atlas on unnamed buttons.
 test("anonymous native bag border gets initial tint and refresh hook", function()
     local t = texture()
@@ -181,6 +294,17 @@ test("already loaded DarkMode receives no SoftDark writes", function()
     assert(t.colorWrites == 0 and t.saturationWrites == 0, "initial conflict never tints")
 end)
 
+for _, changed in ipairs({"color","saturation","both"}) do
+    test("ordinary OFF preserves a newer "..changed.." assignment",function()
+        local t=texture();local _,s=make({CharacterBag0Slot=bag(t)})
+        if changed~="saturation" then t:SetVertexColor(.12,.23,.34,.45) end
+        if changed~="color" then t:SetDesaturation(.37) end
+        s.command("off")
+        if changed=="saturation" then color(t,1,.8,.5,.7,"original")
+        else color(t,.12,.23,.34,.45,"external") end
+        near(t.saturation,changed=="color" and .2 or .37,"independent saturation")
+    end)
+end
 test("late DarkMode restores untouched owned properties on its load event", function()
     local t = texture(); local _, s = make({CharacterBag0Slot = bag(t)})
     tinted(t, "owned before handoff")
@@ -190,6 +314,30 @@ test("late DarkMode restores untouched owned properties on its load event", func
     local writes = t.colorWrites + t.saturationWrites
     retry(s); s.command("off"); s.command("on")
     assert(t.colorWrites + t.saturationWrites == writes, "ownership retires")
+end)
+
+test("repaint before OFF adopts changed native colors without compounding",function()
+    local t=texture();local _,s=make({CharacterBag0Slot=bag(t)})
+    t:SetVertexColor(.12,.23,.34,.45);t:SetDesaturation(.37)
+    retry(s);retry(s);s.command("off")
+    color(t,.12,.23,.34,.45,"new original");near(t.saturation,.37,"new saturation")
+end)
+test("RGB-only color readback recovers its original opaque tint",function()
+    local t=texture(); t.color[4]=1
+    t.GetVertexColor=function(self) return self.color[1],self.color[2],self.color[3] end
+    local _,s=make({PlayerFrameTexture=t})
+    near(t.color[1],.6,"applied");s.command("off");color(t,1,.8,.5,1,"restored")
+end)
+
+test("OFF retries a declined restore without touching a property another writer took",function()
+    local t=texture();local _,s=make({CharacterBag0Slot=bag(t)})
+    local setter=t.SetVertexColor
+    t.SetVertexColor=function() return false end
+    s.command("off")
+    color(t,.53664,.39216,.21156,.7,"color still pending")
+    t:SetDesaturation(.31)
+    t.SetVertexColor=setter;retry(s)
+    color(t,1,.8,.5,.7,"color recovered");near(t.saturation,.31,"new saturation")
 end)
 
 for _, changed in ipairs({"color", "saturation", "both"}) do
@@ -231,6 +379,18 @@ test("secret current color cannot authorize handoff restoration", function()
     local writes = t.colorWrites
     handoff(s)
     assert(t.colorWrites == writes, "secret component never compared or written")
+end)
+
+test("a transient read fault during handoff preserves independently owned properties for retry",function()
+    local t=texture()
+    local _,s=make({CharacterBag0Slot=bag(t)})
+    t.unreadableColor,t.unreadableSaturation=true,true
+    handoff(s)
+    tinted(t,"no writes until authorized")
+    t.unreadableColor,t.unreadableSaturation=false,false
+    retry(s)
+    color(t,1,.8,.5,.7,"native color recovered")
+    near(t.saturation,.2,"native saturation recovered")
 end)
 
 for _, failure in ipairs({"failColor", "failSaturation"}) do
@@ -338,6 +498,9 @@ for _, changed in ipairs({false, true}) do
         local _, s = make({CharacterBag0Slot = bag(t)})
         color(t, .537, .392, .212, .7, "native retained tint")
         near(t.saturation, .56, "native retained saturation")
+        local c,d=t.colorWrites,t.saturationWrites
+        retry(s)
+        assert(t.colorWrites==c and t.saturationWrites==d,"stable quantized tint is already applied")
         if changed then
             t.color = {.221, .332, .443, .554}; t.saturation = .36
         end
@@ -353,6 +516,22 @@ for _, changed in ipairs({false, true}) do
 end
 
 for _, property in ipairs({"color", "saturation"}) do
+    for _, changed in ipairs({false,true}) do
+        test("OFF checks recovered "..property.." readback; changed="..tostring(changed),function()
+            local t=texture()
+            local key=property=="color" and "SetVertexColor" or "SetDesaturation"
+            local flag=property=="color" and "unreadableColor" or "unreadableSaturation"
+            local set=t[key]
+            t[key]=function(self,...) set(self,...);self[flag]=true end
+            local _,s=make({CharacterBag0Slot=bag(t)})
+            s.command("off")
+            t[flag]=false;t[key]=set
+            if changed then t:SetVertexColor(.22,.33,.44,.55);t:SetDesaturation(.37) end
+            s.command("off")
+            if changed then color(t,.22,.33,.44,.55,"external");near(t.saturation,.37,"external saturation")
+            else color(t,1,.8,.5,.7,"original");near(t.saturation,.2,"original saturation") end
+        end)
+    end
     test("unreadable post-write " .. property .. " cannot establish ownership", function()
         local t = texture()
         if property == "color" then
@@ -375,5 +554,36 @@ for _, property in ipairs({"color", "saturation"}) do
     end)
 end
 
+for _, external in ipairs({false,true}) do
+test("delayed float readback tracks the actual tint; external="..tostring(external),function()
+    local t=texture()
+    local colorSetter,levelSetter=t.SetVertexColor,t.SetDesaturation
+    local onceColor,onceLevel=true,true
+    function t:SetVertexColor(r,g,b,a)
+        if math.abs(r-.53664)<1e-9 then
+            r,g,b,a=.5366399884223938,.39215999841690063,.21155999600887299,.699999988079071
+        end
+        colorSetter(self,r,g,b,a)
+        if onceColor then self.unreadableColor=true;onceColor=false end
+    end
+    function t:SetDesaturation(v)
+        levelSetter(self,v==.55 and .550000011920929 or v)
+        if onceLevel then self.unreadableSaturation=true;onceLevel=false end
+    end
+    local _,s=make({CharacterBag0Slot=bag(t)})
+    t.unreadableColor,t.unreadableSaturation=false,false
+    if external then
+        -- The next representable values are real changes. An epsilon
+        -- comparison could incorrectly undo either one on handoff.
+        t:SetVertexColor(.5366400480270386,t.color[2],t.color[3],t.color[4])
+        t:SetDesaturation(.5500000715255737)
+        s.command("off")
+        assert(t.color[1]==.5366400480270386 and t.saturation==.5500000715255737)
+    else
+        retry(s);near(t.color[1],.53664,"no compounding")
+        s.command("off");color(t,1,.8,.5,.7,"native original");near(t.saturation,.2,"native saturation")
+    end
+end)
+end
 print("SoftDark discovery/handoff: " .. passed .. " passed, " .. #failed .. " failed")
 assert(#failed == 0, table.concat(failed, "\n"))

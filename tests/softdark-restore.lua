@@ -2,6 +2,9 @@
 -- Native UI boundaries are doubles; all tint, restore and lifecycle code is real.
 local unpack = table.unpack or unpack
 local passed, failed = 0, {}
+local addonPrivate = {}
+local loadPrecision = loadfile("NativePrecision.lua")
+if loadPrecision then loadPrecision("bjarkiUI", addonPrivate) end
 local function near(got, want, label)
     assert(type(got) == "number" and math.abs(got - want) < 0.0000001,
         label .. ": got " .. tostring(got) .. ", expected " .. tostring(want))
@@ -91,7 +94,7 @@ local function make(extra)
     else
         chunk = assert(load(source, "SoftDark.lua", "t", env))
     end
-    chunk()
+    chunk("bjarkiUI", addonPrivate)
     function state.fire(event) state.event(nil, event) end
     function state.command(arg) env.SlashCmdList.BJARKISOFTDARK(arg) end
     state.fire("PLAYER_LOGIN")
@@ -192,20 +195,24 @@ test("unreadable owned texture keeps originals until readable OFF retry", functi
     near(t.saturation, 0.2, "readable saturation retry")
 end)
 
-test("boolean saturation restoration keeps failed false original", function()
-    local t = texture()
-    t.GetDesaturation = nil
-    function t:IsDesaturated() return self.saturation > 0 end
-    function t:SetDesaturated(value)
-        if self.failSaturation then error("transient boolean rejection") end
-        self.saturation = value and 1 or 0
+test("a boolean saturation read preserves the actual native amount and other writers", function()
+    for _, original in ipairs({0, 0.2, 1}) do
+        local t = texture()
+        local getLevel = t.GetDesaturation
+        t.GetDesaturation = nil
+        t.saturation = original
+        function t:IsDesaturated() return self.saturation > 0 end
+        function t:SetDesaturated(value) self.saturation = value and 1 or 0 end
+        local _, s = make({CharacterBag0Slot = bag(t)})
+        near(t.saturation, original, "boolean-only observation leaves native amount")
+        assert(t.saturationWrites == 0)
+        color(t, 0.53664, 0.39216, 0.21156, 0.7, "warm vertex tint still applies")
+        t.saturation = 0.8
+        s.command("off");near(t.saturation, 0.8, "external amount survives OFF")
+        t.GetDesaturation = getLevel
+        s.command("on");near(t.saturation, 0.55, "numeric baseline enables partial treatment")
+        s.command("off");near(t.saturation, 0.8, "numeric baseline restored")
     end
-    t.saturation = 0
-    local _, s = make({CharacterBag0Slot = bag(t)})
-    near(t.saturation, 0.55, "partial shader treatment")
-    t.failSaturation = true; s.command("off"); t.failSaturation = false
-    s.command("on"); s.command("off")
-    near(t.saturation, 0, "false boolean original")
 end)
 
 test("unreadable saturation is never replaced with an invented original", function()

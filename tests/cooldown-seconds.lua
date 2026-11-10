@@ -193,6 +193,77 @@ do
     eq(late.setterCalls,0,"unrelated addons ignored")
     spy.emit("ADDON_LOADED","Blizzard_MultiActionBars")
     eq(late.setterCalls,1,"late native multi-bar discovered")
+
+    local summoned,unrelated=makeCooldown(),makeCooldown()
+    env.PetActionButton2={cooldown=summoned,index=2}
+    env.ActionButton6={cooldown=unrelated}
+    local petSlot
+    env.bjarkiUINativeDigitCells={InstallAction=function(owner,index)
+        if owner==env.PetActionButton2 then petSlot=index end
+    end}
+    spy.emit("UNIT_PET","party1")
+    eq(summoned.setterCalls,0,"another unit's pet leaves the player's pet buttons alone")
+    spy.emit("UNIT_PET","player")
+    eq(summoned.setterCalls,1,"summoned pet is discovered before a generic bar rescan")
+    eq(petSlot,2,"pet source receives the actual native bar index")
+    eq(unrelated.setterCalls,0,"pet summon does not rescan player action bars")
+    local swapped=makeCooldown()
+    env.PetActionButton2={cooldown=swapped,index=2}
+    spy.emit("PET_BAR_UPDATE")
+    eq(swapped.setterCalls,1,"a changed pet bar discovers the replacement ability slot")
+end
+
+do
+    local env,spy=makeEnv()
+    local hooks,receipts=0,0
+    local owner={cooldown=makeCooldown()}
+    env.bjarkiUINativeDigitCells={StockCountdownVisibilityChanged=function(button)
+        eq(button,owner,"stock helper supplies the actual button")
+        check(button.cooldown.nativeWriteComplete,"the native helper has already completed")
+        receipts=receipts+1
+    end}
+    env.hooksecurefunc=function(target,key,callback)
+        eq(target,env);eq(key,"ActionButton_UpdateCooldownNumberHidden")
+        local original=target[key]
+        target[key]=function(button)original(button);callback(button)end
+        hooks=hooks+1
+    end
+    loadWith(env)
+    env.ActionButton_UpdateCooldownNumberHidden=function(button)button.cooldown.nativeWriteComplete=true end
+    spy.setCombat(true);spy.emit("ADDON_LOADED","Blizzard_ActionBar");eq(hooks,0)
+    spy.setCombat(false);spy.emit("PLAYER_REGEN_ENABLED");spy.emit("PLAYER_LOGIN")
+    eq(hooks,1,"one posthook on the late-loaded Blizzard visibility helper")
+    env.ActionButton_UpdateCooldownNumberHidden(owner)
+    eq(receipts,1,"native visibility receipt is forwarded exactly once")
+end
+
+do
+    local env,spy=makeEnv()
+    local callbacks,resumes,stops={},0,0
+    local enabled,accept=true,false
+    env.C_CVar={GetCVarBool=function() return enabled end}
+    env.bjarkiUINativeDigitCells={
+        ResumeOwnedActionNumbers=function() resumes=resumes+1 end,
+        StopActionNumbers=function() stops=stops+1 end,
+    }
+    env.C_Timer={After=function(_,cb)
+        callbacks[#callbacks+1]=cb
+        if not accept then return false end
+    end}
+    loadWith(env)
+    local function preference(value)
+        enabled=value
+        spy.emit("CVAR_UPDATE","countdownForCooldowns")
+    end
+    preference(true)
+    eq(resumes,1,"a rejected timer recovers the preference immediately")
+    accept=true;preference(true);preference(true)
+    eq(#callbacks,2,"next preference burst coalesces normally")
+    callbacks[1]();eq(resumes,1,"a refused callback cannot consume the next request")
+    preference(false);eq(stops,1,"disable is immediate")
+    callbacks[2]();eq(resumes,1,"disable revokes the previously queued enable")
+    preference(true);callbacks[3]();callbacks[3]()
+    eq(resumes,2,"the latest enable runs exactly once")
 end
 
 do

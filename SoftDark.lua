@@ -1,6 +1,7 @@
 -- bjarkiUI Soft Dark, Forever: automatic and reversible decorative tinting.
 -- No DarkMode source/assets, replacement files, runtime layout manipulation,
 -- or per-user shade configuration. Decorative texture changes only.
+local _, uiPrivate = ...
 local settings = bjarkiUISettings
 if type(settings) ~= "table" then return end
 -- One fixed preset: no user setting, brightness command, or bag mode.
@@ -216,57 +217,97 @@ local function loadedDarkMode()
     return ok and readable(active) and active == true
 end
 
--- During theme handoff, a saved baseline alone cannot prove ownership.
+-- On a repaint or handoff, a saved baseline alone cannot prove ownership.
 -- Compare each readable property with our last successful write; an incoming
--- theme's changes (or uncertain current state) retire only that property's
--- snapshot without writing it. Failed still-owned restores remain retryable.
+-- theme's changes retire only that property's snapshot. Unavailable current
+-- values leave a previously verified write pending for the next safe event.
 local function readColor(texture)
     local getter = child(texture, "GetVertexColor")
     if type(getter) ~= "function" then return nil end
     local ok, r, g, b, a = pcall(getter, texture)
+    if type(a) == "nil" then a = 1 end
     if not ok or not readable(r) or not readable(g) or not readable(b)
         or not readable(a) or type(r) ~= "number" or type(g) ~= "number"
         or type(b) ~= "number" or type(a) ~= "number" then return nil end
     return {r, g, b, a}
 end
 
-local function readDesaturation(texture, mode)
-    local getter = child(texture, mode == "level" and "GetDesaturation" or "IsDesaturated")
+local function readDesaturation(texture)
+    local getter = child(texture, "GetDesaturation")
     if type(getter) ~= "function" then return nil end
     local ok, value = pcall(getter, texture)
-    if not ok or not readable(value) or type(value) ~= (mode == "level" and "number" or "boolean") then
-        return nil
+    if ok and readable(value) and type(value) == "number" and value >= 0 and value <= 1 then
+        return value
     end
-    return {mode = mode, value = value}
 end
 
-local function ownsColor(texture, base)
-    local applied = base.applied
-    local current = applied and readColor(texture)
+-- If immediate readback failed, accept the request itself or its exact
+-- IEEE-754 binary32 rounding. An adjacent stored value belongs to its writer.
+local function matchesTintRequest(current, requested)
+    if current == requested then return true end
+    if type(requested) ~= "number" or not (requested > 0 and requested <= 1) then return false end
+    return current == uiPrivate.RoundToFloat32(requested)
+end
+
+local function matchesColor(current, expected, allowRounding)
+    if not expected then return false end
+    for i = 1, 4 do
+        if current[i] ~= expected[i] and (not allowRounding or not matchesTintRequest(current[i], expected[i])) then
+            return false
+        end
+    end
+    return true
+end
+
+-- Only the redundant-write shortcut allows quantization up to half an
+-- 8-bit color step. Ownership and restoration still require the exact
+-- observed color. An unchanged channel may already be the requested byte.
+local function tintSettled(current, requested, before)
     if not current then return false end
-    return current[1] == applied[1] and current[2] == applied[2]
-        and current[3] == applied[3] and current[4] == applied[4]
+    for i = 1, 4 do
+        local value, target = current[i], requested[i]
+        if not matchesTintRequest(value,target) then
+            local byte = math.floor(target*255+.5)/255
+            if not matchesTintRequest(value,byte) and
+                (value == before[i] or math.abs(value-target) > 0.5/255) then return false end
+        end
+    end
+    return true
 end
 
-local function ownsDesaturation(texture, previous)
-    local applied = previous.applied
-    local current = applied and readDesaturation(texture, applied.mode)
-    return current and current.value == applied.value
+local function ownsColor(texture, base, handoff)
+    if not base.applied and (handoff or not base.requested) then return false end
+    local current = readColor(texture)
+    if not current then return nil end
+    return matchesColor(current,base.applied) or (not handoff and matchesColor(current,base.requested,true)), current
 end
 
-local function restoreColor(texture, handoff, keepOriginal)
+local function ownsDesaturation(texture, previous, handoff)
+    local applied = previous.applied or (not handoff and previous.requested)
+    if not applied then return false end
+    local current = readDesaturation(texture)
+    if current == nil then return nil end
+    return current == previous.applied or
+        (not handoff and previous.requested ~= nil and matchesTintRequest(current, previous.requested)), current
+end
+
+local function writeProperty(texture, method, ...)
+    local ok, result = pcall(child(texture, method), texture, ...)
+    return ok and (type(result) == "nil" or (readable(result) and result ~= false))
+end
+
+local function restoreColor(texture, mode)
     local base = originalColor[texture]
     if not base then return true end
-    if handoff and not ownsColor(texture, base) then
-        originalColor[texture] = nil
-        return true
-    end
-    local setter = handoff and child(texture, "SetVertexColor") or nil
-    if not handoff then setter = texture.SetVertexColor end
-    local restored = pcall(setter, texture, base[1], base[2], base[3], base[4])
+    local owned = ownsColor(texture, base, mode == "handoff")
+    if owned == nil then return false end
+    if not owned then originalColor[texture] = nil; return true end
+    local restored = writeProperty(texture, "SetVertexColor", base[1], base[2], base[3], base[4])
     if restored then
-        if keepOriginal and not handoff then
+        if mode == "preview" then
             base.applied = readColor(texture)
+            base.requested = nil
+            base.tintBrightness = nil
         else
             originalColor[texture] = nil
         end
@@ -274,26 +315,18 @@ local function restoreColor(texture, handoff, keepOriginal)
     return restored
 end
 
-local function restoreDesaturation(texture, handoff, keepOriginal)
+local function restoreDesaturation(texture, mode)
     local previous = originalBagDesaturation[texture]
     if not previous then return true end
-    if handoff and not ownsDesaturation(texture, previous) then
-        originalBagDesaturation[texture] = nil
-        return true
-    end
-    local restored = false
-    if previous.mode == "level" then
-        local setter = handoff and child(texture, "SetDesaturation") or nil
-        if not handoff then setter = texture.SetDesaturation end
-        restored = pcall(setter, texture, previous.value)
-    elseif previous.mode == "bool" then
-        local setter = handoff and child(texture, "SetDesaturated") or nil
-        if not handoff then setter = texture.SetDesaturated end
-        restored = pcall(setter, texture, previous.value)
-    end
+    local owned = ownsDesaturation(texture, previous, mode == "handoff")
+    if owned == nil then return false end
+    if not owned then originalBagDesaturation[texture] = nil; return true end
+    local restored = writeProperty(texture, "SetDesaturation", previous.value)
     if restored then
-        if keepOriginal and not handoff then
-            previous.applied = readDesaturation(texture, previous.mode)
+        if mode == "preview" then
+            previous.applied = readDesaturation(texture)
+            previous.requested = nil
+            previous.settled = nil
         else
             originalBagDesaturation[texture] = nil
         end
@@ -341,11 +374,11 @@ end
 local function restoreBagSiblingArt()
     -- Edit Mode can temporarily restore only these seven frames' artwork,
     -- without undoing the rest of the Soft Dark presentation.
+    local mode = loadedDarkMode() and "handoff" or "preview"
     for texture in pairs(bagSiblingStyledTextures) do
         if readable(texture) then
-            local handoff = loadedDarkMode()
-            local colorRestored = restoreColor(texture, handoff, true)
-            local saturationRestored = restoreDesaturation(texture, handoff, true)
+            local colorRestored = restoreColor(texture, mode)
+            local saturationRestored = restoreDesaturation(texture, mode)
             -- Keep failed siblings eligible for the next Edit Mode/layout retry.
             -- Originals remain available while the rest of the theme is active.
             if colorRestored and saturationRestored then
@@ -426,12 +459,12 @@ local function styleBagSiblingArt(tint)
     return count
 end
 
-local function restore(handoff)
+local function restore(mode)
     -- The global pass includes siblings: attempt each property only once.
     -- Retire only successful writes; failures keep their weak-key originals
     -- for an explicit/lifecycle retry or a noncompounding direct re-enable.
     for texture in pairs(originalColor) do
-        if readable(texture) and restoreColor(texture, handoff) then
+        if readable(texture) and restoreColor(texture, mode) then
             if not originalBagDesaturation[texture] then
                 bagSiblingStyledTextures[texture] = nil
             end
@@ -439,7 +472,7 @@ local function restore(handoff)
     end
     -- Color and desaturation can be owned by different themes.
     for texture in pairs(originalBagDesaturation) do
-        if readable(texture) and restoreDesaturation(texture, handoff) then
+        if readable(texture) and restoreDesaturation(texture, mode) then
             if not originalColor[texture] then
                 bagSiblingStyledTextures[texture] = nil
             end
@@ -458,63 +491,94 @@ end
 local function tintTexture(texture, relativeBrightness, warmBagChrome)
     if not isTexture(texture) then return false end
     local base = originalColor[texture]
-    if not base then
-        local ok, r, g, b, a = pcall(texture.GetVertexColor, texture)
-        if not ok or not readable(r) or not readable(g) or not readable(b)
-            or type(r) ~= "number" or type(g) ~= "number" or type(b) ~= "number" then
-            return false
+    local before
+    local brightness = relativeBrightness or 1
+    if base and (base.applied or base.requested) then
+        local owned, current = ownsColor(texture, base)
+        if owned == nil then return false end
+        before = current
+        if owned and base.tintBrightness == brightness and base.warmBagChrome == warmBagChrome
+            and matchesColor(current, base.applied) then
+            return true
+        elseif not owned then
+            originalColor[texture] = nil
+            base = current
         end
-        if not readable(a) or type(a) ~= "number" then a = 1 end
-        base = { r, g, b, a }
-        originalColor[texture] = base
+    else
+        originalColor[texture] = nil
+        base = readColor(texture)
+        if not base then return false end
+        before = base
     end
-    local factor = SOFT_DARK_BRIGHTNESS * (relativeBrightness or 1)
+    local factor = SOFT_DARK_BRIGHTNESS * brightness
     local red, green, blue = 1, 1, 1
     if warmBagChrome then
         red, green, blue = BAG_WARM_RED, BAG_WARM_GREEN, BAG_WARM_BLUE
     end
     local applied = {base[1] * factor * red, base[2] * factor * green,
         base[3] * factor * blue, base[4]}
-    local ok = pcall(texture.SetVertexColor, texture,
+    local ok = writeProperty(texture, "SetVertexColor",
         applied[1], applied[2], applied[3], applied[4])
     -- Native setters may retain lower-precision values than the Lua inputs.
-    -- Failed/secret readback leaves no evidence authorizing a later handoff.
-    if ok then base.applied = readColor(texture) end
-    return ok
+    -- At ordinary shutdown an exact later read can confirm our request.
+    -- An incoming theme requires the original write's observed result.
+    local current = readColor(texture)
+    -- A wrapper can decline or throw after the native color changed. Keep
+    -- the pre-write baseline only for an observed match or a pending read.
+    if ok or (current and matchesColor(current,applied,true)) then
+        -- Preserve native quantization. A no-op setter cannot establish a
+        -- different requested tint as settled merely by returning normally.
+        local settled = tintSettled(current,applied,before)
+        base.tintBrightness = settled and brightness or nil
+        base.warmBagChrome = warmBagChrome
+        base.applied = current
+        base.requested = not current and applied or nil
+        originalColor[texture] = base
+        return true
+    elseif not current then
+        base.requested = applied
+        originalColor[texture] = base
+    elseif not matchesColor(current,base.applied) and not matchesColor(current,base.requested,true) then
+        originalColor[texture] = nil
+    end
+    return false
 end
 
 -- Safe, reversible desaturation for BAG CHROME ONLY. Do not use on spell,
 -- item, keyring glyph, portrait, status, or quality-colored textures.
 tintBagChromeTexture = function(texture, relativeBrightness)
     if not tintTexture(texture, relativeBrightness, true) then return false end
-    if not originalBagDesaturation[texture] then
-        local getLevel = child(texture, "GetDesaturation")
-        local getBool = child(texture, "IsDesaturated")
-        local previous
-        if type(getLevel) == "function" then
-            local ok, level = pcall(getLevel, texture)
-            if ok and readable(level) and type(level) == "number" then
-                previous = { mode = "level", value = level }
-            end
+    local saved = originalBagDesaturation[texture]
+    local before
+    if saved and (saved.applied or saved.requested) then
+        local owned, current = ownsDesaturation(texture, saved)
+        if owned == nil then return true end -- the color is still styled
+        before = current
+        if owned and saved.settled and current == saved.applied then return true end
+        if not owned then
+            originalBagDesaturation[texture] = nil
+            saved = {value = current}
         end
-        if not previous and type(getBool) == "function" then
-            local ok, isGray = pcall(getBool, texture)
-            if ok and readable(isGray) and type(isGray) == "boolean" then
-                previous = { mode = "bool", value = isGray }
-            end
-        end
-        if previous then originalBagDesaturation[texture] = previous end
+    else
+        -- A boolean cannot identify the amount of partial desaturation to
+        -- restore. The warm vertex tint has its own independent baseline.
+        local level = readDesaturation(texture)
+        if level == nil then return true end
+        saved = {value = level}
+        before = level
     end
-    -- Partial (not full) desaturation is essential: full grayscale is what
-    -- made the bag borders look silver next to the warmer action bar.
-    -- If the client only offers the boolean API, keep native saturation and
-    -- the fixed warm vertex tint instead of forcing full grayscale again.
-    if originalBagDesaturation[texture] then
-        if type(child(texture, "SetDesaturation")) == "function" then
-            if pcall(texture.SetDesaturation, texture, BAG_DESATURATION) then
-                originalBagDesaturation[texture].applied = readDesaturation(texture, "level")
-            end
-        end
+    local ok = writeProperty(texture, "SetDesaturation", BAG_DESATURATION)
+    local current = readDesaturation(texture)
+    if ok or (current ~= nil and matchesTintRequest(current, BAG_DESATURATION)) then
+        saved.settled = current ~= nil and (current ~= before or matchesTintRequest(current, BAG_DESATURATION))
+        saved.applied = current
+        saved.requested = not current and BAG_DESATURATION or nil
+        originalBagDesaturation[texture] = saved
+    elseif current == nil then
+        saved.requested = BAG_DESATURATION
+        originalBagDesaturation[texture] = saved
+    elseif current ~= saved.applied and not matchesTintRequest(current,saved.requested) then
+        originalBagDesaturation[texture] = nil
     end
     return true
 end
@@ -860,7 +924,7 @@ local function applyTheme()
     end
     pending = false
     if loadedDarkMode() then
-        restore(true)
+        restore("handoff")
         if not warnedConflict then
             out("the full DarkMode addon is loaded; Soft Dark is inactive to avoid conflicting recolors")
             warnedConflict = true

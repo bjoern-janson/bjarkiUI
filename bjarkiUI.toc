@@ -2,9 +2,10 @@
 ## Title: bjarkiUI
 ## Notes: Ultralight unit-frame presentation for WoW: Forever
 ## Author: Bjarki / OpenAI
-## Version: 0.2.309-native-spacing-castbar
+## Version: 0.2.323
 ## SavedVariablesPerCharacter: bjarkiUISettings
 
+NativePrecision.lua
 bjarkiUI.lua
 PartyOrder.lua
 SoftDark.lua

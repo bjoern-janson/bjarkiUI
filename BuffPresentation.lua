@@ -86,13 +86,72 @@ local timerStats = { native = 0, fallback = 0, readable = 0,
 local DURATION_RETRY_DELAY = 0.25
 local MAX_DURATION_RETRY_DELAY = 2
 
+local function durationField(button, key)
+    local ok, value = pcall(readMember, button, key)
+    if not ok then return nil, false end
+    if readable(value) then return value, true end
+    return nil, type(value) == "nil"
+end
+local function durationLabel(button)
+    -- A missing legacy field permits the next alias. A denied field cannot
+    -- authorize picking a different label on a recycled button.
+    local label, allowed = durationField(button, "Duration")
+    if label or not allowed then return label end
+    label, allowed = durationField(button, "duration")
+    if label or not allowed then return label end
+    return namedRegion(button, "Duration")
+end
+if bjarkiUINativeDigitCells then
+    bjarkiUINativeDigitCells.GetBuffDurationLabel = durationLabel
+end
+local function releaseDigits(button, state, current)
+    local api = bjarkiUINativeDigitCells
+    if not api or type(api.ClearBuff) ~= "function" then return true end
+    local previous = state and state.splitDuration
+    local lease = state and state.splitGeneration
+    if previous and api.ClearBuff(previous,button,lease) == false then return false end
+    if current and current ~= previous then
+        local currentLease
+        if api.BuffBinding then
+            local ours,generation=api.BuffBinding(current,button)
+            if ours then currentLease=generation end
+        end
+        api.ClearBuff(current,button,currentLease)
+    end
+    if state and state.splitDuration==previous and state.splitGeneration==lease then
+        state.splitDuration, state.splitGeneration = nil, nil
+    end
+    return true
+end
+local function afterAuraType(button)
+    -- Forever's Edit Mode preview sets isExample, changes the aura type, then
+    -- writes its own duration. It never calls the normal expiration updater.
+    local state = states[button]
+    if state and member(button, "isExample") == true then
+        state.assignment=(state.assignment or 0)+1
+        state.pendingForeignReplay=nil
+        if state.splitDuration then releaseDigits(button,state) end
+    end
+end
+local function resetStockReceipt(state)
+    state.sharedHasText,state.sharedText=nil,nil
+    state.receiptRetryAt,state.receiptRetryTicks,state.receiptExpiry=nil,nil,nil
+end
+
 local function invalidateDurationObject(button)
     local state = states[button]
     if not state then return end
     -- An actual aura assignment/expiration refresh is new evidence. Do not
     -- inherit a backoff window from an older, temporarily inaccessible read.
     state.durationObject = nil
+    state.assignment=(state.assignment or 0)+1
+    state.sharedTime,state.sharedSecret,state.sharedNativeTime=nil,nil,nil
+    resetStockReceipt(state)
+    state.capturingStock,state.pendingForeignReplay=nil,nil
     state.durationRetryAt, state.durationRetryDelay = nil, nil
+    -- Permanent bindings hide Duration and stop its update script. Sibling
+    -- FontStrings must release the previous aura at the assignment boundary.
+    releaseDigits(button, state, accessible(button) and durationLabel(button) or nil)
 end
 
 local function getDurationFormatter()
@@ -144,6 +203,38 @@ local function timerClock()
     if ok and readable(value) and type(value) == "number"
         and value >= 0 and value < math.huge then return value end
 end
+local function rememberStockReceipt(state,duration,formatted,text)
+    local now
+    if not formatted then
+        if state.receiptRetryTicks then
+            now=timerClock()
+            if now and state.receiptRetryAt and now<state.receiptRetryAt then return end
+            if not now and state.receiptRetryTicks>0 then
+                state.receiptRetryTicks=state.receiptRetryTicks-1
+                return
+            end
+        end
+        formatted,text=pcall(member(duration,"GetText"),duration)
+    end
+    if not state.capturingStock then return end -- a newer source ran in the getter
+    if formatted then
+        state.sharedHasText,state.sharedText=true,text
+        state.receiptRetryAt,state.receiptRetryTicks,state.receiptExpiry=nil,nil,nil
+    else
+        now=now or timerClock()
+        -- Keep a previously captured receipt briefly for this owner. It
+        -- cannot stand in for a continually ticking, unreadable source.
+        if state.sharedHasText then
+            if now and not state.receiptRetryTicks then
+                state.receiptExpiry=now+MAX_DURATION_RETRY_DELAY
+            elseif not now or not state.receiptExpiry or now>=state.receiptExpiry then
+                state.sharedHasText,state.sharedText=nil,nil
+            end
+        end
+        state.receiptRetryAt=now and now+DURATION_RETRY_DELAY
+        state.receiptRetryTicks=8
+    end
+end
 
 local function deferNativeDuration(state, reason)
     state.durationObject = nil
@@ -163,6 +254,9 @@ local function showNativeDuration(button, duration)
     local id, unit = member(info, "auraInstanceID"), member(button, "unit")
     -- Compare only positively public identities. No spell-ID allowlist, lookup
     -- by hidden spell name, or estimated Escape Artist duration.
+    if id~=state.durationID or unit~=state.durationUnit or info~=state.durationInfo then
+        resetStockReceipt(state)
+    end
     if id ~= state.durationID or unit ~= state.durationUnit then
         state.durationID, state.durationUnit = id, unit
         state.durationObject, state.durationRetryAt, state.durationRetryDelay = nil, nil, nil
@@ -214,12 +308,16 @@ local function showNativeDuration(button, duration)
     else
         ok, text = pcall(format, object, durationFormatter)
     end
-    if ok then ok = pcall(set, duration, text) end
+    if ok then
+        local wrote,result=pcall(set,duration,text)
+        ok=wrote and (type(result)=="nil" or (readable(result) and result~=false))
+    end
     if not ok then
         deferNativeDuration(state, "native formatting write rejected"); return
     end
     state.durationRetryDelay = nil
     noteNativeTimer(state)
+    return true,text
 end
 
 -- IsShown itself can be restricted (SecretAspect.Shown), independently of
@@ -231,14 +329,15 @@ local function canFormatDuration(button, duration)
     if type(isShown) ~= "function" then return false end
     local ok, shown = pcall(isShown, duration)
     if not ok then return false end -- A throwing getter is not a secret-value witness.
-    if readable(shown) then return shown == true end
+    if readable(shown) then return shown == true,shown == false end
     if type(issecretvalue) ~= "function" then return false end
     local checked, hidden = pcall(issecretvalue, shown)
     if not checked or hidden ~= true then return false end
     local get = member(C_CVar, "GetCVarBool") or member(_G, "GetCVarBool")
     if type(get) ~= "function" then return false end
     local enabledOK, enabled = pcall(get, "buffDurations")
-    if not enabledOK or not readable(enabled) or enabled ~= true then return false end
+    if not enabledOK or not readable(enabled) then return false end
+    if enabled~=true then return false,enabled==false and "preference" or nil end
     local state = states[button]
     local info = member(button, "buttonInfo")
     local binding = member(info, "auraInstanceID") or info or false
@@ -250,71 +349,232 @@ local function canFormatDuration(button, duration)
     return true
 end
 
+local function restoreOwnerStockReceipt(owner, ownerState, label, ownerGeneration)
+    -- The failed native call could have transferred the physical label.
+    local cells = bjarkiUINativeDigitCells
+    if not cells or not cells.RestoreBuffStockReceipt or durationLabel(owner) ~= label then return end
+    if ownerState.sharedLabel ~= label or ownerState.sharedGeneration ~= ownerGeneration then return end
+
+    local text = ""
+    if ownerState.sharedHasText then
+        local now = ownerState.receiptExpiry and timerClock()
+        if not ownerState.receiptExpiry or (now and now < ownerState.receiptExpiry) then
+            text = ownerState.sharedText
+        end
+    end
+    cells.RestoreBuffStockReceipt(label, owner, ownerGeneration, true, text)
+end
+
+local function recoverForeignTimer(reader, readerState, label, owner, ownerGeneration)
+    -- The stale reader has already written to the owner's physical label.
+    if readerState and readerState.splitDuration == label then releaseDigits(reader, readerState) end
+    local ownerState = owner and states[owner]
+    if not ownerState or ownerState.replaying or not accessible(owner) or member(owner, "isExample") == true
+        or durationLabel(owner) ~= label then return end
+
+    ownerState.replaying = true
+    if ownerState.splitDuration and ownerState.splitDuration ~= label then releaseDigits(owner, ownerState) end
+    local currentSample = ownerState.sharedLabel == label and ownerState.sharedGeneration == ownerGeneration
+    if currentSample and ownerState.sharedTime then
+        pcall(member(owner, "UpdateDuration"), owner, ownerState.sharedTime)
+    elseif currentSample and ownerState.sharedSecret and (ownerState.sharedVisible or canFormatDuration(owner, label)) then
+        -- Ask stock to format its original opaque sample even when the aura ID is restricted.
+        ownerState.pendingForeignReplay = true
+        local replayed, result = pcall(member(owner, "UpdateDuration"), owner, ownerState.sharedNativeTime)
+        -- A newer owner update clears this flag from inside UpdateDuration.
+        local stillCurrent = ownerState.pendingForeignReplay
+        ownerState.pendingForeignReplay = nil
+        if stillCurrent then
+            local accepted = replayed and (type(result) == "nil" or (readable(result) and result ~= false))
+            if not accepted then restoreOwnerStockReceipt(owner, ownerState, label, ownerGeneration) end
+        end
+    else
+        pcall(member(label, "SetText"), label, "")
+    end
+    ownerState.replaying = nil
+end
+
+local function reconcileDisplacement(binding,button,state,duration)
+    local ours,_,_,owner,_,ownerGeneration=binding(duration,button)
+    if ours==false and owner then recoverForeignTimer(button,state,duration,owner,ownerGeneration) end
+end
+
+local function enchantRemaining(button)
+    local info=member(button,"buttonInfo")
+    local expiration=member(info,"expirationTime")
+    if type(expiration)~="number" or not (expiration>0 and expiration<math.huge) then
+        return nil,"no public enchant expiration"
+    end
+    local now=timerClock()
+    if not now then return nil,"no public enchant expiration" end
+    local ok,rate=pcall(readMember,info,"timeMod")
+    if not ok or (type(rate)~="nil" and (not readable(rate) or type(rate)~="number"
+        or rate==math.huge or rate==-math.huge or rate~=rate)) then return nil,"unreadable enchant time modifier" end
+    return (expiration-now)/(rate and rate>0 and rate or 1)
+end
+
 local function showTenths(button, timeLeft)
-    if not accessible(button) or member(button, "isExample") == true then return end
-    local duration = member(button, "Duration") or member(button, "duration") or namedRegion(button, "Duration")
-    if not accessible(duration) then return end
-    if not canFormatDuration(button, duration) then
-        if bjarkiUINativeDigitCells then bjarkiUINativeDigitCells.ClearBuff(duration) end
+    if not readable(button) then return end
+    local state = states[button]
+    local assignment=state and state.assignment
+    if not accessible(button) or member(button, "isExample") == true then releaseDigits(button, state); return end
+    local duration = durationLabel(button)
+    if not accessible(duration) then releaseDigits(button, state); return end
+    if state and state.splitDuration and state.splitDuration ~= duration and not releaseDigits(button, state) then return end
+    local digitCells = bjarkiUINativeDigitCells
+    local binding = digitCells and digitCells.BuffBinding
+    local visible,hidden=canFormatDuration(button,duration)
+    local publicTime=readable(timeLeft)
+    local secretTime=false
+    local enchantTime,enchantError
+    if not publicTime then
+        local checked,secret=pcall(issecretvalue,timeLeft)
+        secretTime=checked and secret==true
+        if visible and secretTime and member(button,"auraType")=="TempEnchant" then
+            enchantTime,enchantError=enchantRemaining(button)
+        end
+    end
+    local sample=publicTime and timeLeft or enchantTime
+    local short=type(sample)=="number" and sample>0 and sample<10
+    -- Only the native formatter can choose a precision for an opaque aura.
+    local nativeSample=secretTime and not enchantTime and not enchantError
+    local splitReady, generation, rejectedTenth, physicalOwner, stockFlush, ownerGeneration
+    if binding then
+        splitReady, generation, rejectedTenth, physicalOwner, stockFlush, ownerGeneration = binding(duration,button,true,visible and (short or nativeSample),hidden)
+        if splitReady == false then
+            recoverForeignTimer(button,state,duration,physicalOwner,ownerGeneration)
+            return
+        end
+        if physicalOwner==button and state then
+            -- A failed read can keep the existing receipt for this same
+            -- opaque source. An assignment, owner change, or a public/hidden
+            -- sample retires it before it can be replayed elsewhere.
+            if (state.sharedHasText or state.receiptRetryTicks) and
+                (state.sharedLabel~=duration or state.sharedGeneration~=ownerGeneration or not visible or not secretTime) then
+                resetStockReceipt(state)
+            end
+            state.sharedLabel,state.sharedGeneration=duration,ownerGeneration
+            state.sharedTime=type(sample)=="number" and sample or nil
+            state.sharedSecret,state.sharedVisible,state.capturingStock=secretTime,visible,nil
+            if secretTime then state.sharedNativeTime=timeLeft else state.sharedNativeTime=nil end
+        end
+    end
+    if not visible then
+        releaseDigits(button, state, duration)
         return
     end
-    if not readable(timeLeft) then
-        if bjarkiUINativeDigitCells then bjarkiUINativeDigitCells.ClearBuff(duration) end
+    if not publicTime and not enchantTime then
+        releaseDigits(button, state, duration)
         -- Secrecy itself is public metadata. Nil or an uncertain probe is not
         -- evidence of a restricted timer and must not revive an old duration.
-        if type(issecretvalue) ~= "function" then return end
-        local checked, secret = pcall(issecretvalue, timeLeft)
-        if not checked or secret ~= true then return end
-        if member(button, "auraType") ~= "TempEnchant" then
-            showNativeDuration(button, duration)
+        if not secretTime then return end
+        if nativeSample or enchantError then
+            local capture=state and physicalOwner==button and state.assignment==assignment
+            if capture then state.capturingStock=true end
+            local formatted,text
+            if nativeSample then formatted,text=showNativeDuration(button,duration)
+            elseif state then noteNativeTimer(state,enchantError) end
+            if capture and state.capturingStock then
+                -- Native formatting already produced the receipt in the
+                -- usual case. Only the inaccessible/stock-only path needs
+                -- GetText, whose opaque result is forwarded without inspection.
+                rememberStockReceipt(state,duration,formatted,text)
+                state.capturingStock=nil
+            end
+            if stockFlush then digitCells.RememberBuffStock(duration,button) end
             return
         end
-        -- Stock weapon-enchant buttons have an inventory slot, no aura instance
-        -- ID or time modifier. Use only the current binding's public expiration.
-        local info = member(button, "buttonInfo")
-        local expiration = member(info, "expirationTime")
-        local now = timerClock()
-        if type(expiration) ~= "number" or not (expiration > 0 and expiration < math.huge) or not now then
-            local state = states[button]
-            if state then noteNativeTimer(state, "no public enchant expiration") end
-            return
-        end
-        -- Blizzard's readable path divides (expiration - GetTime) by timeMod.
-        -- No calculation when that modifier exists but is secret/invalid.
-        local okRate, rawRate = pcall(readMember, info, "timeMod")
-        local rate = 1
-        if not okRate or (rawRate ~= nil and
-            (not readable(rawRate) or type(rawRate) ~= "number"
-            or rawRate == math.huge or rawRate == -math.huge or rawRate ~= rawRate)) then
-            local state = states[button]
-            if state then noteNativeTimer(state, "unreadable enchant time modifier") end
-            return
-        end
-        if rawRate ~= nil and rawRate > 0 then rate = rawRate end
-        timeLeft = (expiration - now) / rate
     end
-    local digitCells = bjarkiUINativeDigitCells
-    if type(timeLeft) ~= "number" or not (timeLeft > 0 and timeLeft < 10) then
-        if digitCells then digitCells.ClearBuff(duration) end
+    if not short then
+        releaseDigits(button, state, duration)
         return
     end
     local setText = member(duration, "SetFormattedText")
-    if type(setText) ~= "function" then return end
+    if type(setText) ~= "function" then releaseDigits(button, state, duration); return end
     -- Preserve the native font. Only once the original text can be cleared
     -- may the stable glyph cells take over; otherwise use native formatting.
-    local deci = math.min(99, math.max(1, math.floor(timeLeft * 10 + 0.5)))
-    local ok = false
-    if digitCells and type(digitCells.ShowBuff) == "function" then
+    local deci = math.min(99, math.max(1, math.floor(sample * 10 + 0.5)))
+    if stockFlush then
+        -- The native method just supplied its own text. Leave it visible
+        -- while the outer setter returns and reconciles the latest request.
+        digitCells.QueueBuffStock(duration,button,deci)
+        return
+    end
+    local ok, nativeCleared = false, false
+    local nestedClear=state and state.clearingLabel
+    if nestedClear then releaseDigits(button,state,duration) end
+    local trySplit=not nestedClear and digitCells and type(digitCells.ShowBuff)=="function"
+        and (not binding or splitReady) and rejectedTenth~=deci
+    local prepared,keepOriginal,original
+    if trySplit and digitCells.ReadyBuff then
+        local displaced
+        prepared,displaced,keepOriginal,original=digitCells.ReadyBuff(duration,button,generation,deci)
+        if displaced then
+            if binding then reconcileDisplacement(binding,button,state,duration) end
+            return
+        end
+        trySplit=prepared
+    end
+    if state and state.assignment~=assignment then return end
+    if trySplit then
         local clear = member(duration, "SetText")
-        if type(clear) == "function" and pcall(clear, duration, "") then
-            if digitCells.ShowBuff(duration, deci) then
-                ok = true
-            else
-                digitCells.ClearBuff(duration)
+        if state then state.clearingLabel=duration;state.clearSerial=0 end
+        local cleared, result = pcall(clear, duration, "")
+        if state then
+            state.clearingLabel=nil
+            if state.clearSerial>0 then
+                -- A newer native update ran inside the original setter. It
+                -- kept stock presentation; return its completed (possibly
+                -- opaque) native text after the older clear has landed.
+                local received,text,sample=state.clearReceived,state.clearText,state.clearSample
+                state.clearReceived,state.clearText,state.clearSample=nil,nil,nil
+                if state.clearTarget==duration and state.clearAssignment==state.assignment and durationLabel(button)==duration
+                    and digitCells.RestoreBuffStockReceipt then
+                    digitCells.RestoreBuffStockReceipt(duration,button,state.clearOwnerGeneration,received,text,sample)
+                end
+                state.clearTarget=nil
+                return
             end
         end
+        if state and state.assignment~=assignment then return end
+        if cleared and (type(result) == "nil" or (readable(result) and result ~= false)) then
+            nativeCleared = true
+            local acquired,superseded,rollback
+            ok,acquired,superseded,rollback=digitCells.ShowBuff(duration,deci,button,generation,prepared)
+            if superseded then
+                if rollback and keepOriginal then
+                    local known,current=pcall(member(duration,"GetText"),duration)
+                    if known and (type(current)=="nil" or (readable(current) and current=="")) then
+                        pcall(clear,duration,original)
+                    end
+                elseif binding then reconcileDisplacement(binding,button,state,duration) end
+                return
+            end
+            if not ok and binding then
+                -- A native setter may have synchronously transferred this
+                -- FontString. Its new owner controls both presenters now.
+                local ours, currentGeneration = binding(duration, button)
+                if ours == nil then
+                    -- A failed geometry rebuild can revoke readiness after
+                    -- the native text was cleared. Restore it only on a
+                    -- positively identified, still-current physical label.
+                    local known,parent=pcall(member(duration,"GetParent"),duration)
+                    if not known or not readable(parent) or parent~=button or durationLabel(button)~=duration then return end
+                elseif not ours then reconcileDisplacement(binding,button,state,duration);return
+                elseif currentGeneration~=generation then return end
+            end
+            if state then state.splitDuration, state.splitGeneration = duration, acquired or generation end
+        end
+        if not ok then releaseDigits(button, state, duration) end
     end
-    if not ok then ok = pcall(setText, duration, "%.1f", deci / 10) end
+    if not ok then
+        if nativeCleared and digitCells.RestoreBuffText then
+            ok = digitCells.RestoreBuffText(duration, deci, button)
+        else
+            local wrote,result=pcall(setText,duration,"%.1f",deci/10)
+            ok=wrote and (type(result)=="nil" or (readable(result) and result~=false))
+        end
+    end
     if ok then
         timerStats.readable = timerStats.readable + 1
     elseif states[button] then
@@ -329,6 +589,25 @@ local function afterDuration(button, timeLeft)
     -- a permanent/empty slot became timed, leaving .268 flashing again.
     -- Restore opacity even if duration text is hidden, restricted, or >=10s.
     keepOpaque(button)
+    local state=states[button]
+    if state then state.pendingForeignReplay=nil end
+    local clearing=state and state.clearingLabel
+    if clearing then
+        local serial=state.clearSerial+1
+        state.clearSerial=serial
+        showTenths(button,timeLeft)
+        if state.clearSerial==serial then
+            local target,assignment,generation=durationLabel(button),state.assignment,state.sharedGeneration
+            local received,text
+            if target==clearing then received,text=pcall(member(clearing,"GetText"),clearing) end
+            if state.clearSerial==serial then
+                state.clearTarget,state.clearSample=target,timeLeft
+                state.clearAssignment,state.clearOwnerGeneration=assignment,generation
+                state.clearReceived,state.clearText=received,text
+            end
+        end
+        return
+    end
     showTenths(button, timeLeft)
 end
 
@@ -373,11 +652,19 @@ local function styleIcon(button, state)
 end
 
 local function setupButton(button)
-    if not canDecorate(button) or member(button, "isAuraAnchor") == true then return end
+    if not readable(button) then return end
+    local state = states[button]
+    if not accessible(button) or member(button, "isAuraAnchor") == true then
+        if state and state.splitDuration then releaseDigits(button, state) end
+        return
+    end
+    if not canDecorate(button) then return end
     -- Private anchor placeholders expose an Icon frame, not an icon texture;
     -- they have no public UpdateDuration method and must never get post-hooks.
-    if type(member(button, "UpdateDuration")) ~= "function" then return end
-    local state = states[button]
+    if type(member(button, "UpdateDuration")) ~= "function" then
+        if state and state.splitDuration then releaseDigits(button, state) end
+        return
+    end
     if not state then
         state = { scripts = {}, auraStyle = true }
         states[button] = state
@@ -399,6 +686,9 @@ local function setupButton(button)
     -- Invalidate on native assignment/timing updates, not just ID changes.
     state.timerHooks = state.timerHooks or {}
     if type(hooksecurefunc) == "function" then
+        if not state.timerHooks.UpdateAuraType and type(member(button, "UpdateAuraType")) == "function" then
+            state.timerHooks.UpdateAuraType = pcall(hooksecurefunc, button, "UpdateAuraType", afterAuraType)
+        end
         for _, method in ipairs({"Update", "UpdateExpirationTime"}) do
             if not state.timerHooks[method] and type(member(button, method)) == "function" then
                 if pcall(hooksecurefunc, button, method, invalidateDurationObject) then
@@ -409,8 +699,21 @@ local function setupButton(button)
     end
     styleIcon(button, state)
     local digitCells = bjarkiUINativeDigitCells
-    if digitCells and type(digitCells.PrepareBuff) == "function" and outOfCombat() then
-        digitCells.PrepareBuff(member(button, "Duration"))
+    local prepare = digitCells and type(digitCells.PrepareBuff) == "function" and outOfCombat()
+    if digitCells and (prepare or state.splitDuration) then
+        local current = durationLabel(button)
+        local example = member(button, "isExample") == true
+        if state.splitDuration and (state.splitDuration ~= current or example or not accessible(current)) then
+            releaseDigits(button, state)
+        end
+        if not example and prepare then
+            if digitCells.PrepareBuff(current) == false and state.splitDuration then releaseDigits(button, state) end
+        end
+    end
+    local getAlpha = member(button, "GetAlpha")
+    if type(getAlpha) == "function" then
+        local ok, alpha = pcall(getAlpha, button)
+        if ok and readable(alpha) and alpha == 1 then return end
     end
     keepOpaque(button)
 end
@@ -481,22 +784,28 @@ local function styleTargetFrame(unitFrame, name)
     for i = 1, 16 do visit(member(_G, name .. "Debuff" .. i), 0) end
 end
 
-local function setupTargetFrame(unitFrame, name)
-    if not accessible(unitFrame) then return end
+local function targetAuraRoute(name)
     local status = member(member(_G, "bjarkiUIUnitAuraRows"), "GetStatus")
     if type(status) == "function" then
         local ok, route = pcall(status, name)
         if ok and readable(route) and type(route) == "string" then
-            diagnostics[name] = {route = route}
-            return -- explicit native/custom route; no native aura discovery
+            return route
         end
     end
     if type(GetBuildOption) == "function" then
         local ok, restricted = pcall(GetBuildOption, "RestrictedAuraAPI")
         if ok and readable(restricted) and restricted == true then
-            diagnostics[name] = {route = "native restricted (custom styling disabled)"}
-            return
+            return "native restricted (custom styling disabled)"
         end
+    end
+end
+
+local function setupTargetFrame(unitFrame, name, unit)
+    if not accessible(unitFrame) then return end
+    local route = targetAuraRoute(name)
+    if route then
+        diagnostics[name] = {route = route}
+        return
     end
     local installed = targetHooks[unitFrame]
     if not installed then installed = {}; targetHooks[unitFrame] = installed end
@@ -504,8 +813,7 @@ local function setupTargetFrame(unitFrame, name)
         for _, method in ipairs({"AnchorAuraContainer", "UpdateAuras", "ConfigureAuraContainer"}) do
             if not installed[method] and type(member(unitFrame, method)) == "function" then
                 local ok = pcall(hooksecurefunc, unitFrame, method, function()
-                    styleTargetFrame(unitFrame, name)
-                    if requestRefresh then requestRefresh() end
+                    requestRefresh(unit)
                 end)
                 if ok then installed[method] = true end
             end
@@ -541,9 +849,13 @@ local function setupCompactAuras(parentName)
     end
 end
 
-local CAST_NAMES = {"PlayerCastingBarFrame", "CastingBarFrame", "PetCastingBarFrame",
-    "TargetFrameSpellBar", "FocusFrameSpellBar", "OverlayPlayerCastingBarFrame"}
-local function setupCasts()
+local CAST_BARS = {
+    player = {"PlayerFrame", "PlayerCastingBarFrame", "CastingBarFrame", "OverlayPlayerCastingBarFrame"},
+    pet = {"PetFrame", "PetCastingBarFrame"},
+    target = {"TargetFrame", "TargetFrameSpellBar"},
+    focus = {"FocusFrame", "FocusFrameSpellBar"},
+}
+local function setupCasts(units)
     local stats = {icons = 0, styled = 0}
     diagnostics.Cast = stats
     local seen = {}
@@ -555,10 +867,12 @@ local function setupCasts()
             if stylePublicIcon(bar, false) then stats.styled = stats.styled + 1 end
         end
     end
-    for _, name in ipairs(CAST_NAMES) do cast(member(_G, name)) end
-    for _, name in ipairs({"PlayerFrame", "TargetFrame", "FocusFrame", "PetFrame"}) do
-        local frame = member(_G, name)
-        for _, key in ipairs({"spellbar", "SpellBar", "castbar", "CastBar"}) do cast(member(frame, key)) end
+    for unit, names in pairs(CAST_BARS) do
+        if not units or units[unit] then
+            for i = 2, #names do cast(member(_G, names[i])) end
+            local frame = member(_G, names[1])
+            for _, key in ipairs({"spellbar", "SpellBar", "castbar", "CastBar"}) do cast(member(frame, key)) end
+        end
     end
 end
 
@@ -603,10 +917,7 @@ local function keepBuffsExpanded()
     settingCVars = false
 end
 
-local function setup()
-    -- CVar changes and protected owners wait for regen. Public unprotected
-    -- aura/cast icons continue to be discovered even when created in combat.
-    if outOfCombat() then keepBuffsExpanded() end
+local function setupPlayerAuras()
     for _, name in ipairs({ "BuffFrame", "DebuffFrame" }) do
         local container = member(_G, name)
         if accessible(container) then
@@ -619,25 +930,49 @@ local function setup()
             end
         end
     end
-    setupTargetFrame(member(_G, "TargetFrame"), "TargetFrame")
-    setupTargetFrame(member(_G, "FocusFrame"), "FocusFrame")
-    setupCompactAuras("TargetFrame")
-    setupCompactAuras("FocusFrame")
-    setupCasts()
-    setupTracked()
 end
 
-local refreshQueued = false
-requestRefresh = function()
-    if refreshQueued then return end
+local UNIT_FRAMES = {target="TargetFrame", focus="FocusFrame"}
+local function setup(scopes)
+    local all = not scopes or scopes.all
+    if all and outOfCombat() then keepBuffsExpanded() end
+    if all or scopes.player then
+        setupPlayerAuras()
+        setupTracked()
+    end
+    for unit, name in pairs(UNIT_FRAMES) do
+        if all or scopes[unit] then setupTargetFrame(member(_G, name), name, unit) end
+        if all or scopes[unit .. "target"] then setupCompactAuras(name) end
+    end
+    if all then setupCasts()
+    elseif scopes.casts then setupCasts(scopes.casts) end
+end
+
+local pending
+requestRefresh = function(scope, caster, childScope)
+    local queued = pending ~= nil
+    pending = pending or {}
+    if scope then pending[scope] = true end
+    if childScope then pending[childScope] = true end
+    if caster then
+        pending.casts = pending.casts or {}
+        pending.casts[caster] = true
+    end
+    if queued then return end
+    local scopes = pending
+    local function flush()
+        if pending ~= scopes then return end
+        pending = nil
+        setup(scopes)
+    end
+    -- Native frames can be allocated later in this event. Merge all affected
+    -- units until the next frame, and discover them synchronously if scheduling fails.
     local after = member(C_Timer, "After")
-    if type(after) ~= "function" then return end
-    refreshQueued = true
-    local ok = pcall(after, 0, function()
-        refreshQueued = false
-        setup()
-    end)
-    if not ok then refreshQueued = false end
+    if type(after) == "function" then
+        local ok, result = pcall(after, 0, flush)
+        if ok and (not readable(result) or result ~= false) then return end
+    end
+    flush()
 end
 
 local frame = CreateFrame("Frame")
@@ -655,6 +990,8 @@ targetEvents:RegisterUnitEvent("UNIT_AURA", "target", "focus")
 targetEvents:RegisterUnitEvent("UNIT_TARGET", "target", "focus")
 targetEvents:RegisterUnitEvent("UNIT_SPELLCAST_START", "target", "focus")
 targetEvents:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_START", "target", "focus")
+local compactEvents = CreateFrame("Frame")
+compactEvents:RegisterUnitEvent("UNIT_AURA", "targettarget", "focustarget")
 local function onEvent(_, event, name)
     if event == "ADDON_LOADED" then
         if not readable(name) or (name ~= "Blizzard_BuffFrame"
@@ -664,14 +1001,35 @@ local function onEvent(_, event, name)
         if settingCVars or not readable(name) or type(name) ~= "string" then return end
         name = name:lower()
         if name ~= "collapseexpandbuffs" and name ~= "consolidatebuffs" then return end
+        if outOfCombat() then keepBuffsExpanded() end
+        return
+    elseif event == "PLAYER_TARGET_CHANGED" then
+        return requestRefresh("target", "target", "targettarget")
+    elseif event == "PLAYER_FOCUS_CHANGED" then
+        return requestRefresh("focus", "focus", "focustarget")
+    elseif event == "PLAYER_REGEN_ENABLED" then
+        -- Use the safe window for existing owners. A later handler can add
+        -- more buttons during this same event, before deferred discovery.
+        setup()
+        return requestRefresh("all")
+    elseif event == "UNIT_AURA" or event == "UNIT_TARGET"
+        or event == "UNIT_SPELLCAST_START" or event == "UNIT_SPELLCAST_CHANNEL_START" then
+        if not readable(name) or type(name) ~= "string" then return end
+        if event == "UNIT_AURA" then
+            if name == "player" or name == "vehicle" then return requestRefresh("player") end
+            if name == "targettarget" or name == "focustarget" then return requestRefresh(name) end
+            local parent = UNIT_FRAMES[name]
+            if parent and not targetAuraRoute(parent) then return requestRefresh(name) end
+        elseif event == "UNIT_TARGET" then
+            if UNIT_FRAMES[name] then return requestRefresh(name .. "target") end
+        elseif CAST_BARS[name] then return requestRefresh(nil, name) end
+        return
     end
-    setup()
-    -- Native aura allocation may be queued after this event. One coalesced
-    -- next-frame pass catches it; no repeating timer or global OnUpdate scan.
-    requestRefresh()
+    requestRefresh("all")
 end
 frame:SetScript("OnEvent", onEvent)
 targetEvents:SetScript("OnEvent", onEvent)
+compactEvents:SetScript("OnEvent", onEvent)
 
 -- A short live diagnostic for build-specific private/forbidden target frames.
 -- No aura IDs, durations, health values or protected state are read or printed.

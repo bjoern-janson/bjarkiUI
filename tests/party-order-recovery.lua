@@ -136,6 +136,27 @@ test('duplicate visible token waits for a coherent party roster', function()
     same(f.p2.points, {{'TOP', f.p1, 'BOTTOM', 0, 0}}, 'resolved roster recovers')
 end)
 
+test('a declined timer cannot consume a later party layout',function()
+    local f=fixture(true);f:event();f:tick()
+    local stale,accepted
+    f.env.C_Timer.After=function(_,cb) stale=cb;return false end
+    f:native()
+    f.p1.points=f.p1.original
+    f.env.C_Timer.After=function(_,cb) accepted=cb end
+    f:native();assert(accepted,'a fresh timer must be requested')
+    local writes=#f.calls
+    stale();eq(#f.calls,writes,'refused callback cannot run the new request')
+    accepted();assert(#f.calls>writes,'the accepted layout completes')
+end)
+test('an inline timer never reanchors from a native refresh',function()
+    local f=fixture(true);f:event();f:tick()
+    f.p1.points=f.p1.original
+    local calls=#f.calls;local timer=f.env.C_Timer.After
+    f.env.C_Timer.After=function(_,cb) cb() end
+    f:native();eq(#f.calls,calls,'no protected writes on the native call stack')
+    f.env.C_Timer.After=timer;f:native();f:tick()
+    assert(#f.calls>calls,'the next real timer recovers')
+end)
 test('rollback border second SetPoint', function()
     local f, n = fixture(), 0
     f.env.onWrite = function(r, method)
@@ -159,6 +180,12 @@ end)
 for _, target in ipairs({'border', 'pet1', 'pet2'}) do
     test('native dependency chain restores immediately after one-shot ' .. target .. ' failure', function()
         local f = fixture(true)
+        -- A pet can already have its requested native anchor. Displace it so
+        -- the case really executes (and rejects) that pet's setter.
+        if target ~= 'border' then
+            f[target].points[1][5] = -7
+            f[target].original = copy(f[target].points)
+        end
         f[target].fail = 'SetPoint'; f[target].failOnce = true
         f:event(); f:tick(); f:originals()
     end)
@@ -314,6 +341,52 @@ end)
 test('queued party removed before callback receives no writes', function()
     local f = fixture(); f:event(); f.env.CompactPartyFrame = nil; f:tick()
     eq(#f.calls, 0, 'absent current party cannot authorize stale writes')
+end)
+test('Edit Mode respects distinct bindings after native alphabetical or role sorting',function()
+    local f=fixture(true)
+    f.env.EditModeManagerFrame.ArePartyFramesForcedShown=function()return true end
+    f.frame.memberUnitFrames={f.p1,f.p2,f.all[3],f.all[4],f.player}
+    f:event();f:tick()
+    same(f.p1.points,{{'TOP',f.frame,'TOP',0,-13}},'party1 is first')
+    same(f.player.points,{{'TOP',f.all[4],'BOTTOM',0,0}},'player is last')
+end)
+test('preview fills missing slots without reordering an identified party member',function()
+    local f=fixture(true);f.env.EditModeManagerFrame.ArePartyFramesForcedShown=function()return true end
+    f.frame.memberUnitFrames={f.p2,f.player,f.p1,f.all[3],f.all[4]}
+    f.p1.unit,f.all[3].unit,f.all[4].unit='player','player','player'
+    f:event();f:tick()
+    same(f.p2.points,{{'TOP',f.p1,'BOTTOM',0,0}},'known party2 uses its own slot')
+    same(f.player.points,{{'TOP',f.all[4],'BOTTOM',0,0}},'first player representative is last')
+end)
+test('a settled party graph performs zero native writes on the next refresh',function()
+    local f=fixture(true);f:event();f:tick();local writes=#f.calls
+    f.p1.fail='SetPoint';f:event();f:tick()
+    eq(#f.calls,writes,'no destructive reanchor');eq(#f.p1.points,1,'working anchor retained')
+    f.p1.fail=nil;f.frame.title.GetHeight=function()return 17 end
+    f:event();f:tick();same(f.p1.points,{{'TOP',f.frame,'TOP',0,-17}},'real layout change applied')
+end)
+test('only the displaced pet is reanchored', function()
+    local f = fixture(true); f:event(); f:tick()
+    f.pet2.points = {{'TOP', f.frame, 'TOP', 1, 13}}
+    local before = #f.calls
+    f:event(); f:tick()
+    same(f.pet2.points, {{'TOP', f.pet1, 'BOTTOM', 0, 0}}, 'pet repaired')
+    eq(#f.calls - before, 2, 'one clear and one set')
+    eq(f.calls[before + 1][1], f.pet2); eq(f.calls[before + 2][1], f.pet2)
+end)
+test('rollback owns only the changed anchors, including a partially written pet', function()
+    local f = fixture(true); f:event(); f:tick()
+    local gap = {{'TOP', f.frame, 'TOP', 1, 13}}
+    f.p1.points, f.pet2.points = copy(gap), copy(gap)
+    f.pet2.fail, f.pet2.failOnce = 'SetPoint', true
+    local before = #f.calls
+    f:event(); f:tick()
+    same(f.p1.points, gap, 'member rolled back')
+    same(f.pet2.points, gap, 'pet rolled back')
+    for i = before + 1, #f.calls do
+        local object = f.calls[i][1]
+        eq(object == f.p1 or object == f.pet2, true, 'unmodified frame never detached')
+    end
 end)
 print('party recovery: ' .. checks .. ' assertions; ' .. failures .. ' failed scenarios')
 assert(failures == 0, 'party recovery scenarios failed')

@@ -60,22 +60,8 @@ local function visualMembers(frame)
     if type(members) ~= "table" then return nil end
 
     local edit = _G.EditModeManagerFrame
-    if edit and safeBool(edit.ArePartyFramesForcedShown, edit) == true then
-        -- In preview Blizzard uses "player" for empty party slots; retain the
-        -- native preview array as positional evidence rather than trusting tokens.
-        local ordered = {}
-        for i = 2, #members do
-            local visible = shown(members[i])
-            if visible == nil then return nil end
-            if visible then ordered[#ordered + 1] = members[i] end
-        end
-        local playerVisible = shown(members[1])
-        if playerVisible == nil then return nil end
-        if playerVisible then ordered[#ordered + 1] = members[1] end
-        return ordered
-    end
-
-    local byToken, extras = {}, {}
+    local preview = edit and safeBool(edit.ArePartyFramesForcedShown, edit) == true
+    local byToken, extras, placeholders = {}, {}, {}
     for _, member in ipairs(members) do
         local visible = shown(member)
         if visible == nil then return nil end
@@ -85,16 +71,28 @@ local function visualMembers(frame)
             if not unit then return nil end
             if unit == "player" or unit == "party1" or unit == "party2"
                 or unit == "party3" or unit == "party4" then
-                if byToken[unit] then return nil end
-                byToken[unit] = member
+                if not byToken[unit] then
+                    byToken[unit] = member
+                elseif preview and unit == "player" then
+                    -- Empty preview slots borrow the player token. Use their
+                    -- native relative order only to fill unassigned positions.
+                    placeholders[#placeholders + 1] = member
+                else
+                    return nil
+                end
             else
                 extras[#extras + 1] = member
             end
         end
     end
     local ordered = {}
+    local nextPlaceholder = 1
     for i = 1, 4 do
         local member = byToken["party" .. i]
+        if not member and placeholders[nextPlaceholder] then
+            member = placeholders[nextPlaceholder]
+            nextPlaceholder = nextPlaceholder + 1
+        end
         if member then ordered[#ordered + 1] = member end
     end
     for _, member in ipairs(extras) do ordered[#ordered + 1] = member end
@@ -152,16 +150,15 @@ local function restorePoints(transaction)
     -- The custom and native chains can run in opposite directions. Detach the
     -- whole touched graph before reconnecting any saved edge, in any plan order.
     local complete = true
-    for i = 1, transaction.touched do
-        local object = transaction.plan[i].object
+    for _, entry in ipairs(transaction.touched) do
+        local object = entry.object
         local ok, result = pcall(object.ClearAllPoints, object)
         if not ok or result == false then complete = false end
     end
     -- A failed clear may retain a custom dependency. Do not rebuild against it;
     -- retain the observed geometry for a bounded retry on a later safe event.
     if complete then
-        for i = 1, transaction.touched do
-            local entry = transaction.plan[i]
+        for _, entry in ipairs(transaction.touched) do
             if not setPoints(entry.object, entry.original) then complete = false end
         end
     end
@@ -244,12 +241,16 @@ local function applyVisualOrder(frame, nativeLayout)
         end
     end
 
-    local transaction = {frame = frame, plan = plan, touched = 0}
-    for i, entry in ipairs(plan) do
-        transaction.touched = i
-        if not writePoints(entry.object, entry.points) then
-            if not restorePoints(transaction) then pendingRestore = transaction end
-            return
+    local transaction
+    for _, entry in ipairs(plan) do
+        if not samePoints(entry.original, entry.points) then
+            if not transaction then transaction = {frame = frame, plan = plan, touched = {}} end
+            -- A setter can change geometry before returning an error.
+            transaction.touched[#transaction.touched + 1] = entry
+            if not writePoints(entry.object, entry.points) then
+                if not restorePoints(transaction) then pendingRestore = transaction end
+                return
+            end
         end
     end
 end
@@ -260,27 +261,32 @@ local function queueVisualOrder(frame, nativeLayout)
     -- Native completion supersedes recovery even if scheduling is unavailable.
     -- This only drops metadata; all geometry writes remain deferred.
     if nativeLayout and pendingRestore and pendingRestore.frame == frame then pendingRestore = nil end
-    if queuedFrames[frame] then
-        if nativeLayout then queuedFrames[frame] = "native" end
+    local request = queuedFrames[frame]
+    if request then
+        if nativeLayout then request.native = true end
         return
     end
-    queuedFrames[frame] = nativeLayout and "native" or true
+    request = {native = nativeLayout}
+    queuedFrames[frame] = request
+    local scheduling = true
 
     local function run()
-        local native = queuedFrames[frame] == "native"
+        if queuedFrames[frame] ~= request then return end
         queuedFrames[frame] = nil
-        applyVisualOrder(frame, native)
+        if not scheduling then applyVisualOrder(frame, request.native) end
     end
 
     -- Native compact-frame writers can consume protected values. Never perform
     -- our anchor writes inside their call stack; coalesce all repair onto the
     -- next tick and re-evaluate the live frame state there.
     if C_Timer and type(C_Timer.After) == "function" then
-        if pcall(C_Timer.After, 0, run) then return end
+        local ok, result = pcall(C_Timer.After, 0, run)
+        scheduling = false
+        if ok and not isSecret(result) and result ~= false then return end
     end
     -- Skip a failed scheduler rather than re-entering a native protected
     -- refresh. Clear the queued flag so later events can retry.
-    queuedFrames[frame] = nil
+    if queuedFrames[frame] == request then queuedFrames[frame] = nil end
 end
 
 -- Install each native hook only after success, and retry when a party frame
