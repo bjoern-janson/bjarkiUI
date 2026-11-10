@@ -1,6 +1,6 @@
 # bjarkiUI architecture
 
-**Current synchronized test build (2026-11-07):** `0.2.286-combat-icon-clearance-test` adds player aura presentation, border/timer diagnostics, nameplate-style public icon cosmetics, restrained pet and bag text, and outbound level/combat-icon placement. Native target/focus aura rows are retained after retiring the forbidden-object experiment. See section 47; remaining in-game concerns are recorded in [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
+**0.2.286 (2026-11-07)** `0.2.286-combat-icon-clearance-test` adds player aura presentation, border/timer diagnostics, nameplate-style public icon cosmetics, restrained pet and bag text, and outbound level/combat-icon placement. Native target/focus aura rows are retained after retiring the forbidden-object experiment. See section 47; remaining in-game concerns are recorded in [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
 
 **Incoming hit-text lifecycle (2026-10-27):** `0.2.258-hit-text-recovery-test` refreshes incoming Player hit-text position on scale/display changes and retries positioning after combat. It reuses the existing guarded two-pixel anchor calculation; no polling or saved layout writes are introduced. See section 42.
 

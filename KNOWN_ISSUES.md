@@ -1,6 +1,10 @@
 # Known issues and bugs
 
-## Current live-client follow-ups — 0.2.286 (2026-11-07)
+## Live checks for 0.2.323
+
+Check that cast-to-channel transitions retain one visible timer, including empowered hold-at-max time. At the UI scales you use, watch short buff timers during button reuse and check party anchors after a pet changes. Frame time in a busy battleground still needs measurement. [Code and tests](docs/CODE_MAP.md)
+
+## Observations from 0.2.286 (2026-11-07)
 
 - **Player buff/debuff decorative borders remain intermittent.** Missing or inconsistent nameplate-style rims were reported even after the 0.2.277 and 0.2.281 lifecycle fixes. A screenshot alone does not distinguish an unstyled/private aura slot from a previously styled border becoming hidden. Run `/buiborders` while the problem is visible, **before** `/buiicons` or `/reload`. The diagnostic only counts public icons that the skin reached; a zero missing count does not establish that every visible icon was styled.
 - **Sub-ten-second buff/debuff decimals are not universally reliable in-game.** 0.2.280 addresses modeled visibility and retry failure paths, but a few visible buffs (including an Escape Artist report) still showed whole seconds. Run `/buitimers` after the occurrence; private/forbidden timers intentionally retain native formatting rather than guessed values.

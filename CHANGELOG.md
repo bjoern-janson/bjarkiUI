@@ -2,6 +2,12 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.323
+
+- A new channel can take over the cast timer while the previous cast's cleanup is running. Empowered casts use the native duration object through hold-at-max.
+- Shared buff labels discard saved text when a denied read leaves its age unknown.
+- Vertical compact-party layout repairs only displaced anchors and rolls back the frames touched by a failed repair.
+
 ## 0.2.286 — combat-icon clearance test (2026-11-07)
 - Player crossed-swords `AttackIcon` target is `TOPLEFT (76, -63)` against its native contextual frame: 12 UI units right, 1 down from Blizzard's XML. The preceding `/buicombat` output verified a former `(68, -63)` target was applied; the larger offset remains to be visually checked.
 - Keeps the level labels at four UI units outward and bag/ammunition counts at native font size +3.

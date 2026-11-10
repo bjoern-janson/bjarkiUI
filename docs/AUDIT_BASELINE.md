@@ -1,5 +1,7 @@
 # Immutable 0.2.309 audit baseline
 
+The checksums below identify the [pinned audit checkout](https://github.com/bjoern-janson/bjarkiUI/tree/d1797e392e0eb466906632e4dc047eb830b2ac78). For current source and test commands, see the [code map](CODE_MAP.md).
+
 **Date:** 2026-11-09. **Repository:** `bjoern-janson/bjarkiUI`. **Audit branch:** `audit/codex-0.2.309-readonly`. **GitHub main:** still v0.2.286 at `f21400f004ac024204944663a8ed91c7fb15616c`. **Imported source commit:** `9236bbe587d68d5b98b9b432a637c1032544f02b`.
 
 This branch's eleven Lua modules and both `.toc` manifests are byte-identical to the complete local build `bjarkiUI-0.2.309-compact-castbar-native-spacing-COMPLETE.zip`, SHA-256:

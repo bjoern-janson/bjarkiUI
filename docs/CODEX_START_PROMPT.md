@@ -1,5 +1,7 @@
 # Copy into Codex: comprehensive no-change bug audit
 
+**Historical audit for 0.2.309.** Use the [pinned checkout](https://github.com/bjoern-janson/bjarkiUI/tree/d1797e392e0eb466906632e4dc047eb830b2ac78) to reproduce this investigation. For current source and tests, start with the [code map](CODE_MAP.md).
+
 Audit **bjoern-janson/bjarkiUI**, branch **`audit/codex-0.2.309-readonly`**, as deeply as practical. The user wants to spend substantial available Codex time hunting actual bugs **without changing anything**. Do not edit source, docs, tests, workflows, manifests, settings, branches or commits; do not produce a PR. Do not make UI or gameplay changes. Place any temporary reproduction scripts **outside** the checkout, and leave `git status --porcelain` clean.
 
 First read `AGENTS.md`, `docs/CODEX_DEEP_AUDIT.md`, and `docs/AUDIT_BASELINE.md`. Verify the source checksum and run the version-matched test suite. Then methodically audit all 11 production modules, prioritizing secret/forbidden Blizzard values, protected-action taint, combat-time overhead, native duration binding lifecycle, 0–10 / 10–100 / 100–360 timer transitions, GCD-only cooldown numbers, native fallback ownership, cast vs channel timers, buff timer positioning, repeated hooks, UI scale, native class-colour restores, and error/partial-initialization recovery. Challenge every suspected issue with a reproduction and counterexample; write no changes.

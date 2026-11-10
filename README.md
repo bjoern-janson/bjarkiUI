@@ -1,32 +1,27 @@
-# bjarkiUI — 0.2.309 read-only Codex audit branch
+# bjarkiUI
 
-**You are on `audit/codex-0.2.309-readonly`, not the release branch.** This checkout is an **exact, frozen snapshot** of `0.2.309-native-spacing-castbar` (2026-11-09), assembled to let Codex perform an extensive **read-only** bug audit. It is *not* a merge request or a new stable release. GitHub `main` stays on `0.2.286`.
+**0.2.323 for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`.
 
-## Start here if you are Codex
+## Install
 
-1. Read [AGENTS.md](AGENTS.md) — **do not change any files or create commits**.
-2. Read [the deep audit instructions](docs/CODEX_DEEP_AUDIT.md) and [source/verification baseline](docs/AUDIT_BASELINE.md).
-3. Run `python3 tools/audit/check_frozen_source.py`, then `bash tools/audit/run_snapshot_tests.sh` with Lua 5.4 available (CI installs it). Both are read-only.
-4. Audit the exact code and deliver a severity-ranked report in chat, following [the findings template](docs/AUDIT_FINDINGS_TEMPLATE.md). Do not apply fixes.
+1. Open a successful [Package addon run on main](https://github.com/bjoern-janson/bjarkiUI/actions/workflows/package-addon.yml?query=branch%3Amain) and download the `bjarkiUI` artifact.
+2. Extract its `bjarkiUI` folder into the Forever client's `Interface/AddOns/` directory. Check that `Interface/AddOns/bjarkiUI/bjarkiUI.toc` exists.
+3. Enable the addon and reload the interface. Use `/bui help` for the main commands and `/bdark` for Soft Dark controls.
 
-**Suggested task text:** [Codex start prompt](docs/CODEX_START_PROMPT.md).
+## What to look for in 0.2.323
 
-## Contents and provenance
+- Player cast and channel timers use fixed-position digits. Empowered casts use their own native clock, including hold-at-max time. A new channel can take over while the old cast's labels are being cleared.
+- A reused buff label can restore the current owner's timer. A failed text read with no trustworthy time discards stale saved text.
+- Vertical compact-party ordering repairs the frames whose anchors changed. A single displaced pet can be repaired without rewriting the rest of the party.
 
-- Eleven load-ordered Lua modules, including `NativeDigitCells.lua` and `CastBarDigits.lua`, and the two matching `.toc` manifests.
-- `tests/snapshot-0.2.309/`: the nine **original version-matched behavioral regression scripts** plus a syntax manifest test, imported byte-for-byte from the 0.2.309 test archive.
-- `tests/*.lua`: retained older historical regression scripts from the `.286` repository. These may contain stale expectations. Do not silently use their failure or success as evidence for `.309`.
-- `tools/audit/`: read-only baseline checksum, portable suite runner, external-output package script, and archived historical runner/packager.
-- `.github/workflows/audit-0.2.309.yml`: separate source-frozen audit CI with no write permission. The older `package-addon.yml` workflow targets `main` and its nine-module baseline; do not treat it as `.309` audit validation.
+Offline regression coverage includes nested cast callbacks, shared buff labels and partial party-layout failures. Visual spacing at different UI scales, combat restrictions and performance in a busy battleground still need live verification. [Known issues](KNOWN_ISSUES.md)
 
-### Functional scope under audit
+## Diagnostics
 
-This addon refines Blizzard's original UI (unit frames, names, status text, buffs, icons, cooldown labels, party ordering, Soft Dark appearance, bags and combat icon). Its newest work uses **native duration bindings and individually anchored characters** to stabilize timer numbers while keeping default Blizzard fonts and icons. The cast timer geometry in `.309` remains an unverified in-game experiment.
+`/buitimers` reports recent aura timer formatting activity. `/buiborders` inspects border state, and `/buicombat` reports the player combat icon anchor. Capture the visible state before reloading or using `/buiicons`, which can reapply styling.
 
-**No-change invariants:** no font swaps, no new slash commands, no polling, no Edit Mode layout writes, no gameplay action changes, and no target/focus restricted-aura replacements. The user previously reported combat stutter from timer-typography hooks and a protected-action error from custom target/focus aura handling. These are audit priorities, not invitations to recreate the unsafe designs.
+## For contributors
 
-## Install/package distinction
+Use the [code map](docs/CODE_MAP.md) to find the writer and test for a specific symptom. [Agent guidance](AGENTS.md) · [Manifest](bjarkiUI.toc) · [Package and test workflow](.github/workflows/package-addon.yml) · [Changelog](CHANGELOG.md)
 
-Use a verified release ZIP for gameplay; this branch is an audit snapshot. The read-only workflow can create an installable 11-module ZIP outside the checkout as an artifact, but **a passing CI result is not live-client verification**. Do not merge the audit branch into `main` solely because its offline tests pass.
-
-Historical context remains in [ARCHITECTURE.md](ARCHITECTURE.md), [KNOWN_ISSUES.md](KNOWN_ISSUES.md) and [CHANGELOG.md](CHANGELOG.md). Some of their dated sections describe earlier `.286` and below rather than this frozen `.309` experiment.
+Earlier architecture notes document the decisions behind individual modules. The original 0.2.309 audit can be reproduced at its pinned revision. [Architecture history](ARCHITECTURE.md) · [Frozen audit](https://github.com/bjoern-janson/bjarkiUI/tree/d1797e392e0eb466906632e4dc047eb830b2ac78)
