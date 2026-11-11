@@ -1,6 +1,10 @@
 # Known issues and bugs
 
-Current test branch is **0.2.341-buff-glyph-stability-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+Current test branch is **0.2.342-party-presentation-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+
+## 0.2.342 compact party typography/class colors — live verification pending
+
+Compact party member `name`, `healthBar`, and native status text use an isolated presentation module. The native status routine is reused rather than duplicating font styling, while current native power colors, name text, status contents, portrait artwork and compact-party visual order are unchanged. The code is scoped to `CompactPartyFrame.memberUnitFrames`; in-game check needs to confirm class colors during party combat and after Edit Mode updates, including the precise health/power text surfaces exposed by WoW: Forever. No numeric status option is forced on.
 
 ## 0.2.341 buff timer numeral wobble — in-game check pending
 

@@ -2,6 +2,15 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.342-party-presentation-test — class colors and LoL text on compact party frames
+
+- Extend bjarkiUI presentation to the Blizzard-owned compact party member frames (player, party1–4); these use `frame.name`, `frame.healthBar` and `frame.statusText` instead of normal Player/Target unit-frame fields.
+- Class-color each actual member's name and health-bar fill using Blizzard's `C_ClassColor` source or a verified readable `RAID_CLASS_COLORS` fallback, and reapply after the native name/health refresh. Respect changing/reused unit tokens and never style unrelated compact raid/nameplate frames.
+- Reuse bjarkiUI's existing status typography routine on the compact status region and known native health/power text regions: native face, size, color, text, anchors and visibility remain; outlines are removed and a dark 1-screen-pixel shadow is applied when safe.
+- No new commands/settings, extra clocks, per-frame event loops, custom frame replacements, status-value changes, status preference overrides, resource-bar recoloring or Edit Mode layout changes.
+- New dedicated party regression suite covers five class colors, native redraws, nonparty isolation, membership replacement, hook idempotence, and native typography parity. Twelve more exhaustive local scenarios passed on Lua 5.3; live WoW: Forever confirmation is pending.
+- All prior v0.2.341 buff-digit, crown, ZZZ, cast and level-ring behavior is preserved.
+
 ## 0.2.341-buff-glyph-stability-test — stabilize ink inside fixed buff digits
 
 - User reported returning left/right wobble on player buff countdown numerals. The crown update did not change the buff renderer.

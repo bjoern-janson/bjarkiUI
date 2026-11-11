@@ -1,6 +1,6 @@
 # bjarkiUI
 
-**0.2.341-buff-glyph-stability-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
+**0.2.342-party-presentation-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
 
 ## Install
 
@@ -12,6 +12,8 @@ Version **0.2.340-leader-crown-nudge-test** nudges only the native party-leader 
 
 **0.2.341 buff-digit test:** For player buff/debuff timers with *public* remaining seconds, the three already-fixed digit cells may now use native-font glyph width calibration to keep the *visible numeral ink* from wobbling when a narrow `1` becomes a wide `8`. This only changes a supported, out-of-combat-prepared buff glyph's transparent inline spacing. If calibration fails, the original digits remain. Secret/native-fallback timers remain Blizzard-owned. No fonts, timers, frame anchors, other addons or settings are changed.
 
+**0.2.342 compact party presentation:** Native compact party members (player and party1–4) now receive class-colored **names and health-bar fills**, plus the exact existing LoL-style status-text treatment (native font and size, no outline, a one-screen-pixel dark shadow). The native status/power numbers, resource colors, auras, portraits, party order and user Edit Mode layout stay untouched. This is not a new in-game option. [Changelog](CHANGELOG.md)
+
 ## Current behavior
 
 | Surface | Behavior and native fallback |
@@ -20,7 +22,7 @@ Version **0.2.340-leader-crown-nudge-test** nudges only the native party-leader 
 | Player cast/channel timer | Restores the pinned 0.2.309 native duration-bound fixed-digit renderer for casts/channels; Blizzard's original `CastTimeText` is never cleared. The original timer remains visible whenever binding setup or native alpha handoff fails. Native font, settings and Edit Mode remain authoritative. |
 | Player buff/debuff timer | Public short durations can use fixed tenths in the native font and native above/below/beside placement. An unchanged native font/anchor update retains already prepared cells in combat. Actual geometry changes defer to native text until safe preparation. Restricted identity, private anchors and forbidden frames retain their supported native route. |
 | Tracked buff icons | Accessible native cooldown widgets receive the ten-second tenths threshold; timing, longer formats and visibility remain native. |
-| Unit frames and party | Unit names, status typography, readable class colors, cosmetic labels and vertical compact-party ordering use guarded native presentation hooks. Camelot level badge artwork stays hidden through native Show, SetShown and SetAlpha writes; the separate level number remains intact. Layout repairs touch displaced anchors and retain rollback state after partial failure. |
+| Unit frames and party | Unit names, status typography, readable class colors, cosmetic labels and vertical compact-party ordering use guarded native presentation hooks. Compact party names/health fills are class colored and their native numeric text gets the same LoL-style outline-free shadow. Camelot level badge artwork stays hidden through native Show, SetShown and SetAlpha writes; the separate level number remains intact. Layout repairs touch displaced anchors and retain rollback state after partial failure. |
 | Soft Dark and icon borders | Eligible native artwork receives reversible tinting or nameplate-style icon decoration. Restoration checks current ownership before replacing a later writer's work. |
 
 **0.2.339-zzz-right-of-secondary-test** moves Blizzard's original resting ZZZ animation to the **upper-right beyond the secondary portrait**, leaving height, animation and all previous cast/level fixes unchanged. The prior left-side position was a misinterpretation. The installable ZIP is saved in Library → Addon Versions.
@@ -52,7 +54,7 @@ For action/cast reports, capture while the affected cooldown or cast is active. 
 
 ## Development and verification
 
-Start with [AGENTS.md](AGENTS.md), then the [code map](docs/CODE_MAP.md). The two manifests load **14 runtime modules**. Current verification runs **30 top-level Lua scripts** (29 behavioral suites plus the manifest syntax script) under Lua 5.1 and Lua 5.4; the aura suite contains 217 cases. See [testing and packaging](docs/TESTING.md) for commands and the boundary between offline and live evidence.
+Start with [AGENTS.md](AGENTS.md), then the [code map](docs/CODE_MAP.md). The two manifests load **15 runtime modules**. Current verification runs **31 top-level Lua scripts** (30 behavioral suites plus the manifest syntax script) under Lua 5.1 and Lua 5.4; the aura suite contains 219 cases. See [testing and packaging](docs/TESTING.md) for commands and the boundary between offline and live evidence.
 
 - [Timer sources, native writers, hooks and cleanup](docs/TIMER_LIFECYCLE.md)
 - [Default manifest](bjarkiUI.toc) · [Camelot manifest](bjarkiUI_Camelot.toc)
