@@ -1,243 +1,379 @@
--- Fixed glyph positions use the player's freshly written native cast text.
--- No duration object, clock query, alpha suppression or per-frame script.
-local _,private=...
-local profile,probe,setup
-local cached=setmetatable({},{__mode="k"})
-local hookedBars=setmetatable({},{__mode="k"})
-local setupStatus,lastOutcome="not-prepared","none"
+-- Player cast-time decimal cells. Blizzard still owns cast/channel detection,
+-- timing, fill, native formatting, Edit Mode, and visibility. We copy its font
+-- once; a native LuaDurationObject drives two fixed layouts at 0.1-second cadence.
+-- Never inspect a secret remaining-time value or run a per-frame Lua ticker.
+-- Fail open to the native CastTimeText if any native binding/setup step fails.
+local states = setmetatable({}, {__mode='k'})
+local fmt
+local bootstrap
+
 local function public(v)
-    if issecretvalue then local ok,s=pcall(issecretvalue,v);if not ok or s~=false then return false end end
-    if canaccessvalue then local ok,s=pcall(canaccessvalue,v);if not ok or s~=true then return false end end
+    if v == nil then return false end
+    if type(issecretvalue)=='function' then
+        local ok,secret=pcall(issecretvalue,v)
+        if not ok or secret~=false then return false end
+    end
     return true
 end
-local function accepted(ok,v)return ok and public(v) and v~=false end
-local function call(o,k,...)
-    if not o or type(o[k])~="function"then return false end
-    return accepted(pcall(o[k],o,...))
+local function get(o,k)
+    if not public(o) then return nil end
+    local ok,v=pcall(function() return o[k] end)
+    if ok and public(v) then return v end
 end
-local function read(o,k)
-    local ok,v=pcall(o[k],o)
-    if ok and public(v)then return v end
+local function method(o,k)
+    local fn=get(o,k)
+    if type(fn)=='function' then return fn end
 end
-local function allowed(o)return public(o)and o and(not o.IsForbidden or read(o,"IsForbidden")==false)end
-local function hide(p)
-    if not p.shown then return true end
-    if call(p.group,"Hide")or read(p.group,"IsShown")==false then p.shown=false;return true end
-    -- A refused group write must not leave old ink above restored stock.
-    local complete=true
-    for _,cell in ipairs(p.cells or {})do
-        if not call(cell,"Hide")and not call(cell,"SetText","")then complete=false end
-    end
-    p.muted=true;p.lastRaw=nil;p.shown=not complete
-    return complete
+local function safe(o)
+    if not public(o) then return false end
+    local forbidden=method(o,'IsForbidden')
+    if not forbidden then return true end
+    local ok,v=pcall(forbidden,o)
+    return ok and public(v) and v==false
 end
-local function writeSource(p,text,serial)
-    p.writing=true;p.ownWrites=0;p.writeText=text
-    local ok=call(p.label,"SetText",text)
-    p.writing=nil;p.writeText=nil
-    return ok and p.serial==serial
+local function ooc()
+    if type(InCombatLockdown)~='function' then return false end
+    local ok,v=pcall(InCombatLockdown)
+    return ok and public(v) and v==false
 end
-local function release(p,restore)
-    if not p then return end
-    if not hide(p)then return false end
-    if restore and p.cleared and p.raw and read(p.label,"GetText")==""then
-        writeSource(p,p.raw,p.serial)
-    end
-    p.cleared=false;p.raw=nil
-end
-local function sourceWritten(p,text)
-    if p.writing then
-        p.ownWrites=p.ownWrites+1
-        if p.ownWrites==1 and public(text)and text==p.writeText then return end
-    end
-    p.serial=p.serial+1
-    p.cleared=false;p.raw=nil;hide(p)
-end
-local function mirrorAlpha(p)
-    local alpha=read(p.label,"GetAlpha")
-    p.alphaOK=type(alpha)=="number"and alpha==alpha and alpha>=0 and alpha<math.huge and call(p.group,"SetAlpha",alpha)
-    if not p.alphaOK then release(p,true)end
-end
-local function paint(p,fresh)
-    local bar,label=p.bar,p.label
-    if not rawequal(bar,PlayerCastingBarFrame)or not rawequal(bar.CastTimeText,label)
-        or bar.unit~="player"or bar.showCastTimeSetting~=true or bar.isInEditMode
-        or read(label,"IsShown")~=true or not p.alphaOK then release(p,true);return end
-    local raw=read(label,"GetText")
-    local alreadyCleared=raw==""and p.cleared and not fresh
-    if alreadyCleared then raw=p.raw end
-    if type(raw)~="string"then lastOutcome="native-text-unavailable";release(p,true);return end
-    local integer,point,tenth=raw:match(p.pattern)
-    if not integer then lastOutcome="native-format-unmatched";release(p,true);return end
-    local serial=p.serial
-    local track=p.tracks[#integer]
-    if p.lastRaw~=raw then
-        local chars={}
-        for i=1,#integer do chars[#chars+1]=integer:sub(i,i)end
-        chars[#chars+1]=point;chars[#chars+1]=tenth
-        for i,text in ipairs(chars)do
-            if not call(track.cells[i],"SetText",text)or read(track.cells[i],"GetText")~=text then
-                lastOutcome="cell-write-refused";release(p,true);return
+local function copyFont(source, dest)
+    local read,write=method(source,'GetFont'),method(dest,'SetFont')
+    if not read or not write then return false end
+    local ok,path,size,flags=pcall(read,source)
+    if not ok or not public(path) or type(path)~='string' or path==''
+       or not public(size) or type(size)~='number' or size<=0
+       or (flags~=nil and not public(flags)) then return false end
+    if not pcall(write,dest,path,size,flags) then return false end
+    for _,names in ipairs({{'GetTextColor','SetTextColor'},
+        {'GetShadowColor','SetShadowColor'}, {'GetShadowOffset','SetShadowOffset'}}) do
+        local getter,setter=method(source,names[1]),method(dest,names[2])
+        if getter and setter then
+            local values={pcall(getter,source)}
+            if values[1] then
+                table.remove(values,1)
+                local valid=true
+                for _,v in ipairs(values) do if not public(v) then valid=false end end
+                if valid then
+                    local spread=unpack or table.unpack
+                    pcall(setter,dest,spread(values))
+                end
             end
         end
-        p.lastRaw=raw
     end
-    if p.serial~=serial then release(p,false);return end
-    if p.muted then
-        for _,cell in ipairs(p.cells)do
-            if not call(cell,"Show")then release(p,true);return end
+    return true
+end
+local function glyphMetrics(bar,label)
+    local create=method(bar,'CreateFontString')
+    if not create then return nil end
+    local ok,probe=pcall(create,bar,nil,'OVERLAY')
+    if not ok or not safe(probe) or not copyFont(label,probe) then return nil end
+    local put,width=method(probe,'SetText'),method(probe,'GetStringWidth')
+    if not put or not width then return nil end
+    local function measure(s)
+        if not pcall(put,probe,s) then return nil end
+        local got,v=pcall(width,probe)
+        if not got or not public(v) or type(v)~='number' or v<=0 then return nil end
+        return v
+    end
+    local maxDigit=0
+    for i=0,9 do
+        local v=measure(tostring(i))
+        if not v then return nil end
+        maxDigit=math.max(maxDigit,v)
+    end
+    local template=get(_G,'CAST_BAR_CAST_TIME')
+    if type(template)~='string' then return nil end
+    local okOne,one=pcall(string.format,template,1.2)
+    local okTwo,two=pcall(string.format,template,23.7)
+    if not okOne or not okTwo or type(one)~='string' or type(two)~='string' then return nil end
+    local point,suffix=one:match('^1([%.,])2(.*)$')
+    if not point or not suffix or suffix=='' then return nil end
+    local dot=measure(point)
+    local trailing=measure(suffix)
+    local twoWidth=measure(two)
+    local font=method(label,'GetFont')
+    if not font then return nil end
+    local good,_,size=pcall(font,label)
+    if not dot or not trailing or not twoWidth or not good or not public(size)
+       or type(size)~='number' or size<=0 then return nil end
+    -- Match Blizzard's *natural* advance for a complete '23.7 s', not the
+    -- width of the WIDEST character (which caused '2 4 . 0 s'). A cell may
+    -- be wider than its advance: its glyph remains centered and stationary.
+    local naturalAdvance=(twoWidth-dot-trailing)/3
+    if naturalAdvance<=0 then return nil end
+    local digitAdvance=math.min(maxDigit, naturalAdvance)
+    if digitAdvance<=0 then return nil end
+    local hide=method(probe,'Hide')
+    if hide then pcall(hide,probe) end
+    return maxDigit+0.3,digitAdvance,dot,dot,trailing+0.3,size+4
+end
+local function makeFormatters()
+    if fmt then return fmt end
+    local new=get(C_StringUtil,'CreateNumericRuleFormatter')
+    local rounding=get(get(Enum,'NumericRuleFormatRounding'),'Nearest')
+    if type(new)~='function' or type(rounding)~='number' then return nil end
+    local input=get(_G,'CAST_BAR_CAST_TIME')
+    if type(input)~='string' then return nil end
+    local done,sample=pcall(string.format,input,1.2)
+    if not done or type(sample)~='string' then return nil end
+    local point,suffix=sample:match('^1([%.,])2(.*)$')
+    if not point or not suffix or suffix=='' then return nil end
+    local decimalDigit={step=0.1,rounding=rounding,format='%.0f',
+        components={{div=0.1,mod=10,step=1,rounding=rounding}}}
+    -- Two non-overlapping *native* tracks: 10.0-99.9 starts at the stock
+    -- +10 cast-label anchor, and 0.0-9.9 starts at exactly the same anchor.
+    -- Individual FontStrings never move as their numbers tick down.
+    local definitions={
+        -- Two-digit track: tens / units / point / tenths / suffix
+        { {threshold=0,format=''}, {threshold=10,format='1'},
+          {threshold=20,format='2'}, {threshold=30,format='3'},
+          {threshold=40,format='4'}, {threshold=50,format='5'},
+          {threshold=60,format='6'}, {threshold=70,format='7'},
+          {threshold=80,format='8'}, {threshold=90,format='9'},
+          {threshold=100,format=''} },
+        {{threshold=0,format=''}},
+        {{threshold=0,format=''},{threshold=10,format=point},{threshold=100,format=''}},
+        {{threshold=0,format=''},{threshold=10,step=decimalDigit.step,
+            rounding=rounding,format=decimalDigit.format,
+            components=decimalDigit.components},{threshold=100,format=''}},
+        {{threshold=0,format=''},{threshold=10,format=suffix},{threshold=100,format=''}},
+        -- One-digit track: units / point / tenths / suffix
+        {},
+        {{threshold=0,format=point},{threshold=10,format=''}},
+        {{threshold=0,step=decimalDigit.step,rounding=rounding,
+            format=decimalDigit.format,components=decimalDigit.components},
+            {threshold=10,format=''}},
+        {{threshold=0,format=suffix},{threshold=10,format=''}},
+    }
+    for i=10,99 do
+        local rules=definitions[2]
+        rules[#rules+1]={threshold=i,format=tostring(i%10)}
+    end
+    definitions[2][#definitions[2]+1]={threshold=100,format=''}
+    for i=0,9 do
+        local rules=definitions[6]
+        rules[#rules+1]={threshold=i,format=tostring(i)}
+    end
+    definitions[6][#definitions[6]+1]={threshold=10,format=''}
+    local result={}
+    for i,rules in ipairs(definitions) do
+        local ok,f=pcall(new)
+        if not ok or not safe(f) or not method(f,'SetBreakpoints') or not method(f,'FormatNumber')
+            or not pcall(f.SetBreakpoints,f,rules) then return nil end
+        result[i]=f
+    end
+    -- Verify both sides of the 10-second handoff *before* hiding Blizzard.
+    for _,example in ipairs({
+        {0,    {'','','','','','0',point,'0',suffix}},
+        {1.2,  {'','','','','','1',point,'2',suffix}},
+        {7.8,  {'','','','','','7',point,'8',suffix}},
+        {9.9,  {'','','','','','9',point,'9',suffix}},
+        {10,   {'1','0',point,'0',suffix,'','','',''}},
+        {10.7, {'1','0',point,'7',suffix,'','','',''}},
+        {23.7, {'2','3',point,'7',suffix,'','','',''}},
+        {36.9, {'3','6',point,'9',suffix,'','','',''}},
+        {99.9, {'9','9',point,'9',suffix,'','','',''}},
+        {100,  {'','','','','','','','',''}},
+    }) do
+        for k=1,#result do
+            local ok,value=pcall(result[k].FormatNumber,result[k],example[1])
+            if not ok or not public(value) or value~=example[2][k] then return nil end
         end
-        p.muted=nil
     end
-    if p.track~=track then
-        if p.track then call(p.track.group,"Hide")end
-        if not call(track.group,"Show")then release(p,true);return end
-        p.track=track
+    fmt=result
+    return fmt
+end
+local function newLabel(bar,source,x,w,h)
+    local create=method(bar,'CreateFontString')
+    if not create then return nil end
+    local ok,obj=pcall(create,bar,nil,'OVERLAY')
+    if not ok or not safe(obj) or not copyFont(source,obj) then return nil end
+    local good=pcall(function()
+        obj:SetSize(w,h)
+        obj:SetJustifyH('CENTER')
+        if method(obj,'SetJustifyV') then obj:SetJustifyV('MIDDLE') end
+        if method(obj,'SetMaxLines') then obj:SetMaxLines(1) end
+        if method(obj,'SetWordWrap') then obj:SetWordWrap(false) end
+        obj:SetPoint('LEFT',bar,'RIGHT',x,0)
+        obj:SetText('')
+    end)
+    if not good then return nil end
+    return obj
+end
+local function writeNativeAlpha(state, value)
+    local alpha=method(state.original,'SetAlpha')
+    if not alpha then return false end
+    local ok,result=pcall(alpha,state.original,value)
+    -- A false return is a rejected setter, not proof that Blizzard was
+    -- restored or concealed. Nil is the native success convention.
+    return ok and (result==nil or (public(result) and result~=false))
+end
+local function disable(state)
+    -- Restore Blizzard FIRST. If the client refuses an alpha change during
+    -- combat, retain the native-bound cells until a later safe cleanup;
+    -- never blank both presenters at once.
+    if state.active and not writeNativeAlpha(state,state.originalAlpha) then
+        return false
     end
-    -- Show our complete public text before clearing stock. A refused clear
-    -- simply hides this group again; stock alpha/visibility are never changed.
-    p.shown=true
-    if not call(p.group,"Show")or read(p.group,"IsShown")~=true then release(p,true);return end
-    if not alreadyCleared then
-        if not writeSource(p,"",serial)or read(label,"GetText")~=""then
-            lastOutcome="native-clear-refused";release(p,false)
-            if p.serial==serial and read(label,"GetText")==""then writeSource(p,raw,serial)end
-            return
+    if not state.active then writeNativeAlpha(state,state.originalAlpha) end
+    for _,binding in ipairs(state.bindings) do
+        local stop=method(binding,'SetEnabled')
+        if stop then pcall(stop,binding,false) end
+    end
+    for _,text in ipairs(state.labels) do
+        local set=method(text,'SetText')
+        if set then pcall(set,text,'') end
+    end
+    state.active=false
+    return true
+end
+local function prepare(bar)
+    if not ooc() or not safe(bar) then return nil end
+    if states[bar] then return states[bar] end
+    local unit=get(bar,'unit')
+    if unit~='player' then return nil end
+    local source=get(bar,'CastTimeText')
+    if not safe(source) then return nil end
+    local formatters=makeFormatters()
+    local digit,advance,dot,dotAdvance,suffix,height=glyphMetrics(bar,source)
+    if not formatters or not digit then return nil end
+    -- Blizzard anchors CastTimeText LEFT of the bar RIGHT by 10 UI units.
+    -- Keep *both* layouts at that origin, with measured native-font advances.
+    local start=10
+    local offsets={
+        start, start+advance, start+2*advance,
+        start+2*advance+dotAdvance, start+3*advance+dotAdvance,
+        start, start+advance, start+advance+dotAdvance,
+        start+2*advance+dotAdvance,
+    }
+    local widths={digit,digit,dot,digit,suffix,digit,dot,digit,suffix}
+    local labels={}
+    for i=1,#formatters do
+        local label=newLabel(bar,source,offsets[i],widths[i],height)
+        if not label then return nil end
+        labels[#labels+1]=label
+    end
+    local create=get(C_DurationUtil,'CreateDurationTextBinding')
+    if type(create)~='function' then return nil end
+    local bindings={}
+    for i=1,#labels do
+        local ok,b=pcall(create)
+        if not ok or not safe(b) or not method(b,'SetEnabled') then return nil end
+        if not pcall(function()
+            b:SetEnabled(false)
+            b:SetFontString(labels[i])
+            b:SetFormatter(formatters[i])
+            b:SetUpdateInterval(0.1)
+            b:SetZeroDurationText('')
+            b:SetExpiredText('')
+        end) then return nil end
+        bindings[#bindings+1]=b
+    end
+    local a=method(source,'GetAlpha')
+    if not a then return nil end
+    local ok,originalAlpha=pcall(a,source)
+    if not ok or not public(originalAlpha) or type(originalAlpha)~='number' then return nil end
+    local state={bar=bar,original=source,originalAlpha=originalAlpha,
+        labels=labels,bindings=bindings,active=false}
+    states[bar]=state
+    return state
+end
+local function durationFor(mode)
+    local fn=mode=='channel' and get(_G,'UnitChannelDuration') or get(_G,'UnitCastingDuration')
+    if type(fn)~='function' then return false end
+    -- The returned duration is intentionally opaque and may be secret. It is
+    -- forwarded unchanged to Blizzard's duration-binding sink inside pcall.
+    return fn('player')
+end
+local function activate(state,mode)
+    local bar=state.bar
+    if not state or not safe(bar) or get(bar,'isInEditMode')==true
+        or get(bar,'showCastTimeSetting')~=true then
+        if state then disable(state) end
+        return false
+    end
+    local shown=method(state.original,'IsShown')
+    if not shown then disable(state);return false end
+    local yes,visible=pcall(shown,state.original)
+    if not yes or not public(visible) or visible~=true then
+        disable(state);return false
+    end
+    local okay=pcall(function()
+        local duration=durationFor(mode)
+        for _,b in ipairs(state.bindings) do
+            b:SetEnabled(false)
+            b:SetDuration(duration)
+            b:SetEnabled(true)
+            -- An immediate native update avoids a blank first tenth.
+            if method(b,'UpdateFontString') then b:UpdateFontString() end
         end
+    end)
+    if not okay or not writeNativeAlpha(state,0) then
+        disable(state);return false
     end
-    if p.serial~=serial then release(p,false);return end
-    p.raw=raw;p.cleared=true;lastOutcome="cells"
+    state.active=true
+    return true
 end
-local function update(bar,fresh)
-    local p=profile
-    if not p or p.updating or not rawequal(p.bar,bar)then return end
-    p.updating=true
-    local ok=pcall(paint,p,fresh)
-    p.updating=nil
-    if not ok then lastOutcome="native-text-unavailable";release(p,true)end
+local function eventMode(bar)
+    -- Only public state is used. Unknown mode means native fallback.
+    local cast=get(bar,'casting')
+    local channel=get(bar,'channeling')
+    if cast==true then return 'cast' end
+    if channel==true then return 'channel' end
 end
-local function escape(s)return(s:gsub("(%W)","%%%1"))end
-local function configure(p)
-    local label,bar=p.label,p.bar
-    local file,size,flags=label:GetFont()
-    local scale=label:GetEffectiveScale()
-    local textScale=label.GetTextScale and label:GetTextScale()or 1
-    assert(public(file)and type(file)=="string"and public(size)and type(size)=="number"and size>0
-        and public(flags)and public(scale)and type(scale)=="number"and scale>0
-        and public(textScale)and type(textScale)=="number"and textScale>0)
-    local template=CAST_BAR_CAST_TIME
-    assert(public(template)and type(template)=="string")
-    local prefix,point,suffix=string.format(template,1.2):match("^(.-)1([.,])2(.*)$")
-    assert(prefix and string.format(template,23.7)==prefix.."23"..point.."7"..suffix)
-    p.pattern="^"..escape(prefix).."(%d%d?)("..escape(point)..")(%d)"..escape(suffix).."$"
-    local function style(f)
-        assert(call(f,"SetFont",file,size,flags))
-        local actual,stored,fl=f:GetFont();assert(actual==file and stored==size and(fl or"")== (flags or""))
-        assert(call(f,"SetScale",scale/f.parentScale))
-        if f.SetTextScale then assert(call(f,"SetTextScale",textScale))else assert(textScale==1)end
-    end
-    if not probe then probe=UIParent:CreateFontString(nil,"ARTWORK")end
-    assert(call(probe,"Hide"));probe.parentScale=UIParent:GetEffectiveScale();style(probe)
-    local function width(text)
-        if text==""then return 0 end
-        local value
-        if probe.GetUnboundedStringWidthForText then value=probe:GetUnboundedStringWidthForText(text)
-        else assert(call(probe,"SetText",text));value=probe:GetStringWidth()end
-        assert(public(value)and type(value)=="number"and value>=0 and value<math.huge)
-        return value
-    end
-    local digit=0;for i=0,9 do digit=math.max(digit,width(tostring(i)))end
-    local dot=width(point);assert(digit>0 and dot>0)
-    digit,dot=digit+.5,dot+.5
-    -- Keep affix spaces: unchanged sentinels cancel outer ink bearings.
-    local prefixWidth=prefix~=""and(width("8"..prefix.."8")-width("88"))or 0
-    local suffixWidth=suffix~=""and(width("8"..suffix.."8")-width("88"))or 0
-    -- CastTimeText has intrinsic bounds and is emptied after takeover. Copy its
-    -- native LEFT anchor onto a sized frame so no glyph depends on empty text.
-    local count=label:GetNumPoints()
-    local anchor,relative,relativePoint,x,y=label:GetPoint(1)
-    local parentScale=bar:GetEffectiveScale()
-    assert(public(count)and count==1 and public(anchor)and anchor=="LEFT"
-        and public(relative)and not rawequal(relative,label)
-        and public(relativePoint)and type(relativePoint)=="string"
-        and public(x)and type(x)=="number"and x==x and math.abs(x)<math.huge
-        and public(y)and type(y)=="number"and y==y and math.abs(y)<math.huge
-        and public(parentScale)and type(parentScale)=="number"and parentScale>0)
-    assert(call(p.group,"SetScale",scale/parentScale))
-    assert(call(p.group,"ClearAllPoints")and call(p.group,"SetPoint",anchor,relative or bar,relativePoint,x,y))
-    assert(call(p.group,"SetSize",math.max(1,prefixWidth+3*digit+dot+suffixWidth),size*textScale*2))
-    local function cell(group,old,x,text)
-        local f=old or group:CreateFontString(nil,"OVERLAY")
-        if not old then p.cells[#p.cells+1]=f end
-        f.parentScale=group:GetEffectiveScale();style(f)
-        assert(call(f,"ClearAllPoints")and call(f,"SetPoint","CENTER",p.group,"LEFT",x,0))
-        assert(call(f,"SetJustifyH","CENTER")and call(f,"SetJustifyV","MIDDLE"))
-        for _,name in ipairs({"SetWordWrap","SetNonSpaceWrap"})do if f[name]then assert(call(f,name,false))end end
-        if f.SetMaxLines then assert(call(f,"SetMaxLines",1))end
-        for _,pair in ipairs({{"GetTextColor","SetTextColor"},{"GetShadowColor","SetShadowColor"},{"GetShadowOffset","SetShadowOffset"}})do
-            if label[pair[1]]and f[pair[2]]then
-                local values={label[pair[1]](label)};for _,v in ipairs(values)do assert(public(v))end
-                assert(call(f,pair[2],(unpack or table.unpack)(values)))
-            end
-        end
-        assert(call(f,"SetText",text or""));return f
-    end
-    p.prefix=cell(p.group,p.prefix,prefixWidth/2,prefix)
-    for count=1,2 do
-        local track=p.tracks[count]
-        if not track then track={group=CreateFrame("Frame",nil,p.group),cells={}};p.tracks[count]=track end
-        assert(call(track.group,"Hide")and call(track.group,"SetAllPoints",p.group))
-        for i=1,count do track.cells[i]=cell(track.group,track.cells[i],prefixWidth+(i-.5)*digit)end
-        track.cells[count+1]=cell(track.group,track.cells[count+1],prefixWidth+count*digit+dot/2)
-        track.cells[count+2]=cell(track.group,track.cells[count+2],prefixWidth+(count+.5)*digit+dot)
-        track.suffix=cell(track.group,track.suffix,prefixWidth+(count+1)*digit+dot+suffixWidth/2,suffix)
-    end
-    p.track=nil;p.lastRaw=nil;mirrorAlpha(p);assert(p.alphaOK)
+local function refresh(bar)
+    local state=states[bar]
+    if not state then return end
+    local mode=eventMode(bar)
+    if mode then activate(state,mode) else disable(state) end
 end
-local function hook(p,name,fn)
-    if p.hooks[name]or type(p.label[name])~="function"then return end
-    assert(accepted(pcall(hooksecurefunc,p.label,name,function(...)pcall(fn,...)end)))
-    p.hooks[name]=true
+local function setup()
+    local bar=get(_G,'PlayerCastingBarFrame')
+    if not safe(bar) then return end
+    local state=prepare(bar)
+    if not state or state.hooked or type(hooksecurefunc)~='function' then return end
+    -- No OnUpdate or FontString:SetText hook. The existing native cast-bar
+    -- event lifecycle refreshes binding ownership only on state changes.
+    local ok=pcall(hooksecurefunc,bar,'UpdateCastTimeTextShown',function()refresh(bar) end)
+    if not ok then return end
+    state.hooked=true
 end
-local function prepare()
-    setupStatus="combat-deferred"
-    if type(InCombatLockdown)~="function"or InCombatLockdown()~=false then return end
-    local bar=PlayerCastingBarFrame
-    setupStatus="player-bar-unavailable"
-    if not allowed(bar)or bar.unit~="player"or type(bar.UpdateCastTimeText)~="function"then return end
-    local label=bar.CastTimeText;setupStatus="native-label-unavailable"
-    if not allowed(label)or type(label.GetText)~="function"then return end
-    local p=cached[label]
-    if not p then
-        p={bar=bar,label=label,serial=0,tracks={},cells={},hooks={},group=CreateFrame("Frame",nil,bar)}
-        cached[label]=p
+local frame=CreateFrame('Frame')
+for _,name in ipairs({'PLAYER_LOGIN','PLAYER_ENTERING_WORLD','PLAYER_REGEN_ENABLED',
+    'UNIT_SPELLCAST_START','UNIT_SPELLCAST_STOP','UNIT_SPELLCAST_DELAYED',
+    'UNIT_SPELLCAST_INTERRUPTED','UNIT_SPELLCAST_FAILED',
+    'UNIT_SPELLCAST_CHANNEL_START','UNIT_SPELLCAST_CHANNEL_STOP',
+    'UNIT_SPELLCAST_CHANNEL_UPDATE'}) do frame:RegisterEvent(name) end
+frame:SetScript('OnEvent',function(_,event,unit)
+    if event:find('^UNIT_SPELLCAST_') and unit~='player' then return end
+    if event=='PLAYER_LOGIN' or event=='PLAYER_ENTERING_WORLD'
+        or event=='PLAYER_REGEN_ENABLED' then setup() end
+    local bar=get(_G,'PlayerCastingBarFrame')
+    if not safe(bar) then return end
+    local state=states[bar]
+    if not state then return end
+    if event=='UNIT_SPELLCAST_START' or event=='UNIT_SPELLCAST_DELAYED'
+        or event=='UNIT_SPELLCAST_CHANNEL_START' or event=='UNIT_SPELLCAST_CHANNEL_UPDATE'
+        or event=='PLAYER_ENTERING_WORLD' or event=='PLAYER_REGEN_ENABLED' then refresh(bar)
+    elseif event=='UNIT_SPELLCAST_STOP' or event=='UNIT_SPELLCAST_FAILED'
+        or event=='UNIT_SPELLCAST_INTERRUPTED' or event=='UNIT_SPELLCAST_CHANNEL_STOP' then
+        -- Native cast-bar code has already updated casting/channeling flags.
+        if not eventMode(bar) then disable(state) end
     end
-    assert(call(p.group,"Hide"));p.shown=false
-    setupStatus="font-or-layout-unavailable";configure(p)
-    hook(p,"SetText",function(_,text)sourceWritten(p,text)end)
-    hook(p,"SetFormattedText",function()if not p.writing then sourceWritten(p)end end)
-    local function visibility()
-        if read(label,"IsShown")~=true then release(p,true)else update(bar,false)end
-    end
-    for _,name in ipairs({"SetShown","Show","Hide"})do hook(p,name,visibility)end
-    hook(p,"SetAlpha",function()mirrorAlpha(p)end)
-    for _,name in ipairs({"SetFont","SetFontObject","SetTextScale"})do hook(p,name,function()if profile==p then setup()end end)end
-    if not hookedBars[bar]then
-        assert(accepted(pcall(hooksecurefunc,bar,"UpdateCastTimeText",function(self)update(self,true)end)))
-        assert(accepted(pcall(hooksecurefunc,bar,"UpdateCastTimeTextShown",function(self)update(self,false)end)))
-        hookedBars[bar]=true
-    end
-    profile=p;setupStatus="ready"
-end
-setup=function()
-    release(profile,true);profile=nil;lastOutcome="none"
-    local ok=pcall(prepare)
-    if not ok then setupStatus="setup-refused"end
-end
-function private.GetCastTimerDiagnostics()
-    return"cast=fixed-cells setup="..setupStatus.." last="..lastOutcome
-end
-local events=CreateFrame("Frame")
-for _,name in ipairs({"PLAYER_LOGIN","PLAYER_ENTERING_WORLD","PLAYER_REGEN_ENABLED","EDIT_MODE_LAYOUTS_UPDATED","UI_SCALE_CHANGED","DISPLAY_SIZE_CHANGED"})do events:RegisterEvent(name)end
-events:SetScript("OnEvent",setup)
+end)
 setup()
+
+-- Read-only diagnostic for the existing /buitimers command. This does not
+-- inspect, parse or log any private clock or secret native duration value.
+local _,private=...
+if private then
+    function private.GetCastTimerDiagnostics()
+        local bar=get(_G,'PlayerCastingBarFrame')
+        if not safe(bar) then return 'cast=native-bindings bar=unavailable' end
+        local state=states[bar]
+        local enabled=get(bar,'showCastTimeSetting')
+        local setting=enabled==true and 'on' or enabled==false and 'off' or 'unknown'
+        return 'cast=native-bindings state='..(state and state.active and 'cells' or 'stock')
+            ..' setting='..setting
+    end
+end
