@@ -1,194 +1,274 @@
--- Native text drives independent fixed-region anchors; no auxiliary cast clock.
--- Conditional engine geometry model: empty FontStrings may have no bounds;
--- addon Frame containers must have positive bounds before their glyphs draw.
-local root=assert(arg[1])
-local n=0
-local function ok(v,m)assert(v,m);n=n+1 end
-local function eq(a,b,m)ok(a==b,(m or 'mismatch')..': '..tostring(a)..' ~= '..tostring(b))end
-local private,events,labels={},{},{}
-local combat,denyRead,denyClear,denyCell,ignoreClear=false,false,false,false,false
-local secret={}
-issecretvalue=function(v)return rawequal(v,secret)end
-canaccessvalue=function(v)return not rawequal(v,secret)end
+-- Drive the actual CastBarDigits.lua against a simulated WoW: Forever cast bar.
+-- Native engine owns time samples; addon must never inspect the opaque object.
+local addon=assert(arg[1])
+local passed=0
+local function ok(v,why) assert(v,why);passed=passed+1 end
+local function eq(got,want,why) ok(got==want,(why or '')..' expected '..tostring(want)..' got '..tostring(got)) end
+local events={};local callbacks={};local frames={};local fontStrings={};local bindings={};local nativeReads=0
+local combat=false;local availability=true;local unsupported=false;local alphaDenied=false;local restoreDenied=false
+local alphaFalse=false;local restoreFalse=false
+local opaque=setmetatable({},{__index=function()error('secret duration was read')end,
+ __tostring=function()error('secret converted to text')end})
+issecretvalue=function(v)return v==opaque end
 InCombatLockdown=function()return combat end
 CAST_BAR_CAST_TIME='%.1f s'
-local reads,writes,anchors,fonts,clockReads=0,0,0,0,0
-UnitCastingDuration=function()clockReads=clockReads+1;error('independent clock')end
-UnitChannelDuration=UnitCastingDuration;UnitEmpoweredChannelDuration=UnitCastingDuration
-private.GetFixedTimerGlyphs=function()local t={};for i=0,9 do t[tostring(i)]=tostring(i)end;return t end
-local function bounds(text)
- local x,lo,hi=0,nil,nil
- for i=1,#text do
-  local c=text:sub(i,i);local advance=c:match('%d')and 10 or c:match('[.,]')and 4 or c==' 'and 3 or 7
-  -- Equal advances, deliberately different numeral ink and side bearings.
-  local left,right=c=='1'and 4 or 0,c=='1'and 8 or advance-1
-  if c~=' 'then lo=lo and math.min(lo,x+left)or x+left;hi=x+right end
-  x=x+advance
- end
- return lo or 0,hi or 0
-end
-local function visible(o)return o and o.shown~=false and o.alpha~=0 and (not o.requiresBounds or (o:GetWidth()>0 and o:GetHeight()>0)) and (not o.point or o:GetCenter()~=nil) and(not o.parent or visible(o.parent))end
-local function region(parent)
- local o={parent=parent,shown=true,alpha=1,scale=1}
- function o:IsForbidden()return false end
- function o:IsShown()return self.shown end
- function o:IsVisible()return visible(self)end
- function o:SetShown(v)self.shown=not not v end
- function o:Show()self.shown=true end
- function o:Hide()self.shown=false end
- function o:GetAlpha()return self.alpha end
- function o:SetAlpha(v)self.alpha=v end
- function o:GetEffectiveScale()return self.scale*(self.parent and self.parent:GetEffectiveScale()or 1)end
- function o:SetScale(v)ok(not combat,'combat scale');self.scale=v end
- function o:SetPoint(...)ok(not combat,'combat anchor');anchors=anchors+1;self.point={...}end
- function o:ClearAllPoints()ok(not combat,'combat anchor');self.point=nil end
- function o:SetSize(w,h)ok(self.isFrame,'glyph dimensions must remain intrinsic');ok(not combat,'combat container size');self.width,self.height=w,h end
- function o:SetAllPoints(other)ok(self.isFrame and not combat,'only safe frame bounds');self.allPoints=other end
- function o:GetWidth()return self.allPoints and self.allPoints:GetWidth()or self.width or 0 end
- function o:GetHeight()return self.allPoints and self.allPoints:GetHeight()or self.height or 0 end
- function o:GetNumPoints()return self.nativePoint and 1 or self.point and 1 or 0 end
- function o:GetPoint()return table.unpack(self.nativePoint or self.point or {})end
- function o:GetCenter()
-  if self.allPoints then return self.allPoints:GetCenter()end
-  local p=self.point;if not p then return self.centerX or 0,0 end
-  local x;if p[3]=='LEFT'then x=p[2]:GetLeft()elseif p[3]=='RIGHT'then x=p[2]:GetRight()else x=p[2]:GetCenter()end
-  if not x then return nil end
-  local offset=p[1]=='LEFT'and self:GetWidth()/2 or p[1]=='RIGHT'and -self:GetWidth()/2 or 0
-  return x+(p[4]or 0)+offset,0
- end
- function o:GetLeft()local x=self:GetCenter();return x and x-self:GetWidth()/2 end
- function o:GetRight()local x=self:GetCenter();return x and x+self:GetWidth()/2 end
- return o
-end
-local function label(parent,source)
- local f=region(parent);f.source=source;f.text='';f.path='Native.ttf';f.size=16;f.flags='OUTLINE';f.textScale=1
- function f:GetFont()return self.path,self.size,self.flags end
- function f:SetFont(p,s,fl)ok(not combat,'combat font');fonts=fonts+1;self.path,self.size,self.flags=p,s,fl end
- function f:SetFontObject()end
- function f:GetTextScale()return self.textScale end
- function f:SetTextScale(v)ok(not combat,'combat textscale');self.textScale=v end
- function f:GetText()reads=reads+1;if self.source and denyRead then return secret end;return self.text end
- function f:SetText(v)
-  writes=writes+1
-  if self.source and v==''and not self.stockWriting then
-   if denyClear then return false end;if ignoreClear then return end
-  elseif not self.source and denyCell then return false end
-  self.text=v
- end
- function f:SetFormattedText(fmt,...)self:SetText(string.format(fmt,...))end
- function f:GetStringWidth()local a,b=bounds(self.text);return(b-a)*self.textScale end
- function f:GetUnboundedStringWidthForText(t)local a,b=bounds(t);return(b-a)*self.textScale end
- function f:SetJustifyH(v)self.justify=v end
- function f:SetJustifyV()end
- function f:SetWordWrap()end
- function f:SetNonSpaceWrap()end
- function f:SetMaxLines()end
- function f:GetTextColor()return 1,.8,.4,1 end
+local digits={['0']=9,['1']=4,['2']=8,['3']=8,['4']=8,['5']=8,
+ ['6']=8,['7']=8,['8']=9,['9']=8,['.']=3,[' ']=3,['s']=6}
+local function label(parent)
+ local f={parent=parent,alpha=1,shown=true,content='',font='Fonts\\FRIZQT__.TTF',size=16,flags='OUTLINE'}
+ function f:IsForbidden()return false end
+ function f:GetFont()return self.font,self.size,self.flags end
+ function f:SetFont(path,size,flags)self.font=path;self.size=size;self.flags=flags end
+ function f:GetStringWidth()local t=0;for i=1,#self.content do t=t+(digits[self.content:sub(i,i)] or 7)end;return t end
+ function f:GetTextColor()return 1,1,1,1 end
  function f:SetTextColor(...)self.color={...}end
  function f:GetShadowColor()return 0,0,0,1 end
- function f:SetShadowColor(...)self.shadow={...}end
+ function f:SetShadowColor(...)self.shadowColor={...}end
  function f:GetShadowOffset()return 1,-1 end
  function f:SetShadowOffset(...)self.shadowOffset={...}end
- if source then f.origin=parent:GetRight()+10;f.nativePoint={'LEFT',parent,'RIGHT',10,0}
-  function f:GetLeft()if self.text==''then return nil end;return self.origin end
-  function f:GetCenter()if self.text==''then return nil end;return self.origin+self:GetStringWidth()/2,0 end
- else labels[#labels+1]=f end
- return f
+ function f:SetText(s)self.content=s end
+ function f:GetText()return self.content end
+ function f:SetPoint(...)self.point={...}end
+ function f:SetJustifyH(v)self.justifyH=v end
+ function f:SetJustifyV(v)self.justifyV=v end
+ function f:SetSize(w,h)self.width=w;self.height=h end
+ function f:SetMaxLines(v)self.maxLines=v end
+ function f:SetWordWrap(v)self.wordWrap=v end
+ function f:Hide()self.shown=false end
+ function f:IsShown()return self.shown end
+ function f:GetAlpha()return self.alpha end
+ function f:SetAlpha(v)
+  if (alphaDenied and v==0) or (restoreDenied and v~=0) then error('protected alpha')end
+  if (alphaFalse and v==0) or (restoreFalse and v~=0) then return false end
+  self.alpha=v
+ end
+ fontStrings[#fontStrings+1]=f;return f
 end
-local function frame(parent)
- local f=region(parent);f.isFrame=true
- function f:CreateFontString()return label(self)end
- function f:RegisterEvent(e)events[e]=true end
- function f:SetScript(k,fn)if k=='OnEvent'then events.handler=fn else error('no per-frame script')end end
- return f
+local bar={unit='player',casting=false,channeling=false,showCastTimeSetting=true,isInEditMode=false}
+function bar:IsForbidden()return false end
+function bar:CreateFontString()return label(self)end
+bar.CastTimeText=label(bar)
+function bar:UpdateCastTimeTextShown()
+ self.CastTimeText.shown=(self.casting or self.channeling) and self.showCastTimeSetting
 end
-UIParent=frame()
-CreateFrame=function(_,_,parent)local f=frame(parent);f.requiresBounds=parent~=nil;return f end
-hooksecurefunc=function(o,k,fn)local old=assert(o[k]);o[k]=function(self,...)local v=old(self,...);fn(self,...);return v end end
-local function event(e)if events[e]then events.handler(nil,e)end end
-local bar=frame(UIParent);bar.width=200;bar.height=24;bar.centerX=100;bar.unit='player';bar.showCastTimeSetting=true;bar.CastTimeText=label(bar,true)
-function bar:UpdateCastTimeText()
- local seconds=self.casting and math.max(0,self.maxValue-self.value)or self.channeling and math.max(0,self.value)or self.isInEditMode and 10 or 0
- local l=self.CastTimeText;l.stockWriting=true;l:SetText(self.override or string.format(CAST_BAR_CAST_TIME,seconds));l.stockWriting=nil
-end
-function bar:UpdateCastTimeTextShown()self.CastTimeText:SetShown(self.showCastTimeSetting and(self.casting or self.channeling or self.isInEditMode))end
--- Copy the source's coordinate space, not just its font size.
-bar.scale=.75;bar.CastTimeText.scale=1.5
-bar.CastTimeText.nativePoint={'LEFT',bar,'RIGHT',17,-3};bar.CastTimeText.origin=217
 PlayerCastingBarFrame=bar
-assert(loadfile(root..'/CastBarDigits.lua'))('bjarkiUI',private)
-event('PLAYER_LOGIN')
-local function start(mode,time)
- bar.casting=false;bar.channeling=false;bar.CastTimeText:SetShown(false)
- bar.maxValue=time;bar.value=mode=='channel'and time or 0
- bar.casting=mode~='channel';bar.channeling=mode=='channel';bar.reverseChanneling=mode=='empower'
- bar:UpdateCastTimeText();bar:UpdateCastTimeTextShown();bar:Show()
+local function render(rules,num)
+ local active
+ for _,r in ipairs(rules) do if num>=r.threshold then active=r end end
+ if not active then return '' end
+ local n=num
+ if active.step then
+  local q=n/active.step
+  if active.rounding==1 then q=math.ceil(q)
+  elseif active.rounding==2 then q=math.floor(q)
+  else q=math.floor(q+0.5) end
+  n=q*active.step
+ end
+ if active.components then
+  local c=active.components[1]
+  if c.div then n=n/c.div end
+  if c.mod then n=n%c.mod end
+  if c.step then n=math.floor(n/c.step+0.5)*c.step end
+ end
+ if active.format:find('%%') then return string.format(active.format,n) end
+ return active.format
 end
-local function tick(mode,time)bar.value=mode=='channel'and time or bar.maxValue-time;bar:UpdateCastTimeText()end
-local function display()
- local out={};for _,f in ipairs(labels)do if visible(f)and f.text~=''then out[#out+1]={text=f.text,x=f:GetCenter(),fs=f}end end
- table.sort(out,function(a,b)return a.x<b.x end)
- local s='';for _,v in ipairs(out)do s=s..v.text end
- return s,out
+Enum={NumericRuleFormatRounding={Nearest=0,Down=2,Up=1}}
+C_StringUtil={CreateNumericRuleFormatter=function()
+ local f={}
+ function f:IsForbidden()return false end
+ function f:SetBreakpoints(v)if unsupported then error('formatter unsupported')end;self.rules=v end
+ function f:FormatNumber(value)return render(self.rules,value)end
+ return f
+end}
+C_DurationUtil={CreateDurationTextBinding=function()
+ local b={enabled=false}
+ function b:IsForbidden()return false end
+ function b:SetEnabled(v)self.enabled=v end
+ function b:SetFontString(v)self.label=v end
+ function b:SetFormatter(v)self.formatter=v end
+ function b:SetUpdateInterval(v)self.interval=v end
+ function b:SetZeroDurationText(v)self.zero=v end
+ function b:SetExpiredText(v)self.expired=v end
+ function b:SetDuration(v)
+  -- A secret payload is forwarded untouched into the native sink.
+  ok(v==opaque,'native duration forwarded unchanged')
+  self.duration=v
+ end
+ function b:UpdateFontString() if self.enabled then self.label:SetText(self.formatter:FormatNumber(3.2)) end end
+ function b:Tick(number)
+  if self.enabled then self.label:SetText(self.formatter:FormatNumber(number))end
+ end
+ bindings[#bindings+1]=b;return b
+end}
+UnitCastingDuration=function(unit)
+ eq(unit,'player','player cast duration source')
+ nativeReads=nativeReads+1
+ if not availability then error('duration temporarily unavailable') end
+ return opaque
 end
-start('cast',3.2)
-eq(display(),'3.2 s','tabular font activates actual anchored glyphs')
-eq(bar.CastTimeText.text,'','committed cells clear only the native text')
-eq(bar.CastTimeText:GetLeft(),nil,'empty native label has no geometry in this engine model')
-local _,firstItems=display();for _,item in ipairs(firstItems)do
- ok(item.fs.point[2]~=bar.CastTimeText,'glyphs never anchor to the emptied source')
- local g=item.fs.point[2];local a,r,rp,x,y=g:GetPoint()
- eq(a,'LEFT');eq(r,bar);eq(rp,'RIGHT');eq(x,17);eq(y,-3)
- eq(g:GetEffectiveScale(),bar.CastTimeText:GetEffectiveScale(),'anchor follows source scale')
- eq(item.fs:GetEffectiveScale(),bar.CastTimeText:GetEffectiveScale(),'glyph follows source scale')
- ok(item.x>=210,'copied LEFT anchor remains at native bar RIGHT plus ten')
+UnitChannelDuration=function(unit)
+ eq(unit,'player','player channel duration source')
+ nativeReads=nativeReads+1
+ if not availability then error('channel duration unavailable') end
+ return opaque
 end
-local function centers(text)
- bar.override=text;bar:UpdateCastTimeText();bar.override=nil
- local value,items=display();eq(value,text)
- local out={};for i,v in ipairs(items)do out[i]=v.x;eq(v.fs.path,'Native.ttf');ok(v.fs.width==nil,'intrinsic width')end
+function hooksecurefunc(object,key,cb)
+ local old=assert(object[key])
+ object[key]=function(self,...)
+  local result={old(self,...)};cb(self,...);return table.unpack(result)
+ end
+end
+CreateFrame=function()
+ local f={}
+ function f:RegisterEvent(name)events[name]=true end
+ function f:SetScript(script,fn)self[script]=fn end
+ frames[#frames+1]=f;return f
+end
+local source=assert(loadfile(addon..'/CastBarDigits.lua'))
+local private={}
+source('bjarkiUI',private)
+ok(events.PLAYER_LOGIN and events.UNIT_SPELLCAST_START and events.UNIT_SPELLCAST_CHANNEL_START,'cast events subscribed')
+eq(#frames,1,'only one lightweight event frame')
+eq(#bindings,9,'nine native bindings for separate compact 1/2-digit cast layouts')
+ok(#fontStrings==11,'one native label, one font probe, nine fixed glyphs')
+local labels={};for i=#fontStrings-8,#fontStrings do labels[#labels+1]=fontStrings[i] end
+local function fire(event,unit) assert(events[event],event);frames[1].OnEvent(frames[1],event,unit)end
+local function textAt(value)
+ for _,b in ipairs(bindings)do b:Tick(value)end
+ local out=''
+ if value<10 then for i=6,9 do out=out..labels[i].content end
+ else for i=1,5 do out=out..labels[i].content end end
  return out
 end
-local a,b=centers('1.1 s'),centers('8.8 s')
-for i=1,#a do eq(a[i],b[i],'actual anchors do not follow unequal glyph ink')end
-local na,nf=anchors,fonts;combat=true
-for _,mode in ipairs({'cast','channel','empower'})do for iteration=1,3 do
- start(mode,12.3);eq(display(),'12.3 s',mode..' consecutive start')
- tick(mode,9.9);eq(display(),'9.9 s');tick(mode,1.1);eq(display(),'1.1 s')
- bar.casting=false;bar.channeling=false;bar:UpdateCastTimeTextShown();eq(display(),'','stop')
-end end
-eq(anchors,na,'no combat geometry');eq(fonts,nf,'no combat font writes');eq(clockReads,0)
-start('channel',3.2)
-denyRead=true;tick('channel',2.8);eq(display(),'');eq(bar.CastTimeText.text,'2.8 s');denyRead=false
-tick('channel',2.7);eq(display(),'2.7 s')
-denyClear=true;tick('channel',2.6);eq(display(),'');eq(bar.CastTimeText.text,'2.6 s');denyClear=false
-ignoreClear=true;tick('channel',2.5);eq(display(),'');eq(bar.CastTimeText.text,'2.5 s');ignoreClear=false
-denyCell=true;tick('channel',2.4);eq(display(),'');eq(bar.CastTimeText.text,'2.4 s');denyCell=false
-tick('channel',2.3);eq(display(),'2.3 s')
-local _,shown=display();local group=shown[1].fs.parent.parent;local hideGroup=group.Hide
- group.Hide=function()return false end
- bar.CastTimeText:SetText('foreign');eq(display(),'','refused group Hide retires owned glyphs');eq(bar.CastTimeText.text,'foreign')
- group.Hide=hideGroup;tick('channel',2.25);eq(display(),'2.2 s','later writer recovers muted glyphs')
- bar.CastTimeText:SetText('foreign');eq(display(),'');eq(bar.CastTimeText.text,'foreign')
-tick('channel',2.2);bar.CastTimeText:SetAlpha(.4);ok(#select(2,display())>0,'public alpha')
-bar.CastTimeText:SetAlpha(0);eq(display(),'');bar.CastTimeText:SetAlpha(1);tick('channel',2.1);eq(display(),'2.1 s')
-bar.CastTimeText:Hide();eq(display(),'');bar.CastTimeText:Show();bar:UpdateCastTimeTextShown();eq(display(),'2.1 s')
-bar.isInEditMode=true;bar:UpdateCastTimeText();eq(display(),'');ok(bar.CastTimeText.text~='')
-bar.isInEditMode=false;tick('channel',120.1);eq(display(),'');eq(bar.CastTimeText.text,'120.1 s')
-combat=false;CAST_BAR_CAST_TIME='Zeit (%.1f) 秒';event('PLAYER_REGEN_ENABLED');tick('channel',1.2);eq(display(),'Zeit (1.2) 秒')
-local allocated=#labels;event('PLAYER_REGEN_ENABLED');eq(#labels,allocated,'safe rediscovery reuses regions')
- tick('channel',1.2);eq(display(),'Zeit (1.2) 秒')
- local former=bar.CastTimeText;bar.CastTimeText=label(bar,true)
- bar:UpdateCastTimeText();eq(display(),'','replacement retires old cells')
- eq(bar.CastTimeText.text,'Zeit (1.2) 秒','new source retains its own native output')
- event('PLAYER_REGEN_ENABLED');tick('channel',1.2);eq(display(),'Zeit (1.2) 秒','replacement acquires independent geometry')
- combat=true;bar.CastTimeText:SetFontObject()
- eq(display(),'','combat font invalidation retires incompatible glyphs')
- eq(bar.CastTimeText.text,'Zeit (1.2) 秒','combat invalidation restores current owned raw')
- local count=#labels;tick('channel',1.1);eq(#labels,count,'combat invalidation allocates no regions')
- eq(bar.CastTimeText.text,'Zeit (1.1) 秒')
- combat=false;event('PLAYER_REGEN_ENABLED');tick('channel',1.1);eq(display(),'Zeit (1.1) 秒','safe font recovery')
-local nr,nw=reads,writes
-ok(private.GetCastTimerDiagnostics():find('cells',1,true),'strategy diagnostic')
-eq(reads,nr);eq(writes,nw)
-print('CASTBAR NATIVE TEXT CELL TESTS: '..n..' passed')
+for _,v in ipairs(labels) do
+ eq(v.font,bar.CastTimeText.font,'native font retained')
+ eq(v.size,bar.CastTimeText.size,'native font size retained')
+ ok(v.point[2]==bar and v.point[3]=='RIGHT','cell anchored to bar edge')
+end
+-- The stock CastTimeText uses LEFT(bar RIGHT, 10, 0), independent of
+-- whether a cast has 1 or 2 digits. Both replacements must start there.
+eq(labels[1].point[4],10,'two-digit track begins at Blizzard cast-label origin')
+eq(labels[6].point[4],10,'one-digit track begins at Blizzard cast-label origin')
+local nativeAdvance=(8+8+8)/3 -- measured '23.7 s' minus '.' and ' s'
+eq(labels[2].point[4],10+nativeAdvance,'units use natural font advance')
+ok(labels[2].point[4]-labels[1].point[4]<labels[1].width,
+    'digit cells closer than maximum glyph width, no huge gaps')
+eq(labels[3].point[4],10+2*nativeAdvance,'double-digit point natural spacing')
+eq(labels[7].point[4],10+nativeAdvance,'single-digit point natural spacing')
+local barRight=277
+local nativeX=barRight+10
+local twoDigitFirstGlyphX=barRight+labels[1].point[4]
+local oneDigitFirstGlyphX=barRight+labels[6].point[4]
+eq(twoDigitFirstGlyphX,nativeX,'24.0 starts with Blizzard 23.7 left edge')
+eq(oneDigitFirstGlyphX,nativeX,'3.1 starts with Blizzard left edge')
+local beforeLabels=#fontStrings
+combat=true
+fire('PLAYER_REGEN_ENABLED')
+eq(#fontStrings,beforeLabels,'no extra allocations in combat')
+bar.casting=true;bar:UpdateCastTimeTextShown()
+fire('UNIT_SPELLCAST_START','player')
+combat=false
+ok(bar.CastTimeText.alpha==0,'native timer hidden only when bindings are live')
+for _,b in ipairs(bindings)do ok(b.enabled and b.interval==0.1,'0.1-sec native timer binding')end
+for _,example in ipairs({{0,'0.0 s'},{0.1,'0.1 s'},{1.2,'1.2 s'},{3.1,'3.1 s'},
+ {8.7,'8.7 s'},{9.9,'9.9 s'},{10,'10.0 s'},{10.7,'10.7 s'},{36.9,'36.9 s'},
+ {65.5,'65.5 s'},{99.9,'99.9 s'},{100,''}}) do
+ eq(textAt(example[1]),example[2],'fixed-width cast text at '..example[1])
+end
+-- Every 0.1-second display from 0.0 to 99.9 uses a fixed set of cells,
+-- with no unexpected rounding to a second digit or overlapping presenter.
+for tenth=0,999 do
+ local value=tenth/10
+ local want=string.format('%.1f s',value)
+ eq(textAt(value),want,'complete cast decimal range at '..tenth)
+end
+-- Fixed cells never shift with their glyphs, even when '1' is narrow.
+local base={}
+for i,v in ipairs(labels) do base[i]=v.point[4] end
+for _,n in ipairs({3.1,8.8,9.1,1.1,10,30.7})do textAt(n) end
+for i,v in ipairs(labels)do eq(v.point[4],base[i],'no per-digit reanchoring')end
+for _,value in ipairs({9.9,10.0,10.1,9.9}) do
+ local displayed=textAt(value)
+ eq(displayed,string.format('%.1f s',value),'correct value at 10-second boundary')
+ local hidden=''
+ if value<10 then for i=1,5 do hidden=hidden..labels[i].content end
+ else for i=6,9 do hidden=hidden..labels[i].content end end
+ eq(hidden,'','inactive track completely cleared at 10-second boundary')
+end
+-- Native visibility control remains authoritative.
+bar.showCastTimeSetting=false;bar:UpdateCastTimeTextShown()
+eq(bar.CastTimeText.alpha,1,'native alpha restored when edit setting disables time')
+for _,b in ipairs(bindings)do ok(not b.enabled,'all bindings stopped on disabled cast time')end
+bar.showCastTimeSetting=true;bar:UpdateCastTimeTextShown()
+ok(bar.CastTimeText.alpha==0,'native binding resumes when cast time re-enabled')
+bar.casting=false;bar.channeling=true;bar:UpdateCastTimeTextShown()
+fire('UNIT_SPELLCAST_CHANNEL_START','player')
+ok(bar.CastTimeText.alpha==0 and bindings[1].enabled,'channel uses native duration object')
+bar.channeling=false;bar:UpdateCastTimeTextShown()
+fire('UNIT_SPELLCAST_CHANNEL_STOP','player')
+eq(bar.CastTimeText.alpha,1,'original shown after channel ends')
+for _,b in ipairs(bindings)do ok(not b.enabled,'channel bindings stopped')end
+-- An inaccessible native duration leaves Blizzard unchanged, never overlapping.
+bar.casting=true;bar:UpdateCastTimeTextShown()
+availability=false
+fire('UNIT_SPELLCAST_START','player')
+eq(bar.CastTimeText.alpha,1,'native timer visible when native duration inaccessible')
+for _,b in ipairs(bindings)do ok(not b.enabled,'no active overlay on failure')end
+availability=true
+fire('UNIT_SPELLCAST_DELAYED','player')
+eq(bar.CastTimeText.alpha,0,'recover on native cast delay event')
+-- Refusal to hide stock text rolls back every overlay.
+bar.casting=false;bar:UpdateCastTimeTextShown()
+bar.casting=true;bar:UpdateCastTimeTextShown()
+alphaDenied=true
+fire('UNIT_SPELLCAST_START','player')
+eq(bar.CastTimeText.alpha,1,'hide rejection leaves original timer visible')
+for _,b in ipairs(bindings)do ok(not b.enabled,'hide rejection does not leave duplicate digits')end
+alphaDenied=false
+-- A setter can refuse by returning false instead of throwing. Previously
+-- this was misread as a completed native handoff and could blank the timer.
+bar.casting=false;bar:UpdateCastTimeTextShown()
+bar.casting=true;bar:UpdateCastTimeTextShown()
+alphaFalse=true
+fire('UNIT_SPELLCAST_START','player')
+eq(bar.CastTimeText.alpha,1,'false return on native hide keeps original timer')
+for _,b in ipairs(bindings)do ok(not b.enabled,'false hide refusal disables overlay')end
+alphaFalse=false
+-- Entering edit mode or hiding a cast bar never keeps an overlay alive.
+-- If protected restoration is temporarily denied, NEVER clear the only
+-- visible presenter. The next out-of-combat lifecycle restores Blizzard.
+bar.casting=true;bar:UpdateCastTimeTextShown()
+restoreDenied=true
+bar.casting=false;bar:UpdateCastTimeTextShown()
+eq(bar.CastTimeText.alpha,0,'failed restoration leaves fixed digits visible')
+ok(bindings[1].enabled,'binding kept active while native label remains hidden')
+restoreDenied=false
+fire('PLAYER_REGEN_ENABLED')
+eq(bar.CastTimeText.alpha,1,'later safe lifecycle restores native label')
+for _,b in ipairs(bindings)do ok(not b.enabled,'bindings cleared after successful restore')end
+bar.isInEditMode=true;bar:UpdateCastTimeTextShown()
+eq(bar.CastTimeText.alpha,1,'edit mode retains Blizzard original')
+bar.isInEditMode=false
+-- Reject restoring stock with an explicit false return as well as an error.
+bar.casting=true;bar:UpdateCastTimeTextShown()
+restoreFalse=true
+bar.casting=false;bar:UpdateCastTimeTextShown()
+eq(bar.CastTimeText.alpha,0,'false return on restoration keeps bindings alive')
+ok(bindings[1].enabled,'refused native restoration keeps visible fixed cells')
+restoreFalse=false;fire('PLAYER_REGEN_ENABLED')
+eq(bar.CastTimeText.alpha,1,'native restored after false refusal recovers')
+for _,b in ipairs(bindings)do ok(not b.enabled,'no stale bindings after false refusal')end
+ok(type(private.GetCastTimerDiagnostics)=='function','cast diagnostic remains available')
+ok(private.GetCastTimerDiagnostics():find('cast=native-bindings',1,true)~=nil,'native binding strategy reported')
+fire('UNIT_SPELLCAST_START','party1')
+eq(bar.CastTimeText.alpha,1,'other unit events ignored')
+-- Native duration updates, not Lua text arithmetic or a ticker, own the timing.
+local f=assert(io.open(addon..'/CastBarDigits.lua'));local code=f:read('*a');f:close()
+for _,forbidden in ipairs({'SetScript(\'OnUpdate\'','SetScript("OnUpdate"','SLASH_','GetCooldownTimes',
+  'GetRemainingDuration(', 'UnitCastingInfo(', 'UnitChannelInfo('}) do
+ ok(not code:find(forbidden,1,true),'no heavy/protected duration path: '..forbidden)
+end
+ok(code:find("UnitCastingDuration",1,true)~=nil and code:find('UnitChannelDuration',1,true)~=nil,
+ 'native duration objects used for cast and channel')
+print('CASTBAR NATIVE DIGIT TESTS: '..passed..' passed')
