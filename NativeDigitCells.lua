@@ -1695,6 +1695,36 @@ function api.ShowBuff(label,deci,owner,generation,prepared)
     local ok,superseded=writeBuff(label,st,deci)
     return ok and not superseded,st.generation,superseded
 end
+-- Public stock buffs above the decimal threshold otherwise return to a
+-- centered, proportional Blizzard FontString. Its visible digit ink can
+-- wobble even though the label's anchor never moves. Width-calibrate ONLY
+-- readable native text, using the same font's already prepared glyph map.
+-- Never inspect private/secret text or duration objects, replace the native
+-- clock/formatter, or change geometry in an aura tick.
+function api.StabilizeBuffStockText(label,owner)
+    local st=buffCells[label]
+    if not st or not st.ready or st.writing or st.stockPaddingWriting or st.last~=nil or st.dirty
+        or st.ownerUncertain or st.owner~=owner or not st.buffGlyphs
+        or not safe(label) or not safe(owner) then return false end
+    local parent=m(label,'GetParent')
+    if not parent then return false end
+    local parentOK,currentParent=pcall(parent,label)
+    if not parentOK or not public(currentParent) or currentParent~=owner then return false end
+    local getText,setText=m(label,'GetText'),m(label,'SetText')
+    if not getText or not setText then return false end
+    local got,text=pcall(getText,label)
+    -- Native text can be an opaque secret even if the elapsed time is public.
+    -- Never convert, compare or pattern-match a secret payload.
+    if not got or not public(text) or type(text)~='string' or #text>32
+        or not text:find('%d') or text:find('|',1,true)
+        or text:find('[\r\n]') then return false end
+    local padded=text:gsub('%d',st.buffGlyphs)
+    if padded==text then return false end
+    st.stockPaddingWriting=true
+    local ok,result=pcall(setText,label,padded)
+    st.stockPaddingWriting=nil
+    return accepted(ok,result)
+end
 function api.ClearBuff(label,owner,generation)
     local st=buffCells[label]
     if st and owner and (st.owner~=owner or st.generation~=generation) then return true end

@@ -3,7 +3,7 @@
 -- Position the native ZZZ to the RIGHT of the upper-right secondary
 -- portrait, not on the left of the player portrait. This offset is relative
 -- to the portrait's physical scale so it remains stable across UI scaling.
-local RESTED_Z_RIGHT_OF_PORTRAIT = 49
+local RESTED_Z_RIGHT_OF_PORTRAIT = 48
 local states=setmetatable({},{__mode="k"})
 local function public(v)
     if type(issecretvalue)=="function" then
