@@ -2,6 +2,14 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.336-level-ring-test — keep Camelot level badge hidden
+
+- Fix the level background/rim returning around player, target and focus level numbers. The existing `LevelBackgroundCircle` hide observed native `Show` only, missing direct `SetShown` and `SetAlpha` restoration.
+- Guard the exact native Camelot ring by hiding it and holding alpha at zero. Observe `Show`, `SetShown`, and `SetAlpha` via secure post-hooks, with separate retryable registrations, refusal-safe writes, and a recursion guard. Leave `LevelText`, frame art, protected/secret objects and other textures untouched.
+- Reassert this narrowly scoped presentation at native UI load, target/focus changes, Edit Mode refresh, scale changes and combat exit. No per-frame update or global frame scan.
+- New isolated 13-case Lua regression suite tests native re-show/alpha, ring recycling, refused setters, forbidden objects, hook failures, and stable geometry. Live client verification remains pending.
+- The prior cast-timer recovery and all other timer/portrait behavior are unchanged.
+
 ## 0.2.335-cast-recovery-test — restore the cast timer
 
 - The 0.2.334 cast glyph renderer could clear `PlayerCastingBarFrame.CastTimeText` while its replacement became invisible or failed to paint. A live Hearthstone cast displayed no countdown.
