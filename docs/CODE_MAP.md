@@ -1,6 +1,6 @@
 # bjarkiUI code map
 
-Current test branch: **0.2.342-party-presentation-test**. Start with the physical region that displays the symptom, then follow its native writer, addon observer, ownership record and cleanup. [Timer lifecycle detail](TIMER_LIFECYCLE.md) · [Verification commands and suite map](TESTING.md)
+Current test branch: **0.2.345-static-buff-text-test**. Start with the physical region that displays the symptom, then follow its native writer, addon observer, ownership record and cleanup. [Timer lifecycle detail](TIMER_LIFECYCLE.md) · [Verification commands and suite map](TESTING.md)
 
 ## Runtime load order
 
@@ -16,7 +16,7 @@ The [default manifest](../bjarkiUI.toc) and [Camelot manifest](../bjarkiUI_Camel
 | 6 | [TrackedBuffSeconds.lua](../TrackedBuffSeconds.lua) | Native ten-second decimal threshold for active tracked-buff cooldown widgets. |
 | 7 | [ActionTimerSpacing.lua](../ActionTimerSpacing.lua) | Measures native font glyphs, verifies action formatters and prepares a bounded 16-style map of optional fixed-width glyph text for buff digit cells. |
 | 8 | [CooldownSeconds.lua](../CooldownSeconds.lua) | Installs native action countdown formatting; observes settings and safe bar lifecycle events. |
-| 9 | [NativeDigitCells.lua](../NativeDigitCells.lua) | Action duration bindings, fixed action cells, public buff glyph preparation/calibration and physical-label ownership. |
+| 9 | [NativeDigitCells.lua](../NativeDigitCells.lua) | Action duration bindings, fixed action cells, public buff glyph preparation/calibration, longer readable stock text digit mapping, and physical-label ownership. |
 | 10 | [CastBarDigits.lua](../CastBarDigits.lua) | Native `UnitCastingDuration`/`UnitChannelDuration` objects drive fixed glyph bindings; retains Blizzard's original cast text as fallback and never clears it. |
 | 11 | [IconSkin.lua](../IconSkin.lua) | Native icon masks/rims, donor visibility restoration and `/buiborders`. |
 | 12 | [UnitAuraStyling.lua](../UnitAuraStyling.lua) | Inert compatibility stub reporting retirement of the custom target/focus aura route. |
@@ -34,7 +34,7 @@ The [default manifest](../bjarkiUI.toc) and [Camelot manifest](../bjarkiUI_Camel
 | Incoming player hit-text placement | `anchorCombatText`; follow safe lifecycle retries and native write refusals separately from geometry math. | [hit-text-lifecycle.lua](../tests/hit-text-lifecycle.lua), [hit-text-write-recovery.lua](../tests/hit-text-write-recovery.lua) |
 | Action or pet-action countdown | `applyCooldownSeconds` → `InstallAction` → `prepareAction/setDuration/refreshAction`; native duration bindings drive cells. `restoreStock` and visibility ownership return the native countdown. Check minimum/GCD policy, preference, spell identity and current source style. | [cooldown-seconds.lua](../tests/cooldown-seconds.lua), [action-timer-spacing.lua](../tests/action-timer-spacing.lua), [native-digit-cells.lua](../tests/native-digit-cells.lua) |
 | Player cast/channel countdown | `UpdateCastTimeTextShown` and player cast/channel events → `prepare/refresh/activate` → opaque `UnitCastingDuration`/`UnitChannelDuration` passed unchanged to native duration text bindings. `disable` restores native alpha before disabling cells. Never clear `CastTimeText`; the mirrored-native-text approach is retired in this test build. | [castbar-digit-cells.lua](../tests/castbar-digit-cells.lua) |
-| Player buff/debuff countdown | Native `UpdateDuration` → `afterDuration/showTenths`; `PrepareBuff/BuffBinding/ReadyBuff/ShowBuff` manage the physical label and its generation. `releaseDigits/ClearBuff` and stock receipts handle retirement or handoff. Native font/layout setters can run after the duration hook. | [aura-presentation.lua](../tests/aura-presentation.lua) |
+| Player buff/debuff countdown | Native `UpdateDuration` → `afterDuration/showTenths`; `PrepareBuff/BuffBinding/ReadyBuff/ShowBuff` manage the physical label and its generation. `releaseDigits/ClearBuff` and stock receipts handle retirement or handoff. Native font/layout setters can run after the duration hook. | [aura-presentation.lua](../tests/aura-presentation.lua), [static-buff-timers.lua](../tests/static-buff-timers.lua) |
 | Tracked buff countdown | Viewer `RefreshLayout` → `updateViewer/setTenths/applyThreshold`; a pass identity and current item-to-cooldown association prevent recycled items from reclaiming old widgets. | [presentation.lua](../tests/presentation.lua) |
 | Missing icon rims/masks | `BuffPresentation.setupButton/styleIcon` → `Skin.Apply`; follow icon ownership, donor alpha, mask attachment and `release/restore`. Private/inaccessible icons are outside public skin coverage. | [icon-skin.lua](../tests/icon-skin.lua), [aura-presentation.lua](../tests/aura-presentation.lua) |
 | Party or pet order | Native layout → `queueVisualOrder/applyVisualOrder`; `readPoints` snapshots before writes and `restorePoints` unwinds touched frames. Only displaced anchors should be rewritten. | [party-order-recovery.lua](../tests/party-order-recovery.lua) |
