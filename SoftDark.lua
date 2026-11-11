@@ -108,6 +108,7 @@ local originalColor = setmetatable({}, { __mode = "k" })
 -- the exact native materials, not only their vertex colors.
 local originalBagDesaturation = setmetatable({}, { __mode = "k" })
 local pending = false
+local tintRetryPending = false -- refused tint needs a safe next lifecycle repair
 local warnedConflict = false
 local lastStats = { chrome = 0, windows = 0, buttons = 0, textures = 0, dividers = 0, bagArt = 0, bagBorders = 0, bagDetails = 0, bagDividers = 0, compactChrome = 0, compactBackdrops = 0, compactLower = 0 }
 local dividerHookInstalled = false
@@ -541,6 +542,7 @@ local function tintTexture(texture, relativeBrightness, warmBagChrome)
     elseif not matchesColor(current,base.applied) and not matchesColor(current,base.requested,true) then
         originalColor[texture] = nil
     end
+    if not ok then tintRetryPending = true end
     return false
 end
 
@@ -580,6 +582,7 @@ tintBagChromeTexture = function(texture, relativeBrightness)
     elseif current ~= saved.applied and not matchesTintRequest(current,saved.requested) then
         originalBagDesaturation[texture] = nil
     end
+    if not ok then tintRetryPending = true end
     return true
 end
 
@@ -923,6 +926,7 @@ local function applyTheme()
         return
     end
     pending = false
+    tintRetryPending = false
     if loadedDarkMode() then
         restore("handoff")
         if not warnedConflict then
@@ -1390,6 +1394,13 @@ lifecycle:SetScript("OnEvent", function(_, event, addon)
         tintCompactChrome(tintTexture)
         return
     end
+    -- Clean combat exit must not repaint all bag/action/window/PRD chrome.
+    -- Defer only if combat skipped real work, a tint setter failed, an Edit
+    -- Mode callback is unresolved, or the theme must be restored/handed off.
+    if event == "PLAYER_REGEN_ENABLED" and not inCombat()
+        and settings.softDarkEnabled == true and not pending
+        and not tintRetryPending and not bagSiblingEditModeRecoveryPending
+        and not loadedDarkMode() then return end
     if event == "ADDON_LOADED" and type(addon) == "string"
         and addon ~= "bjarkiUI" and addon ~= "DarkMode" and not addon:match("^Blizzard_") then
         return

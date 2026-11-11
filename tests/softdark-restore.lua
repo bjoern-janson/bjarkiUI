@@ -329,5 +329,25 @@ test("failed originals and sibling membership remain weak keys", function()
     assert(watched[1] == nil, "failed snapshots cannot keep dead texture alive")
 end)
 
+test("clean combat exit avoids full theme traversal while pending work recovers",function()
+    local t=texture()
+    local _,s=make({PlayerFrameTexture=t})
+    local orig=t.GetObjectType
+    local reads=0
+    t.GetObjectType=function(self) reads=reads+1;return orig(self) end
+    s.fire("PLAYER_REGEN_ENABLED")
+    assert(reads==0,"clean exit must not revisit decorated textures")
+    s.combat=true;s.fire("PLAYER_REGEN_ENABLED")
+    s.combat=false;s.fire("PLAYER_REGEN_ENABLED")
+    assert(reads>0,"combat-deferred theme must repaint")
+end)
+test("failed initial tint still retries during safe combat exit",function()
+    local t=texture();t.colorFailures=1
+    local _,s=make({PlayerFrameTexture=t})
+    color(t,1,.8,.5,.7,"original survives denied first write")
+    s.fire("PLAYER_REGEN_ENABLED")
+    color(t,.6,.48,.3,.7,"denied tint repaired")
+end)
+
 print("SoftDark restore: " .. passed .. " passed, " .. #failed .. " failed")
 assert(#failed == 0, table.concat(failed, "\n"))

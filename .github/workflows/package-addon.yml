@@ -2,7 +2,7 @@ name: Package addon
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'rescue/combat-exit-0.2.336']
   pull_request:
     branches: [main]
   workflow_dispatch:
