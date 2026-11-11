@@ -2,6 +2,11 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.344-rested-zzz-nudge-test — tiny leftward adjustment
+
+- Move the original resting ZZZ texture 3 UI units left while keeping it to the right of the secondary portrait (portrait-relative X = 52 → 49; prior repository baseline X = 72). No Y, animation, frame ownership, class color, party styling or other timer changes.
+- Regression expectations now cover the requested X=49 offset. Live optical placement remains to be confirmed.
+
 ## 0.2.342-party-presentation-test — class colors and LoL text on compact party frames
 
 - Extend bjarkiUI presentation to the Blizzard-owned compact party member frames (player, party1–4); these use `frame.name`, `frame.healthBar` and `frame.statusText` instead of normal Player/Target unit-frame fields.

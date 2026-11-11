@@ -3,7 +3,7 @@
 -- Position the native ZZZ to the RIGHT of the upper-right secondary
 -- portrait, not on the left of the player portrait. This offset is relative
 -- to the portrait's physical scale so it remains stable across UI scaling.
-local RESTED_Z_RIGHT_OF_PORTRAIT = 72
+local RESTED_Z_RIGHT_OF_PORTRAIT = 49
 local states=setmetatable({},{__mode="k"})
 local function public(v)
     if type(issecretvalue)=="function" then
@@ -91,7 +91,7 @@ apply=function()
             local originalX,y=(tx-px)/ts,(ty-py)/ts
             if finite(originalX) and finite(y) and originalX>0 then
                 -- The player secondary circle occupies the upper-right
-                -- corner; place ZZZ beyond it, maintaining stock height.
+                -- corner; place ZZZ just beyond it, maintaining stock height.
                 local x=RESTED_Z_RIGHT_OF_PORTRAIT*ps/ts
                 x=math.floor(x*100+.5)/100
                 y=math.floor(y*100+.5)/100
