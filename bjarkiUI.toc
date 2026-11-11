@@ -2,7 +2,7 @@
 ## Title: bjarkiUI
 ## Notes: Ultralight unit-frame presentation for WoW: Forever
 ## Author: Bjarki / OpenAI
-## Version: 0.2.345-static-buff-text-test
+## Version: 0.2.346-static-action-digits-test
 ## SavedVariablesPerCharacter: bjarkiUISettings
 
 NativePrecision.lua
