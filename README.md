@@ -1,6 +1,6 @@
 # bjarkiUI
 
-**0.2.335-cast-recovery-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
+**0.2.336-level-ring-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
 
 ## Install
 
@@ -16,8 +16,10 @@
 | Player cast/channel timer | Restores the pinned 0.2.309 native duration-bound fixed-digit renderer for casts/channels; Blizzard's original `CastTimeText` is never cleared. The original timer remains visible whenever binding setup or native alpha handoff fails. Native font, settings and Edit Mode remain authoritative. |
 | Player buff/debuff timer | Public short durations can use fixed tenths in the native font and native above/below/beside placement. An unchanged native font/anchor update retains already prepared cells in combat. Actual geometry changes defer to native text until safe preparation. Restricted identity, private anchors and forbidden frames retain their supported native route. |
 | Tracked buff icons | Accessible native cooldown widgets receive the ten-second tenths threshold; timing, longer formats and visibility remain native. |
-| Unit frames and party | Unit names, status typography, readable class colors, cosmetic labels and vertical compact-party ordering use guarded native presentation hooks. Layout repairs touch displaced anchors and retain rollback state after partial failure. |
+| Unit frames and party | Unit names, status typography, readable class colors, cosmetic labels and vertical compact-party ordering use guarded native presentation hooks. Camelot level badge artwork stays hidden through native Show, SetShown and SetAlpha writes; the separate level number remains intact. Layout repairs touch displaced anchors and retain rollback state after partial failure. |
 | Soft Dark and icon borders | Eligible native artwork receives reversible tinting or nameplate-style icon decoration. Restoration checks current ownership before replacing a later writer's work. |
+
+**0.2.336-level-ring-test** repairs the Camelot level-badge background/rim reappearing on player, target and focus. A Show-only hook missed SetShown/alpha updates; narrowly scoped hooks and lifecycle retries now suppress the native LevelBackgroundCircle without hiding the number or changing portrait artwork. Offline checks are not in-game verification. [Changelog](CHANGELOG.md)
 
 **0.2.335-cast-recovery-test** rolls back only the destructive 0.2.334 cast text-mirror rewrite after a live Hearthstone cast showed no countdown. Native duration bindings preserve the fixed digit positions, and failed native alpha writes now recognize explicit `false` refusals. Source-level tests are not live validation. [Changelog](CHANGELOG.md)
 
@@ -40,7 +42,7 @@ For action/cast reports, capture while the affected cooldown or cast is active. 
 
 ## Development and verification
 
-Start with [AGENTS.md](AGENTS.md), then the [code map](docs/CODE_MAP.md). The two manifests load **13 runtime modules**. Current verification runs **27 top-level Lua scripts** (26 behavioral suites plus the manifest syntax script) under Lua 5.1 and Lua 5.4; the aura suite contains 217 cases. See [testing and packaging](docs/TESTING.md) for commands and the boundary between offline and live evidence.
+Start with [AGENTS.md](AGENTS.md), then the [code map](docs/CODE_MAP.md). The two manifests load **13 runtime modules**. Current verification runs **28 top-level Lua scripts** (27 behavioral suites plus the manifest syntax script) under Lua 5.1 and Lua 5.4; the aura suite contains 217 cases. See [testing and packaging](docs/TESTING.md) for commands and the boundary between offline and live evidence.
 
 - [Timer sources, native writers, hooks and cleanup](docs/TIMER_LIFECYCLE.md)
 - [Default manifest](bjarkiUI.toc) · [Camelot manifest](bjarkiUI_Camelot.toc)
