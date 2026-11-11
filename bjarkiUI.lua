@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.335-cast-recovery-test"
+local BJARKI_UI_VERSION = "0.2.345-static-buff-text-test"
 -- Standalone PRD treatment is retained. Unit-frame resource bars stay native.
 local PRD_MANA_R, PRD_MANA_G, PRD_MANA_B = 0.10, 0.25, 1.00
 local WORLD_TEXT_SCREEN_Y = "0.0430"
@@ -749,6 +749,10 @@ end
 
 local healthColorWrites = setmetatable({}, { __mode = "k" })
 local _, uiPrivate = ...
+if type(uiPrivate) == "table" then
+    -- Reuse the existing LoL-style status-text shadow without a second stylist.
+    uiPrivate.InstallCompactStatusFont = installStatusFont
+end
 
 -- Native health artwork has a baked-in green color. Multiplying that image by
 -- a class RGB produced the olive bars seen in .210. Use only the corresponding
@@ -1544,19 +1548,58 @@ local function shrinkLevel(text)
     if applied and result ~= false then text._bjarkiUISized = true end
 end
 
+-- Forever's Camelot LevelBackgroundCircle contains the unwanted round
+-- badge/rim behind the separate LevelText. Blizzard can restore it through
+-- SetShown and SetAlpha as well as Show; a Show-only hook was insufficient.
 local hiddenLevelRings = setmetatable({}, { __mode = "k" })
 
-local function hideLevelRing(ring)
-    if not ring or not ring.Hide then return end
-    pcall(ring.Hide, ring)
+local function levelRingMethod(ring, name)
+    local ok, method = pcall(function() return ring[name] end)
+    if ok and not isSecret(method) and type(method) == "function" then return method end
+end
 
-    if hiddenLevelRings[ring] or type(hooksecurefunc) ~= "function" then return end
-    hiddenLevelRings[ring] = pcall(hooksecurefunc, ring, "Show", function(self)
-        if self._bjarkiUIHidingLevelRing then return end
-        self._bjarkiUIHidingLevelRing = true
-        pcall(self.Hide, self)
-        self._bjarkiUIHidingLevelRing = nil
-    end)
+local function hideLevelRing(ring)
+    if not ring or isSecret(ring) then return end
+    local forbidden = levelRingMethod(ring, "IsForbidden")
+    if forbidden then
+        local ok, value = pcall(forbidden, ring)
+        if not ok or isSecret(value) or value ~= false then return end
+    end
+    local state = hiddenLevelRings[ring]
+    if not state then
+        state = { hooks = {} }
+        hiddenLevelRings[ring] = state
+    end
+    local function enforce(self)
+        if state.applying then return end
+        state.applying = true
+        local getShown = levelRingMethod(self, "IsShown")
+        local shownOK, shown
+        if getShown then shownOK, shown = pcall(getShown, self) end
+        if not shownOK or isSecret(shown) or shown ~= false then
+            local hide = levelRingMethod(self, "Hide")
+            if hide then pcall(hide, self) end
+        end
+        -- Alpha is an independent native writer, so keep the visual badge
+        -- invisible even when a native SetShown/Hide cannot be honored.
+        local getAlpha = levelRingMethod(self, "GetAlpha")
+        local alphaOK, alpha
+        if getAlpha then alphaOK, alpha = pcall(getAlpha, self) end
+        if not alphaOK or isSecret(alpha) or alpha ~= 0 then
+            local setAlpha = levelRingMethod(self, "SetAlpha")
+            if setAlpha then pcall(setAlpha, self, 0) end
+        end
+        state.applying = nil
+    end
+    if type(hooksecurefunc) == "function" then
+        for _, method in ipairs({ "Show", "SetShown", "SetAlpha" }) do
+            if not state.hooks[method] and levelRingMethod(ring, method) then
+                local ok, result = pcall(hooksecurefunc, ring, method, enforce)
+                state.hooks[method] = ok and not isSecret(result) and result ~= false
+            end
+        end
+    end
+    enforce(ring)
 end
 
 local function applyPlainLevelRings()
@@ -2787,6 +2830,7 @@ events:SetScript("OnEvent", function(_, event, unit)
         if unit == "Blizzard_ActionBar" then
             hideActionBarMacroLabels()
         elseif unit == "Blizzard_UnitFrame" then
+            applyPlainLevelRings()
             installNameplateClassNameColors()
             installDerivedFrameAlignment()
             applyAll()
@@ -2854,6 +2898,7 @@ events:SetScript("OnEvent", function(_, event, unit)
         anchorCombatText()
         applyAll()
     elseif event == "EDIT_MODE_LAYOUTS_UPDATED" then
+        applyPlainLevelRings()
         retryThreatAlphaHooks()
         hideActionBarMacroLabels()
         hideMinimapDayNightIndicator()
@@ -2864,6 +2909,7 @@ events:SetScript("OnEvent", function(_, event, unit)
         anchorCombatText()
         applyAll()
     elseif event == "UI_SCALE_CHANGED" or event == "DISPLAY_SIZE_CHANGED" then
+        applyPlainLevelRings()
         -- Refresh scale-dependent status fonts and incoming hit-text anchors.
         -- Combat deferrals retry on regeneration.
         for _, token in ipairs({ "player", "target", "focus", "targettarget", "focustarget", "pet" }) do
@@ -2874,6 +2920,7 @@ events:SetScript("OnEvent", function(_, event, unit)
     elseif event == "UNIT_PET" or event == "PET_UI_UPDATE" or event == "UNIT_DISPLAYPOWER" then
         installUnitStatusFonts("pet")
     elseif event == "PLAYER_REGEN_ENABLED" then
+        applyPlainLevelRings()
         raiseFramerateCounter()
         retryThreatAlphaHooks()
         installMicroMenuChildOffset()
@@ -2892,9 +2939,11 @@ events:SetScript("OnEvent", function(_, event, unit)
         applyAll()
 
     elseif event == "PLAYER_TARGET_CHANGED" then
+        applyPlainLevelRings()
         installDerivedFrameAlignment()
         applyUnit("target"); applyUnit("targettarget")
     elseif event == "PLAYER_FOCUS_CHANGED" then
+        applyPlainLevelRings()
         installDerivedFrameAlignment()
         applyUnit("focus"); applyUnit("focustarget")
     end

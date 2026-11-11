@@ -1,12 +1,20 @@
 # bjarkiUI
 
-**0.2.335-cast-recovery-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
+**0.2.345-static-buff-text-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
 
 ## Install
 
 1. Open a successful [Package addon run](https://github.com/bjoern-janson/bjarkiUI/actions/workflows/package-addon.yml?query=branch%3Amain) and download the `bjarkiUI` artifact.
 2. Extract its `bjarkiUI` folder into the Forever client's `Interface/AddOns/` directory. Check that `Interface/AddOns/bjarkiUI/bjarkiUI.toc` exists.
 3. Enable the addon and reload the interface. Use `/bui help` for the main commands and `/bdark` for Soft Dark controls.
+
+Version **0.2.340-leader-crown-nudge-test** nudges only the native party-leader crown by 2 UI units horizontally: right on Player, left on Target/Focus. No GuideIcon, role icon, vertical anchor, font, portrait, cast bar or timer changes. The installable ZIP is saved in ChatGPT Library → Addon Versions.
+
+**0.2.341 buff-digit test:** For player buff/debuff timers with *public* remaining seconds, the three already-fixed digit cells may now use native-font glyph width calibration to keep the *visible numeral ink* from wobbling when a narrow `1` becomes a wide `8`. This only changes a supported, out-of-combat-prepared buff glyph's transparent inline spacing. If calibration fails, the original digits remain. Secret/native-fallback timers remain Blizzard-owned. No fonts, timers, frame anchors, other addons or settings are changed.
+
+**0.2.342 compact party presentation:** Native compact party members (player and party1–4) now receive class-colored **names and health-bar fills**, plus the exact existing LoL-style status-text treatment (native font and size, no outline, a one-screen-pixel dark shadow). The native status/power numbers, resource colors, auras, portraits, party order and user Edit Mode layout stay untouched. This is not a new in-game option. [Changelog](CHANGELOG.md)
+
+**v0.2.345 readable long buff timers:** The previous three fixed glyphs covered only public timers below 10 seconds. At 10 seconds and above, buffs used Blizzard's original proportional text, allowing visible digits to shift. This build applies the existing native-font equal-advance glyph map to *readable stock buff text* (seconds, minutes, hours and days), while preserving Blizzard's time formats, font, color, anchor, visibility and clock. Secret or unsupported values remain native; no extra timer or setting is introduced. Also includes the requested resting ZZZ X 49 → 48 adjustment.
 
 ## Current behavior
 
@@ -16,8 +24,16 @@
 | Player cast/channel timer | Restores the pinned 0.2.309 native duration-bound fixed-digit renderer for casts/channels; Blizzard's original `CastTimeText` is never cleared. The original timer remains visible whenever binding setup or native alpha handoff fails. Native font, settings and Edit Mode remain authoritative. |
 | Player buff/debuff timer | Public short durations can use fixed tenths in the native font and native above/below/beside placement. An unchanged native font/anchor update retains already prepared cells in combat. Actual geometry changes defer to native text until safe preparation. Restricted identity, private anchors and forbidden frames retain their supported native route. |
 | Tracked buff icons | Accessible native cooldown widgets receive the ten-second tenths threshold; timing, longer formats and visibility remain native. |
-| Unit frames and party | Unit names, status typography, readable class colors, cosmetic labels and vertical compact-party ordering use guarded native presentation hooks. Layout repairs touch displaced anchors and retain rollback state after partial failure. |
+| Unit frames and party | Unit names, status typography, readable class colors, cosmetic labels and vertical compact-party ordering use guarded native presentation hooks. Compact party names/health fills are class colored and their native numeric text gets the same LoL-style outline-free shadow. Camelot level badge artwork stays hidden through native Show, SetShown and SetAlpha writes; the separate level number remains intact. Layout repairs touch displaced anchors and retain rollback state after partial failure. |
 | Soft Dark and icon borders | Eligible native artwork receives reversible tinting or nameplate-style icon decoration. Restoration checks current ownership before replacing a later writer's work. |
+
+**0.2.339-zzz-right-of-secondary-test** moves Blizzard's original resting ZZZ animation to the **upper-right beyond the secondary portrait**, leaving height, animation and all previous cast/level fixes unchanged. The prior left-side position was a misinterpretation. The installable ZIP is saved in Library → Addon Versions.
+
+**0.2.338-zzz-inward-test** moves the mirrored player resting Zs 8 UI units to the right (toward the portrait rim), retaining their original vertical position and Blizzard animation. The cast-timer and level-ring fixes are unchanged. A verified ZIP is saved to Library → Addon Versions.
+
+**0.2.337-zzz-integrated-test** includes the previously isolated ZZZ animation fix: the native player resting indicator is mirrored to the upper-left of the portrait, away from bjarkiPortraits' upper-right secondary circle. It does not change the art, animation, fonts, secondary portrait or saved layout. Earlier builds omitted the ZZZ module. [Changelog](CHANGELOG.md)
+
+**0.2.336-level-ring-test** repairs the Camelot level-badge background/rim reappearing on player, target and focus. A Show-only hook missed SetShown/alpha updates; narrowly scoped hooks and lifecycle retries now suppress the native LevelBackgroundCircle without hiding the number or changing portrait artwork. Offline checks are not in-game verification. [Changelog](CHANGELOG.md)
 
 **0.2.335-cast-recovery-test** rolls back only the destructive 0.2.334 cast text-mirror rewrite after a live Hearthstone cast showed no countdown. Native duration bindings preserve the fixed digit positions, and failed native alpha writes now recognize explicit `false` refusals. Source-level tests are not live validation. [Changelog](CHANGELOG.md)
 
@@ -40,7 +56,7 @@ For action/cast reports, capture while the affected cooldown or cast is active. 
 
 ## Development and verification
 
-Start with [AGENTS.md](AGENTS.md), then the [code map](docs/CODE_MAP.md). The two manifests load **13 runtime modules**. Current verification runs **27 top-level Lua scripts** (26 behavioral suites plus the manifest syntax script) under Lua 5.1 and Lua 5.4; the aura suite contains 217 cases. See [testing and packaging](docs/TESTING.md) for commands and the boundary between offline and live evidence.
+Start with [AGENTS.md](AGENTS.md), then the [code map](docs/CODE_MAP.md). The two manifests load **15 runtime modules**. Current verification runs **32 top-level Lua scripts** (31 behavioral suites plus the manifest syntax script) under Lua 5.1 and Lua 5.4; the aura suite contains 219 cases. See [testing and packaging](docs/TESTING.md) for commands and the boundary between offline and live evidence.
 
 - [Timer sources, native writers, hooks and cleanup](docs/TIMER_LIFECYCLE.md)
 - [Default manifest](bjarkiUI.toc) · [Camelot manifest](bjarkiUI_Camelot.toc)

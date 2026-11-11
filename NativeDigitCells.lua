@@ -1191,6 +1191,13 @@ end
 local function putBuffGlyphs(state,tenth,revision)
     for i,cell in ipairs(state.cells) do
         local text=i==2 and '.' or tostring(i==1 and math.floor(tenth/10) or tenth%10)
+        -- A centered FontString does not center a proportional glyph's ink:
+        -- narrow '1' and wide '8' can still visually wobble in a fixed cell.
+        -- Use a *safely calibrated native-font* digit with transparent inline
+        -- spacing when supported; the physical cell anchors never move.
+        if i~=2 and state.buffGlyphs then
+            text=state.buffGlyphs[text] or text
+        end
         if not accepted(true,cell:SetText(text)) or revision~=state.revision then return false end
     end
     for i in pairs(state.muted) do
@@ -1452,6 +1459,22 @@ local function layoutBuff(label,state,parent,icon,path,size,flags,layout)
             end)) then return false end
         state.anchored=i
     end
+    -- Calibration is optional and fail-open. It uses only public font/style
+    -- metrics and proves the original Blizzard glyph/font/line-height is
+    -- unchanged. Unavailable or secret font information keeps plain digits.
+    local glyphs
+    local calibrate=private and private.GetFixedTimerGlyphs
+    if type(calibrate)=='function' then
+        local ok,map=pcall(calibrate,label)
+        if ok and type(map)=='table' then
+            local valid=true
+            for i=0,9 do
+                if type(map[tostring(i)])~='string' then valid=false;break end
+            end
+            if valid then glyphs=map end
+        end
+    end
+    state.buffGlyphs=glyphs
     state.layout,state.layoutDirty=layout,nil
     return true
 end
@@ -1671,6 +1694,36 @@ function api.ShowBuff(label,deci,owner,generation,prepared)
     if st.writing then st.generation=st.generation+1 end
     local ok,superseded=writeBuff(label,st,deci)
     return ok and not superseded,st.generation,superseded
+end
+-- Public stock buffs above the decimal threshold otherwise return to a
+-- centered, proportional Blizzard FontString. Its visible digit ink can
+-- wobble even though the label's anchor never moves. Width-calibrate ONLY
+-- readable native text, using the same font's already prepared glyph map.
+-- Never inspect private/secret text or duration objects, replace the native
+-- clock/formatter, or change geometry in an aura tick.
+function api.StabilizeBuffStockText(label,owner)
+    local st=buffCells[label]
+    if not st or not st.ready or st.writing or st.stockPaddingWriting or st.last~=nil or st.dirty
+        or st.ownerUncertain or st.owner~=owner or not st.buffGlyphs
+        or not safe(label) or not safe(owner) then return false end
+    local parent=m(label,'GetParent')
+    if not parent then return false end
+    local parentOK,currentParent=pcall(parent,label)
+    if not parentOK or not public(currentParent) or currentParent~=owner then return false end
+    local getText,setText=m(label,'GetText'),m(label,'SetText')
+    if not getText or not setText then return false end
+    local got,text=pcall(getText,label)
+    -- Native text can be an opaque secret even if the elapsed time is public.
+    -- Never convert, compare or pattern-match a secret payload.
+    if not got or not public(text) or type(text)~='string' or #text>32
+        or not text:find('%d') or text:find('|',1,true)
+        or text:find('[\r\n]') then return false end
+    local padded=text:gsub('%d',st.buffGlyphs)
+    if padded==text then return false end
+    st.stockPaddingWriting=true
+    local ok,result=pcall(setText,label,padded)
+    st.stockPaddingWriting=nil
+    return accepted(ok,result)
 end
 function api.ClearBuff(label,owner,generation)
     local st=buffCells[label]
