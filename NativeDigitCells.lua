@@ -276,6 +276,76 @@ local function buildFormatters()
     nativeFormatters=f
     return f
 end
+-- The four single-numeral action bindings previously used the literal
+-- proportional glyphs '1'...'9'. Their anchors were fixed, but their visual
+-- centers could still move as narrow and wide glyphs alternated.
+-- Reuse the already tested native-font/scale glyph map. Never read a cooldown
+-- clock in Lua, change the native font or add timer callbacks.
+local fixedActionDigits=setmetatable({}, {__mode='k'})
+local actionDigits={1,3,5,6}
+
+local function actionDigitsForFont(label,ordinary)
+    local get=field(private,'GetFixedTimerGlyphs')
+    if type(get)~='function' then return ordinary end
+    local readable,glyphs=pcall(get,label)
+    if not readable or not public(glyphs) or type(glyphs)~='table' then return ordinary end
+    for number=0,9 do
+        local text=glyphs[tostring(number)]
+        if not public(text) or type(text)~='string' then return ordinary end
+    end
+    local cached=fixedActionDigits[glyphs]
+    if cached~=nil then return cached or ordinary end
+    local create=field(C_StringUtil,'CreateNumericRuleFormatter')
+    if type(create)~='function' then return ordinary end
+    local mapped={ordinary[1],ordinary[2],ordinary[3],ordinary[4],ordinary[5],ordinary[6]}
+    local ok=pcall(function()
+        for _,index in ipairs(actionDigits) do
+            local rules={}
+            if index==1 or index==3 then
+                for tenth=0,99 do
+                    local digit=index==1 and math.floor(tenth/10) or tenth%10
+                    rules[#rules+1]={threshold=tenth==0 and 0 or (tenth-0.5)/10,
+                        format=glyphs[tostring(digit)]}
+                end
+                rules[#rules+1]={threshold=10,format=''}
+            else
+                rules[1]={threshold=0,format=''}
+                for second=10,MINUTE_CUTOFF-1 do
+                    local digit=index==5 and math.floor(second/10) or second%10
+                    rules[#rules+1]={threshold=second,format=glyphs[tostring(digit)]}
+                end
+                rules[#rules+1]={threshold=MINUTE_CUTOFF,format=''}
+            end
+            local formatter=create()
+            assert(safe(formatter) and m(formatter,'SetBreakpoints')
+                and m(formatter,'FormatNumber'), 'native formatter unavailable')
+            assert(accepted(pcall(formatter.SetBreakpoints,formatter,rules)),
+                'native format rule refused')
+            -- Validate the native formatter at transitions AND through every
+            -- actual single-digit literal used by these fixed cells.
+            local function verify(value)
+                local base=ordinary[index]:FormatNumber(value)
+                assert(public(base) and type(base)=='string' and #base<=1)
+                local expected=base=='' and '' or glyphs[base]
+                assert(expected~=nil and formatter:FormatNumber(value)==expected)
+            end
+            for digit=0,9 do
+                verify(digit+0.1)
+                verify(digit+0.9)
+            end
+            for second=10,90 do verify(second+0.1) end
+            for _,edge in ipairs({0,0.05,9.9,9.999,10,90.99,91,120,3600}) do
+                verify(edge)
+            end
+            mapped[index]=formatter
+        end
+    end)
+    -- Failure leaves the six proven native binding formatters untouched.
+    -- Memoizing a rejected glyph profile also bounds repeated bar discovery.
+    fixedActionDigits[glyphs]=ok and mapped or false
+    return ok and mapped or ordinary
+end
+
 local function memberValue(button,key)
     return button[key]
 end
@@ -881,6 +951,7 @@ end
 local function prepareAction(state,label,formatters,createBinding)
     local style=readActionStyle(label)
     if not style then return false end
+    local desired=actionDigitsForFont(label,formatters)
     state.timerColor=style.color
     local minimum=publicMilliseconds(state.cooldown,'GetMinimumCountdownDuration')
     if minimum and minimum>0 then minimumGate(state,minimum) end
@@ -888,6 +959,14 @@ local function prepareAction(state,label,formatters,createBinding)
         if not makeCells(label,state.cooldown,true,state.cells,false,style) then return false end
         state.cellsReady=true
         state.actionStyle=style
+    end
+    -- A previously partial binding can survive a font/profile change.
+    -- Repair only already created bindings while stock remains visible.
+    if state.actionFormatters~=desired then
+        for _,index in ipairs(actionDigits) do
+            if index<=state.readyBindings
+                and not setCellFormatter(state,index,desired[index]) then return false end
+        end
     end
     for i=state.readyBindings+1,#formatters do
         local binding=state.bindings[i]
@@ -900,13 +979,14 @@ local function prepareAction(state,label,formatters,createBinding)
         if not m(binding,'SetDuration') or not accepted(pcall(function()
             return accepted(true,binding:SetEnabled(false))
                 and accepted(true,binding:SetFontString(state.cells[i]))
-                and setCellFormatter(state,i,formatters[i])
+                and setCellFormatter(state,i,desired[i])
                 and accepted(true,binding:SetUpdateInterval(0.1))
                 and accepted(true,binding:SetZeroDurationText(''))
                 and accepted(true,binding:SetExpiredText(''))
         end)) then return false end
         state.readyBindings=i
     end
+    state.actionFormatters=desired
     -- Completed hooks cannot be uninstalled. Retain each successful hook and
     -- the resources it references if any later stage needs another attempt.
     if not state.setHook then
@@ -947,7 +1027,11 @@ end
 local function resyncActionStyle(state)
     local got,label=pcall(m(state.cooldown,'GetCountdownFontString'),state.cooldown)
     local style=got and safe(label) and readActionStyle(label)
-    if not state.stylePending and sameActionStyle(state.actionStyle,style) then return true end
+    local formatters=nativeFormatters or buildFormatters()
+    if not formatters then return false end
+    local desired=actionDigitsForFont(label,formatters)
+    local sameStyle=sameActionStyle(state.actionStyle,style)
+    if not state.stylePending and sameStyle and state.actionFormatters==desired then return true end
     -- Restore stock before changing any cell. If visibility restoration is
     -- refused, retain the intact current presenter until the next native clock
     -- invalidates it. A partial style refusal always leaves stock in charge.
@@ -955,10 +1039,19 @@ local function resyncActionStyle(state)
     state.stockFallback=true
     state.fallbackReason=style and 'style-refused' or 'style-unavailable'
     if not restoreStock(state) or not style or not resetMinimumGate(state) then return false end
-    if not makeCells(label,state.cooldown,true,state.cells,false,style) then return false end
+    if not sameStyle or not state.cellsReady then
+        if not makeCells(label,state.cooldown,true,state.cells,false,style) then return false end
+        state.cellsReady=true
+    end
+    -- Apply all four corrected single-glyph formatters only while stock
+    -- owns the display. Unsupported native markup falls back to the originals.
+    for _,index in ipairs(actionDigits) do
+        if not setCellFormatter(state,index,desired[index]) then return false end
+    end
     -- The source is the native stock label, never a gated replacement cell.
     state.timerColor=style.color
     state.actionStyle=style
+    state.actionFormatters=desired
     state.stylePending=nil
     return true
 end
