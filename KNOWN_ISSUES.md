@@ -1,6 +1,12 @@
 # Known issues and bugs
 
-Current source is **0.2.334**. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+Current test branch is **0.2.335-cast-recovery-test**, based on main 0.2.334. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+
+## New cast timer recovery test
+
+- Reported live regression: a Hearthstone cast displayed no countdown while the cast bar remained visible on the 0.2.334 family. The 0.2.334 cast module cleared Blizzard's native `CastTimeText` to replace it with independent glyph regions. Restore the frozen 0.2.309 native duration-bound renderer in this test branch, preserving the original text as fallback. Offline tests validate supported transition/refusal paths, not the live result.
+- Validate the native Show Cast Time option is enabled. If it is off, this test build deliberately does **not** change the user's saved option or force Blizzard to show a disabled label. `/buitimers` reports `cast=native-bindings`, current state and whether the option is on/off/unknown.
+- The ZZZ portrait clearance remains a separate experimental PR and is not included here.
 
 ## Current live follow-up
 

@@ -2,6 +2,13 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.335-cast-recovery-test — restore the cast timer
+
+- The 0.2.334 cast glyph renderer could clear `PlayerCastingBarFrame.CastTimeText` while its replacement became invisible or failed to paint. A live Hearthstone cast displayed no countdown.
+- Restore the pinned 0.2.309 cast module's native duration-to-fixed-digit bindings and preserve Blizzard's original timer text. A failed binding or alpha handoff returns to the native text; source text is never cleared. Preserve native font, cast-time option, visual anchors, and no addon OnUpdate loop.
+- Handle native `SetAlpha` returning `false` as a rejected hide or restore, not a successful handoff. Reuse the pinned regression suite with explicit false-return cases.
+- This only changes the cast timer path. Action cooldowns, buff timers, portraits, borders, frame geometry and Edit Mode layouts are unchanged. Live client rendering remains to be verified.
+
 ## 0.2.334
 
 - Retain prepared fixed buff digits when the native duration update repeats an unchanged font and anchor during combat. Identical layouts need no glyph geometry writes; actual changes still defer safely to native text.

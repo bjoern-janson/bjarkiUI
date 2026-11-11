@@ -1,6 +1,6 @@
 # Testing and packaging bjarkiUI
 
-Current target: **0.2.334**, **13 manifest-loaded runtime modules**, and **27 top-level Lua scripts**: 26 behavioral suites plus `tests/syntax.lua`. Run both Lua 5.1 and Lua 5.4. The current aura suite reports **217 cases**; suite/assertion counts describe fixture coverage, not a percentage of live-client behavior covered.
+Current test target: **0.2.335-cast-recovery-test**, **13 manifest-loaded runtime modules**, and **27 top-level Lua scripts**: 26 behavioral suites plus `tests/syntax.lua`. Run both Lua 5.1 and Lua 5.4. The current aura suite reports **217 cases**; suite/assertion counts describe fixture coverage, not a percentage of live-client behavior covered.
 
 ## Portable verification
 
@@ -8,7 +8,7 @@ Run from the repository root with Python 3.10 or newer and native Lua/luac execu
 
 ```sh
 python tools/verify.py
-python tools/verify.py --output ../bjarkiUI-0.2.334-COMPLETE.zip
+python tools/verify.py --output ../bjarkiUI-0.2.335-cast-recovery-test.zip
 ```
 
 The default uses Lua 5.1 and 5.4 with their matching compilers. `--output` is an optional ZIP filename **outside the checkout**, not a report path. Its parent directory must already exist and the file must be new. Packaging occurs only after verification succeeds. The [CI workflow](../.github/workflows/package-addon.yml) uses native interpreters and the same [verification tool](../tools/verify.py).
@@ -49,7 +49,7 @@ Substitute another top-level script for a focused regression. `tests/syntax.lua`
 | --- | --- | --- |
 | Action timers | [cooldown-seconds.lua](../tests/cooldown-seconds.lua), [action-timer-spacing.lua](../tests/action-timer-spacing.lua), [native-digit-cells.lua](../tests/native-digit-cells.lua) | Exact thresholds, native formatter support, fixed cells, font/style refresh, minimum/GCD gates, preference changes, duration binding and stock restoration. |
 | Player aura timers | [aura-presentation.lua](../tests/aura-presentation.lua) | Public/opaque timing, assignment and expiry, native update order, font/layout changes, combat, physical owner changes, nested writes and fallback text. |
-| Player cast timers | [castbar-digit-cells.lua](../tests/castbar-digit-cells.lua) | Native text copying, real anchored glyphs, empty-label geometry, repeated cast/channel/empower cycles, locale, settings/visibility, denied writes and replacement labels. |
+| Player cast timers | [castbar-digit-cells.lua](../tests/castbar-digit-cells.lua) | Frozen 0.2.309 native duration-to-text bindings, unmodified Blizzard source text, fixed positions and thresholds, casts/channels, permission refusals, and rejected alpha handoffs returning native text. |
 | Tracked buffs and decoration | [presentation.lua](../tests/presentation.lua), [icon-skin.lua](../tests/icon-skin.lua) | Active pool iteration, item/widget reuse, threshold resets, masks/rims, external writes and restoration. |
 | Health/name ownership | [health-color-observer.lua](../tests/health-color-observer.lua), [name-color-ownership.lua](../tests/name-color-ownership.lua) | Native color observation, recipient changes, partial restoration, stale ownership and combat-exit reconciliation. |
 | Unit status typography | [status-style.lua](../tests/status-style.lua), [status-scale.lua](../tests/status-scale.lua), [status-combat.lua](../tests/status-combat.lua), [pet-status-text.lua](../tests/pet-status-text.lua) | Current native font, shadow/style, scale refresh and pet presentation. |
