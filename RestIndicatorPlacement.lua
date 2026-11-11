@@ -1,5 +1,7 @@
 -- Move Blizzard's original resting ZZZ flipbook away from the secondary portrait.
 -- Only its native texture anchor changes; no new artwork, animation or polling.
+-- A small inward nudge keeps the upper-left ZZZ close to the portrait rim.
+local RESTED_Z_INWARD = 8
 local states=setmetatable({},{__mode="k"})
 local function public(v)
     if type(issecretvalue)=="function" then
@@ -86,6 +88,9 @@ apply=function()
         if tx and px then
             local x,y=(px-tx)/ts,(ty-py)/ts
             if finite(x) and finite(y) and x<0 then
+                -- Nudge the mirrored Z 8 UI units inward, but never move it
+                -- past the portrait's center onto the secondary-portrait side.
+                x=math.min(x+RESTED_Z_INWARD,-2)
                 x=math.floor(x*100+.5)/100
                 y=math.floor(y*100+.5)/100
                 local desired={"CENTER",portrait,"CENTER",x,y}
