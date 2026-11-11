@@ -1,4 +1,4 @@
--- Cosmetic-only adjustments to native status labels and the player combat icon.
+-- Cosmetic-only native status labels, player combat glyph and leader crown offsets.
 -- Do not alter FontString text,
 -- visibility, button behavior, shared Font objects, or surrounding frame layout.
 local _, uiPrivate = ...
@@ -9,6 +9,7 @@ local LEVEL_OUTWARD, LEVEL_DOWN, BAG_FONT_INCREASE = 4, 1, 3
 -- No independent visual-offset guesses or anchor stacking.
 local levels = setmetatable({}, { __mode = "k" })
 local combatIcons = setmetatable({}, { __mode = "k" })
+local leaderIcons = setmetatable({}, { __mode = "k" })
 local counts = setmetatable({}, { __mode = "k" })
 local refreshCombatIcon
 
@@ -264,6 +265,44 @@ refreshCombatIcon = function()
     if state then moveCombatIcon(icon, state) end
 end
 
+-- Tiny optical adjustment of Blizzard's *leader crown only*.
+-- Player: +2 right. Target/Focus: -2 left. Guide/role/PvP icons
+-- and the frame's original vertical position stay native.
+local LEADER_CROWN_NUDGE = 2
+
+local function moveLeaderIcon(texture, state)
+    if state.applying or not outsideCombat() or not accessibleCombatIcon(texture) then return end
+    local point = pointOf(texture)
+    if not point or point[1] ~= state.nativePoint or point[3] ~= state.nativePoint
+        or ownsReceipt(state, point, samePoint) then return end
+    local setter = field(texture, "SetPoint")
+    if type(setter) ~= "function" then return end
+    local desired = { point[1], point[2], point[3], point[4] + state.dx, point[5] }
+    state.applying = true
+    local ok, result = pcall(setter, texture,
+        desired[1], desired[2], desired[3], desired[4], desired[5])
+    state.applying = false
+    if ok and readable(result) and result ~= false then
+        recordReceipt(state, desired, pointOf(texture), samePoint)
+    end
+end
+
+local function installLeaderIcon(texture, dx, nativePoint)
+    if not outsideCombat() or not accessibleCombatIcon(texture) then return end
+    local state = leaderIcons[texture]
+    if not state then
+        state = { dx = dx, nativePoint = nativePoint }
+        leaderIcons[texture] = state
+    end
+    -- Never treat a reused physical texture with a different role as an
+    -- opportunity to add a second offset on top of the first.
+    if state.dx ~= dx or state.nativePoint ~= nativePoint then return end
+    moveLeaderIcon(texture, state)
+    hookOnce(texture, state, "SetPoint", function(self)
+        if not state.applying then moveLeaderIcon(self, state) end
+    end)
+end
+
 local function fontOf(text)
     local ok, face, size, flags = pcall(field(text, "GetFont"), text)
     if not ok or not readable(face) or type(face) ~= "string" or face == ""
@@ -319,10 +358,13 @@ local function apply()
     local frameContainer = field(_G.PlayerFrame, "PlayerFrameContainer")
     installCombatIcon(field(playerContext, "AttackIcon"), field(frameContainer, "PlayerPortrait"),
         _G.PlayerLevelText)
+    installLeaderIcon(field(playerContext, "LeaderIcon"), LEADER_CROWN_NUDGE, "TOPLEFT")
     for _, name in ipairs({ "TargetFrame", "FocusFrame" }) do
         local content = field(_G[name], "TargetFrameContent")
         local main = field(content, "TargetFrameContentMain")
         installLevel(field(main, "LevelText"), LEVEL_OUTWARD)
+        local contextual = field(content, "TargetFrameContentContextual")
+        installLeaderIcon(field(contextual, "LeaderIcon"), -LEADER_CROWN_NUDGE, "TOPRIGHT")
     end
 
     -- Forever uses a separate FreeSlots region on the backpack and the normal
