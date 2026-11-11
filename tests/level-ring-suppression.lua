@@ -154,11 +154,16 @@ test("missing or incompatible native frame is a no-op",function()
     e.apply();eq(e.target.visible,true);eq(e.player.visible,false)
 end)
 test("source keeps target focus and lifecycle recovery boundaries",function()
+    -- Scope search to the actual bjarkiUI lifecycle handler, not unrelated
+    -- module-local event handlers earlier in the same large file.
+    local start=assert(source:find("local function applyAll()",1,true))
+    local finish=assert(source:find("end -- Lifecycle helper scope.",start,true))
+    local lifecycle=source:sub(start,finish)
     for _,event in ipairs({"PLAYER_TARGET_CHANGED","PLAYER_FOCUS_CHANGED",
         "PLAYER_REGEN_ENABLED","EDIT_MODE_LAYOUTS_UPDATED",
         "UI_SCALE_CHANGED","DISPLAY_SIZE_CHANGED"})do
-        local p=assert(source:find('event == "'..event..'"',1,true),event)
-        local window=source:sub(p,p+350)
+        local p=assert(lifecycle:find('event == "'..event..'"',1,true),event)
+        local window=lifecycle:sub(p,p+350)
         assert(window:find("applyPlainLevelRings()",1,true),
             event.." does not reassert ring suppression")
     end
