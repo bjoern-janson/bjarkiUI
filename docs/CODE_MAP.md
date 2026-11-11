@@ -1,10 +1,10 @@
 # bjarkiUI code map
 
-Current test branch: **0.2.336-level-ring-test**. Start with the physical region that displays the symptom, then follow its native writer, addon observer, ownership record and cleanup. [Timer lifecycle detail](TIMER_LIFECYCLE.md) · [Verification commands and suite map](TESTING.md)
+Current test branch: **0.2.337-zzz-integrated-test**. Start with the physical region that displays the symptom, then follow its native writer, addon observer, ownership record and cleanup. [Timer lifecycle detail](TIMER_LIFECYCLE.md) · [Verification commands and suite map](TESTING.md)
 
 ## Runtime load order
 
-The [default manifest](../bjarkiUI.toc) and [Camelot manifest](../bjarkiUI_Camelot.toc) load these same 13 files in this order and declare `bjarkiUISettings` as per-character saved variables. This order is part of the integration contract: formatter helpers load before their consumers; the digit API exists before aura setup.
+The [default manifest](../bjarkiUI.toc) and [Camelot manifest](../bjarkiUI_Camelot.toc) load these same 14 files in this order and declare `bjarkiUISettings` as per-character saved variables. This order is part of the integration contract: formatter helpers load before their consumers; the digit API exists before aura setup.
 
 | Order | Module | Responsibility |
 | --- | --- | --- |
@@ -21,6 +21,7 @@ The [default manifest](../bjarkiUI.toc) and [Camelot manifest](../bjarkiUI_Camel
 | 11 | [UnitAuraStyling.lua](../UnitAuraStyling.lua) | Inert compatibility stub reporting retirement of the custom target/focus aura route. |
 | 12 | [BuffPresentation.lua](../BuffPresentation.lua) | Accessible aura/cast/icon discovery; player duration post-hooks; `/buitimers` and `/buiicons`. |
 | 13 | [FrameLabelTweaks.lua](../FrameLabelTweaks.lua) | Level offsets, combat-icon geometry, bag/ammunition count fonts and `/buicombat`. |
+| 14 | [RestIndicatorPlacement.lua](../RestIndicatorPlacement.lua) | Horizontally mirror Blizzard's original resting-ZZZ flipbook away from the secondary portrait; guard owner and protected geometry without changing the native animation. |
 
 ## Find a symptom
 
@@ -51,4 +52,4 @@ For protected-frame changes, inspect the permission check immediately before the
 
 ## Current versus historical material
 
-`tests/*.lua` is the current 28-script verification set. `tests/snapshot-0.2.309/`, `tools/audit/`, the `CODEX_*` audit prompts and [AUDIT_BASELINE.md](AUDIT_BASELINE.md) describe the pinned .309 audit. [ARCHITECTURE.md](../ARCHITECTURE.md) preserves historical design notes, some of which describe superseded cast/timer implementations. Use current source and this map when changing main.
+`tests/*.lua` is the current 29-script verification set. `tests/snapshot-0.2.309/`, `tools/audit/`, the `CODEX_*` audit prompts and [AUDIT_BASELINE.md](AUDIT_BASELINE.md) describe the pinned .309 audit. [ARCHITECTURE.md](../ARCHITECTURE.md) preserves historical design notes, some of which describe superseded cast/timer implementations. Use current source and this map when changing main.
