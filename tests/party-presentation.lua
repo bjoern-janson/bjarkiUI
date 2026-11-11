@@ -106,7 +106,7 @@ case("unit replacement and new physical member use current class identity",funct
 end)
 case("incompatible/forbidden member stays native",function()
     local e=fixture();e.members[2].unit="raid1";e.members[3].forbidden=true
-    function e.members[3]:IsForbidden()return true end
+    e.members[3].IsForbidden=function()return true end
     e:load();eq(e.members[2].healthBar.color[1],0)
     eq(e.members[3].healthBar.color[1],0)
 end)
