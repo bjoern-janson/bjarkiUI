@@ -1,6 +1,11 @@
 # Known issues and bugs
 
-Current test branch is **0.2.335-cast-recovery-test**, based on main 0.2.334. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+Current test branch is **0.2.336-level-ring-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+
+## 0.2.336 level-background clearance (live validation pending)
+
+- A screenshot after 0.2.335 shows the round black/gold level background and border visible again on target. The source only hooked `LevelBackgroundCircle.Show`, while native Camelot may update `SetShown` and `SetAlpha` independently. This build observes all three and retries narrowly when the target/focus frame refreshes.
+- Verify player, target and focus numbers remain visible while only their level badge/rim disappears, including repeated target changes, zoning and combat. This source-level repair does not establish actual client rendering or protected-call safety.
 
 ## New cast timer recovery test
 
