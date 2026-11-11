@@ -514,7 +514,15 @@ local function showTenths(button, timeLeft)
         end
     end
     if not short then
-        releaseDigits(button, state, duration)
+        -- Keep Blizzard's exact time format and ownership for long buffs.
+        -- Its proportional native digits can still visibly wander despite
+        -- the label having a fixed anchor; pad readable stock digits using
+        -- the same prepared native-font calibration as the short buff cells.
+        -- A secret time/text or unprepared layout stays fully native.
+        if releaseDigits(button, state, duration) and publicTime
+            and digitCells and type(digitCells.StabilizeBuffStockText)=='function' then
+            digitCells.StabilizeBuffStockText(duration,button)
+        end
         return
     end
     local setText = member(duration, "SetFormattedText")

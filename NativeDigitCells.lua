@@ -276,6 +276,81 @@ local function buildFormatters()
     nativeFormatters=f
     return f
 end
+-- The four single-numeral action bindings previously used the literal
+-- proportional glyphs '1'...'9'. Their anchors were fixed, but their visual
+-- centers could still move as narrow and wide glyphs alternated.
+-- Reuse the already tested native-font/scale glyph map. Never read a cooldown
+-- clock in Lua, change the native font or add timer callbacks.
+local fixedActionDigits=setmetatable({}, {__mode='k'})
+local actionDigits={1,3,5,6}
+
+local function actionDigitsForFont(label,ordinary)
+    local get=field(private,'GetFixedTimerGlyphs')
+    if type(get)~='function' then return ordinary end
+    local readable,glyphs=pcall(get,label)
+    if not readable or not public(glyphs) or type(glyphs)~='table' then return ordinary end
+    local alreadyTabular=true
+    for number=0,9 do
+        local digit=tostring(number)
+        local text=glyphs[digit]
+        if not public(text) or type(text)~='string' then return ordinary end
+        if text~=digit then alreadyTabular=false end
+    end
+    -- Monospaced native numeral ink needs no replacement bindings at all.
+    if alreadyTabular then return ordinary end
+    local cached=fixedActionDigits[glyphs]
+    if cached~=nil then return cached or ordinary end
+    local create=field(C_StringUtil,'CreateNumericRuleFormatter')
+    if type(create)~='function' then return ordinary end
+    local mapped={ordinary[1],ordinary[2],ordinary[3],ordinary[4],ordinary[5],ordinary[6]}
+    local ok=pcall(function()
+        for _,index in ipairs(actionDigits) do
+            local rules={}
+            if index==1 or index==3 then
+                for tenth=0,99 do
+                    local digit=index==1 and math.floor(tenth/10) or tenth%10
+                    rules[#rules+1]={threshold=tenth==0 and 0 or (tenth-0.5)/10,
+                        format=glyphs[tostring(digit)]}
+                end
+                rules[#rules+1]={threshold=10,format=''}
+            else
+                rules[1]={threshold=0,format=''}
+                for second=10,MINUTE_CUTOFF-1 do
+                    local digit=index==5 and math.floor(second/10) or second%10
+                    rules[#rules+1]={threshold=second,format=glyphs[tostring(digit)]}
+                end
+                rules[#rules+1]={threshold=MINUTE_CUTOFF,format=''}
+            end
+            local formatter=create()
+            assert(safe(formatter) and m(formatter,'SetBreakpoints')
+                and m(formatter,'FormatNumber'), 'native formatter unavailable')
+            assert(accepted(pcall(formatter.SetBreakpoints,formatter,rules)),
+                'native format rule refused')
+            -- Validate the native formatter at transitions AND through every
+            -- actual single-digit literal used by these fixed cells.
+            local function verify(value)
+                local base=ordinary[index]:FormatNumber(value)
+                assert(public(base) and type(base)=='string' and #base<=1)
+                local expected=base=='' and '' or glyphs[base]
+                assert(expected~=nil and formatter:FormatNumber(value)==expected)
+            end
+            for digit=0,9 do
+                verify(digit+0.1)
+                verify(digit+0.9)
+            end
+            for second=10,90 do verify(second+0.1) end
+            for _,edge in ipairs({0,0.05,9.9,9.999,10,90.99,91,120,3600}) do
+                verify(edge)
+            end
+            mapped[index]=formatter
+        end
+    end)
+    -- Failure leaves the six proven native binding formatters untouched.
+    -- Memoizing a rejected glyph profile also bounds repeated bar discovery.
+    fixedActionDigits[glyphs]=ok and mapped or false
+    return ok and mapped or ordinary
+end
+
 local function memberValue(button,key)
     return button[key]
 end
@@ -881,6 +956,7 @@ end
 local function prepareAction(state,label,formatters,createBinding)
     local style=readActionStyle(label)
     if not style then return false end
+    local desired=actionDigitsForFont(label,formatters)
     state.timerColor=style.color
     local minimum=publicMilliseconds(state.cooldown,'GetMinimumCountdownDuration')
     if minimum and minimum>0 then minimumGate(state,minimum) end
@@ -888,6 +964,14 @@ local function prepareAction(state,label,formatters,createBinding)
         if not makeCells(label,state.cooldown,true,state.cells,false,style) then return false end
         state.cellsReady=true
         state.actionStyle=style
+    end
+    -- A previously partial binding can survive a font/profile change.
+    -- Repair only already created bindings while stock remains visible.
+    if state.actionFormatters~=desired then
+        for _,index in ipairs(actionDigits) do
+            if index<=state.readyBindings
+                and not setCellFormatter(state,index,desired[index]) then return false end
+        end
     end
     for i=state.readyBindings+1,#formatters do
         local binding=state.bindings[i]
@@ -900,13 +984,14 @@ local function prepareAction(state,label,formatters,createBinding)
         if not m(binding,'SetDuration') or not accepted(pcall(function()
             return accepted(true,binding:SetEnabled(false))
                 and accepted(true,binding:SetFontString(state.cells[i]))
-                and setCellFormatter(state,i,formatters[i])
+                and setCellFormatter(state,i,desired[i])
                 and accepted(true,binding:SetUpdateInterval(0.1))
                 and accepted(true,binding:SetZeroDurationText(''))
                 and accepted(true,binding:SetExpiredText(''))
         end)) then return false end
         state.readyBindings=i
     end
+    state.actionFormatters=desired
     -- Completed hooks cannot be uninstalled. Retain each successful hook and
     -- the resources it references if any later stage needs another attempt.
     if not state.setHook then
@@ -947,7 +1032,11 @@ end
 local function resyncActionStyle(state)
     local got,label=pcall(m(state.cooldown,'GetCountdownFontString'),state.cooldown)
     local style=got and safe(label) and readActionStyle(label)
-    if not state.stylePending and sameActionStyle(state.actionStyle,style) then return true end
+    local formatters=nativeFormatters or buildFormatters()
+    if not formatters then return false end
+    local desired=actionDigitsForFont(label,formatters)
+    local sameStyle=sameActionStyle(state.actionStyle,style)
+    if not state.stylePending and sameStyle and state.actionFormatters==desired then return true end
     -- Restore stock before changing any cell. If visibility restoration is
     -- refused, retain the intact current presenter until the next native clock
     -- invalidates it. A partial style refusal always leaves stock in charge.
@@ -955,10 +1044,19 @@ local function resyncActionStyle(state)
     state.stockFallback=true
     state.fallbackReason=style and 'style-refused' or 'style-unavailable'
     if not restoreStock(state) or not style or not resetMinimumGate(state) then return false end
-    if not makeCells(label,state.cooldown,true,state.cells,false,style) then return false end
+    if not sameStyle or not state.cellsReady then
+        if not makeCells(label,state.cooldown,true,state.cells,false,style) then return false end
+        state.cellsReady=true
+    end
+    -- Apply all four corrected single-glyph formatters only while stock
+    -- owns the display. Unsupported native markup falls back to the originals.
+    for _,index in ipairs(actionDigits) do
+        if not setCellFormatter(state,index,desired[index]) then return false end
+    end
     -- The source is the native stock label, never a gated replacement cell.
     state.timerColor=style.color
     state.actionStyle=style
+    state.actionFormatters=desired
     state.stylePending=nil
     return true
 end
@@ -1191,6 +1289,13 @@ end
 local function putBuffGlyphs(state,tenth,revision)
     for i,cell in ipairs(state.cells) do
         local text=i==2 and '.' or tostring(i==1 and math.floor(tenth/10) or tenth%10)
+        -- A centered FontString does not center a proportional glyph's ink:
+        -- narrow '1' and wide '8' can still visually wobble in a fixed cell.
+        -- Use a *safely calibrated native-font* digit with transparent inline
+        -- spacing when supported; the physical cell anchors never move.
+        if i~=2 and state.buffGlyphs then
+            text=state.buffGlyphs[text] or text
+        end
         if not accepted(true,cell:SetText(text)) or revision~=state.revision then return false end
     end
     for i in pairs(state.muted) do
@@ -1452,6 +1557,22 @@ local function layoutBuff(label,state,parent,icon,path,size,flags,layout)
             end)) then return false end
         state.anchored=i
     end
+    -- Calibration is optional and fail-open. It uses only public font/style
+    -- metrics and proves the original Blizzard glyph/font/line-height is
+    -- unchanged. Unavailable or secret font information keeps plain digits.
+    local glyphs
+    local calibrate=private and private.GetFixedTimerGlyphs
+    if type(calibrate)=='function' then
+        local ok,map=pcall(calibrate,label)
+        if ok and type(map)=='table' then
+            local valid=true
+            for i=0,9 do
+                if type(map[tostring(i)])~='string' then valid=false;break end
+            end
+            if valid then glyphs=map end
+        end
+    end
+    state.buffGlyphs=glyphs
     state.layout,state.layoutDirty=layout,nil
     return true
 end
@@ -1671,6 +1792,36 @@ function api.ShowBuff(label,deci,owner,generation,prepared)
     if st.writing then st.generation=st.generation+1 end
     local ok,superseded=writeBuff(label,st,deci)
     return ok and not superseded,st.generation,superseded
+end
+-- Public stock buffs above the decimal threshold otherwise return to a
+-- centered, proportional Blizzard FontString. Its visible digit ink can
+-- wobble even though the label's anchor never moves. Width-calibrate ONLY
+-- readable native text, using the same font's already prepared glyph map.
+-- Never inspect private/secret text or duration objects, replace the native
+-- clock/formatter, or change geometry in an aura tick.
+function api.StabilizeBuffStockText(label,owner)
+    local st=buffCells[label]
+    if not st or not st.ready or st.writing or st.stockPaddingWriting or st.last~=nil or st.dirty
+        or st.ownerUncertain or st.owner~=owner or not st.buffGlyphs
+        or not safe(label) or not safe(owner) then return false end
+    local parent=m(label,'GetParent')
+    if not parent then return false end
+    local parentOK,currentParent=pcall(parent,label)
+    if not parentOK or not public(currentParent) or currentParent~=owner then return false end
+    local getText,setText=m(label,'GetText'),m(label,'SetText')
+    if not getText or not setText then return false end
+    local got,text=pcall(getText,label)
+    -- Native text can be an opaque secret even if the elapsed time is public.
+    -- Never convert, compare or pattern-match a secret payload.
+    if not got or not public(text) or type(text)~='string' or #text>32
+        or not text:find('%d') or text:find('|',1,true)
+        or text:find('[\r\n]') then return false end
+    local padded=text:gsub('%d',st.buffGlyphs)
+    if padded==text then return false end
+    st.stockPaddingWriting=true
+    local ok,result=pcall(setText,label,padded)
+    st.stockPaddingWriting=nil
+    return accepted(ok,result)
 end
 function api.ClearBuff(label,owner,generation)
     local st=buffCells[label]

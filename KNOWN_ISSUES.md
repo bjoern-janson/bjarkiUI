@@ -1,6 +1,43 @@
 # Known issues and bugs
 
-Current test branch is **0.2.335-cast-recovery-test**, based on main 0.2.334. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+Current test branch is **0.2.346-static-action-digits-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+
+## 0.2.346 action-bar fixed digit ink (live confirmation pending)
+
+A new report states that action-bar timers still visibly shift. Source inspection confirms that the four individual action number bindings used literal proportional `0–9` glyphs, although their FontStrings were separately anchored. This patch forwards calibrated native-font digit strings to those bindings using the already present glyph-map helper, reusing native duration objects and fixed geometry. A secret/unsupported font or rejected inline markup stays with the native or original fixed-cell fallback, which may remain visually proportional. In-game render confirmation and performance testing are pending.
+
+## 0.2.345 long buff static digit coverage (live validation pending)
+
+Source inspection confirms the gap: readable 10s+ buff clocks used Blizzard's centered proportional stock text, unlike public below-10s three-cell digits. v0.2.345 optionally equalizes native stock numeral advances using a cached native-font map after Blizzard's UpdateDuration while leaving its string, formatting, font and anchor under native ownership. Secret/denied/unsupported text is never inspected or replaced. This adds one cosmetic native SetText per supported long-buff native update; live FPS and visual stability still need verification. Rested ZZZ moves X49 → X48.
+
+## 0.2.342 compact party typography/class colors — live verification pending
+
+Compact party member `name`, `healthBar`, and native status text use an isolated presentation module. The native status routine is reused rather than duplicating font styling, while current native power colors, name text, status contents, portrait artwork and compact-party visual order are unchanged. The code is scoped to `CompactPartyFrame.memberUnitFrames`; in-game check needs to confirm class colors during party combat and after Edit Mode updates, including the precise health/power text surfaces exposed by WoW: Forever. No numeric status option is forced on.
+
+## 0.2.341 buff timer numeral wobble — in-game check pending
+
+The latest live report describes fixed buff timer numerals wobbling again. No buff-specific source changed between the .334 and .340 builds. This experimental patch normalizes visible glyph advances within **already fixed** three-cell public buff decimals, while retaining the native font and static anchors. It uses supported per-font measurement outside combat, with a bounded cache and native/uncalibrated fallback. This only addresses visual ink drift when the split-cell path is active. If the visible issue occurs on an opaque native-fallback aura, it can persist: capture the existing `/buitimers` information during the affected buff instead of guessing the aura ID or protected remaining time.
+
+## 0.2.340 native leader crown alignment (live check pending)
+
+The screenshot showed the small leader crown on Target/Focus needing a slight leftward adjustment, and the Player crown the opposite. This version changes only LeaderIcon by ±2 UI units and keeps other group icons native. Confirm optical placement on player, target and focus in Forever.
+
+## 0.2.339 ZZZ right of the secondary portrait (in-game check pending)
+
+After a user screenshot demonstrated that the previously relocated ZZZ remained on the **wrong side** of the player portrait, v0.2.339 places the native RestTexture at the upper-right **past the secondary circle**. Representative portrait-relative x offset is +72; vertical placement remains native. The animation/texture are not mirrored or replaced. Verify clearance at the configured UI scale; local tests cannot certify final in-client pixels.
+
+## 0.2.338 resting indicator optical alignment (in-game check pending)
+
+A live screenshot showed the upper-left native ZZZ animation too far from the portrait. This build nudges its native anchor 8 UI units inward while preserving the vertical position, animation and strict left-side guard. Mocked layout tests pass; confirm optical alignment in the client.
+
+## 0.2.337 rested indicator integration — in-game check pending
+
+A new live screenshot showed the native resting ZZZ indicator still at the upper-right of PlayerPortrait. Root cause: prior 0.2.336 ZIP never packaged the standalone ZZZ PR #4 implementation. The .337 package integrates that module, its manifest entries and original tests, without touching the already repaired cast timer or level rings. Verify the Z's move to the upper-left during rest, while the secondary circle retains its upper-right position.
+
+## 0.2.336 level-background clearance (live validation pending)
+
+- A screenshot after 0.2.335 shows the round black/gold level background and border visible again on target. The source only hooked `LevelBackgroundCircle.Show`, while native Camelot may update `SetShown` and `SetAlpha` independently. This build observes all three and retries narrowly when the target/focus frame refreshes.
+- Verify player, target and focus numbers remain visible while only their level badge/rim disappears, including repeated target changes, zoning and combat. This source-level repair does not establish actual client rendering or protected-call safety.
 
 ## New cast timer recovery test
 
