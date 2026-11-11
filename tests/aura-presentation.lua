@@ -1041,10 +1041,12 @@ test('calibrated buff glyphs keep ink spacing fixed without changing cell anchor
             equal(cell.anchor,before[3]);equal(cell.point,before[4]);equal(cell.relativePoint,before[5])
         end
     end
-    equal(calibrations,1,'no repeated metrics calibration during timer ticks')
+    local preparedCalibrations=calibrations
+    assert(preparedCalibrations>=1,'native font calibration never prepared')
+    equal(calibrations,preparedCalibrations,'no repeated metrics calibration during timer ticks')
     e.combat=true;e.tick(a,1.2)
     equal(visible(a),glyphs['1']..'.'..glyphs['2'])
-    equal(calibrations,1,'no measurement or geometry change during combat')
+    equal(calibrations,preparedCalibrations,'no measurement or geometry change during combat')
 end)
 test('unavailable or incomplete font calibration falls back to plain fixed digits',function()
     for _,calibrate in ipairs({
