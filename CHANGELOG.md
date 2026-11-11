@@ -2,6 +2,13 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.345-static-buff-text-test — cover long-buff numeral shift
+
+- Static three-cell buff decimals previously applied only under 10s; the readable 10s+ native stock FontString still used proportional digits and could visibly move. This build also applies the prepared native-font transparent-spacer mapping to readable long seconds/minutes/hours/days while retaining their exact native format, anchor, font, color, visibility and clock.
+- Never parse secret text/time or guess durations; native/unsupported and unprepared layouts remain untouched. A guarded SetText follows Blizzard's existing UpdateDuration; no new timer/OnUpdate or combat-time geometry writes. The extra cosmetic native text write is an explicit in-game performance check.
+- Resting ZZZ moves just 1 UI unit left: portrait-relative X 49 → 48, same height and Blizzard animation. No crown, party, portrait, cast or action timer changes.
+- Dedicated stock buff numeral regression suite and updated rested-position assertions. Live visual/static behavior still needs confirmation.
+
 ## 0.2.344-rested-zzz-nudge-test — tiny leftward adjustment
 
 - Move the original resting ZZZ texture 3 UI units left while keeping it to the right of the secondary portrait (portrait-relative X = 52 → 49; prior repository baseline X = 72). No Y, animation, frame ownership, class color, party styling or other timer changes.
