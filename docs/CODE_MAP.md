@@ -1,6 +1,6 @@
 # bjarkiUI code map
 
-Current test branch: **0.2.338-zzz-inward-test**. Start with the physical region that displays the symptom, then follow its native writer, addon observer, ownership record and cleanup. [Timer lifecycle detail](TIMER_LIFECYCLE.md) · [Verification commands and suite map](TESTING.md)
+Current test branch: **0.2.339-zzz-right-of-secondary-test**. Start with the physical region that displays the symptom, then follow its native writer, addon observer, ownership record and cleanup. [Timer lifecycle detail](TIMER_LIFECYCLE.md) · [Verification commands and suite map](TESTING.md)
 
 ## Runtime load order
 
@@ -21,7 +21,7 @@ The [default manifest](../bjarkiUI.toc) and [Camelot manifest](../bjarkiUI_Camel
 | 11 | [UnitAuraStyling.lua](../UnitAuraStyling.lua) | Inert compatibility stub reporting retirement of the custom target/focus aura route. |
 | 12 | [BuffPresentation.lua](../BuffPresentation.lua) | Accessible aura/cast/icon discovery; player duration post-hooks; `/buitimers` and `/buiicons`. |
 | 13 | [FrameLabelTweaks.lua](../FrameLabelTweaks.lua) | Level offsets, combat-icon geometry, bag/ammunition count fonts and `/buicombat`. |
-| 14 | [RestIndicatorPlacement.lua](../RestIndicatorPlacement.lua) | Horizontally mirror Blizzard's original resting-ZZZ flipbook away from the secondary portrait; guard owner and protected geometry without changing the native animation. |
+| 14 | [RestIndicatorPlacement.lua](../RestIndicatorPlacement.lua) | Place Blizzard's original resting-ZZZ flipbook to the upper-right beyond the secondary portrait; guard owner and protected geometry without changing the native animation. |
 
 ## Find a symptom
 

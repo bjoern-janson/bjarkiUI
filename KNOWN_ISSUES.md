@@ -1,6 +1,10 @@
 # Known issues and bugs
 
-Current test branch is **0.2.338-zzz-inward-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+Current test branch is **0.2.339-zzz-right-of-secondary-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+
+## 0.2.339 ZZZ right of the secondary portrait (in-game check pending)
+
+After a user screenshot demonstrated that the previously relocated ZZZ remained on the **wrong side** of the player portrait, v0.2.339 places the native RestTexture at the upper-right **past the secondary circle**. Representative portrait-relative x offset is +72; vertical placement remains native. The animation/texture are not mirrored or replaced. Verify clearance at the configured UI scale; local tests cannot certify final in-client pixels.
 
 ## 0.2.338 resting indicator optical alignment (in-game check pending)
 

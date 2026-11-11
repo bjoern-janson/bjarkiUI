@@ -2,6 +2,14 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.339-zzz-right-of-secondary-test — ZZZ belongs past the second portrait
+
+- Correct the mistakenly left-side ZZZ placement. The requested visual order is **player portrait → secondary portrait → native resting ZZZ** from left to right.
+- Reposition only the original `PlayerRestLoop.RestTexture` at +72 portrait-relative UI units horizontally, to the upper-right beyond bjarkiPortraits' secondary circle. Preserve its original vertical coordinate, flipbook animation, artwork, alpha, visibility and native frame ownership.
+- Guard unknown/secret/native-left layouts, reanchors, combat deferral and UI-scale differences. No more mirroring the ZZZ's position to the left. The original texture itself is not flipped.
+- Scope changes to the resting ZZZ source, its test, version metadata and documentation. All other runtime modules match the previous .338 package byte-for-byte.
+- Local verification: 14 runtime modules parse with Lua 5.4, 13 dedicated placement scenarios pass, and the installable 17-file ZIP has validated structure and hashes. In-game optical check remains pending.
+
 ## 0.2.338-zzz-inward-test — tuck the rested Zs closer to the portrait
 
 - The native Blizzard resting ZZZ animation remains on the upper-left, but its mirrored horizontal anchor moves **8 UI units inward** (representative coordinate -20 → -12) with exactly the same vertical anchor.
