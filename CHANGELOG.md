@@ -2,6 +2,13 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.337-zzz-integrated-test — include the missing rested indicator fix
+
+- The previous 0.2.336 ZIP contained the level-ring and cast-timer repairs but **not** the earlier rested-ZZZ change, which remained in separate draft PR #4. The player resting Zs therefore could not have moved.
+- Include the already tested original Blizzard `PlayerRestLoop.RestTexture` mirror in the same package as the existing level-ring and cast fixes. The animation remains Blizzard-owned and only the validated native CENTER anchor is horizontally reflected across `PlayerPortrait` (upper right → upper left).
+- Preserve the original 0.2.336 level-ring behavior and 0.2.335 cast-timer recovery unchanged, with no custom art, additional timers, or Edit Mode layout changes.
+- Add the existing nine-case rested-portrait regression suite alongside the level-ring suite. Live optical positioning in WoW: Forever still needs confirmation.
+
 ## 0.2.336-level-ring-test — keep Camelot level badge hidden
 
 - Fix the level background/rim returning around player, target and focus level numbers. The existing `LevelBackgroundCircle` hide observed native `Show` only, missing direct `SetShown` and `SetAlpha` restoration.
