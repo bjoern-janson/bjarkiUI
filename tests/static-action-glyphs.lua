@@ -81,6 +81,11 @@ local created=env.builds
 assert(fix({glyphs=setA},plain)==corrected and env.builds==created,
     "same font should reuse four native digit formatters")
 assert(fix({glyphs=nil},plain)==plain,"restricted/unsupported font falls back")
+local tabular={}
+for i=0,9 do tabular[tostring(i)]=tostring(i) end
+local tabularBuildCount=env.builds
+assert(fix({glyphs=tabular},plain)==plain and env.builds==tabularBuildCount,
+    "already-tabular native font should not allocate redundant bindings")
 local setB=glyphSet("{")
 local another=assert(fix({glyphs=setB},plain))
 assert(another~=corrected and another[1]:FormatNumber(1.1)=="{1]",
