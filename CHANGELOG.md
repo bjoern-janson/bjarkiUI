@@ -2,6 +2,13 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.340-leader-crown-nudge-test — minimal leader crown alignment
+
+- Adjust only the native LeaderIcon position: **Player +2** UI units right, **Target/Focus −2** UI units left.
+- Retain each crown's existing vertical anchor, artwork, visibility, native relative frame and one-point attachment. GuideIcon, role/PvP icons and all portraits are unchanged.
+- Reuse FrameLabelTweaks' out-of-combat guarded native geometry and receipt tracking; observe subsequent native SetPoint without cumulative drift, and retry on existing lifecycle events.
+- Ten isolated Lua 5.4 runtime regressions passed locally; added focused source regression suite. The 17-file installable ZIP has verified source identities. Live client optical alignment remains pending.
+
 ## 0.2.339-zzz-right-of-secondary-test — ZZZ belongs past the second portrait
 
 - Correct the mistakenly left-side ZZZ placement. The requested visual order is **player portrait → secondary portrait → native resting ZZZ** from left to right.

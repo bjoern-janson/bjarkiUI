@@ -1,6 +1,10 @@
 # Known issues and bugs
 
-Current test branch is **0.2.339-zzz-right-of-secondary-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+Current test branch is **0.2.340-leader-crown-nudge-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+
+## 0.2.340 native leader crown alignment (live check pending)
+
+The screenshot showed the small leader crown on Target/Focus needing a slight leftward adjustment, and the Player crown the opposite. This version changes only LeaderIcon by ±2 UI units and keeps other group icons native. Confirm optical placement on player, target and focus in Forever.
 
 ## 0.2.339 ZZZ right of the secondary portrait (in-game check pending)
 
