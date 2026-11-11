@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.341-buff-glyph-stability-test"
+local BJARKI_UI_VERSION = "0.2.342-party-presentation-test"
 -- Standalone PRD treatment is retained. Unit-frame resource bars stay native.
 local PRD_MANA_R, PRD_MANA_G, PRD_MANA_B = 0.10, 0.25, 1.00
 local WORLD_TEXT_SCREEN_Y = "0.0430"
@@ -749,6 +749,10 @@ end
 
 local healthColorWrites = setmetatable({}, { __mode = "k" })
 local _, uiPrivate = ...
+if type(uiPrivate) == "table" then
+    -- Reuse the existing LoL-style status-text shadow without a second stylist.
+    uiPrivate.InstallCompactStatusFont = installStatusFont
+end
 
 -- Native health artwork has a baked-in green color. Multiplying that image by
 -- a class RGB produced the olive bars seen in .210. Use only the corresponding
