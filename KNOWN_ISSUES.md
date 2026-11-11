@@ -1,6 +1,10 @@
 # Known issues and bugs
 
-Current test branch is **0.2.342-party-presentation-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+Current test branch is **0.2.345-static-buff-text-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+
+## 0.2.345 long buff static digit coverage (live validation pending)
+
+Source inspection confirms the gap: readable 10s+ buff clocks used Blizzard's centered proportional stock text, unlike public below-10s three-cell digits. v0.2.345 optionally equalizes native stock numeral advances using a cached native-font map after Blizzard's UpdateDuration while leaving its string, formatting, font and anchor under native ownership. Secret/denied/unsupported text is never inspected or replaced. This adds one cosmetic native SetText per supported long-buff native update; live FPS and visual stability still need verification. Rested ZZZ moves X49 → X48.
 
 ## 0.2.342 compact party typography/class colors — live verification pending
 
