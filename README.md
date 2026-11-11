@@ -1,10 +1,10 @@
 # bjarkiUI
 
-**0.2.334 for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
+**0.2.335-cast-recovery-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
 
 ## Install
 
-1. Open a successful [Package addon run on main](https://github.com/bjoern-janson/bjarkiUI/actions/workflows/package-addon.yml?query=branch%3Amain) and download the `bjarkiUI` artifact.
+1. Open a successful [Package addon run](https://github.com/bjoern-janson/bjarkiUI/actions/workflows/package-addon.yml?query=branch%3Amain) and download the `bjarkiUI` artifact.
 2. Extract its `bjarkiUI` folder into the Forever client's `Interface/AddOns/` directory. Check that `Interface/AddOns/bjarkiUI/bjarkiUI.toc` exists.
 3. Enable the addon and reload the interface. Use `/bui help` for the main commands and `/bdark` for Soft Dark controls.
 
@@ -13,11 +13,13 @@
 | Surface | Behavior and native fallback |
 | --- | --- |
 | Action and pet-action countdowns | Fixed digit cells retain the current native font. Tenths appear below 10 seconds; whole seconds continue through 90.99 seconds; rounded-up minutes begin at 91 seconds (`2m`), with hours/days at their existing boundaries. Blizzard still owns cooldown timing, swipes, countdown preferences and minimum/GCD policy. Unsupported fixed-cell paths use the guarded native countdown. |
-| Player cast/channel timer | Fixed glyphs mirror Blizzard's freshly written cast-time text, including its locale format. An independent bounded frame copies the native bar anchor; glyphs do not depend on the emptied source label's width. Native font, visibility and Edit Mode Show Cast Time setting are retained. Unreadable or unsupported text stays native. |
+| Player cast/channel timer | Restores the pinned 0.2.309 native duration-bound fixed-digit renderer for casts/channels; Blizzard's original `CastTimeText` is never cleared. The original timer remains visible whenever binding setup or native alpha handoff fails. Native font, settings and Edit Mode remain authoritative. |
 | Player buff/debuff timer | Public short durations can use fixed tenths in the native font and native above/below/beside placement. An unchanged native font/anchor update retains already prepared cells in combat. Actual geometry changes defer to native text until safe preparation. Restricted identity, private anchors and forbidden frames retain their supported native route. |
 | Tracked buff icons | Accessible native cooldown widgets receive the ten-second tenths threshold; timing, longer formats and visibility remain native. |
 | Unit frames and party | Unit names, status typography, readable class colors, cosmetic labels and vertical compact-party ordering use guarded native presentation hooks. Layout repairs touch displaced anchors and retain rollback state after partial failure. |
 | Soft Dark and icon borders | Eligible native artwork receives reversible tinting or nameplate-style icon decoration. Restoration checks current ownership before replacing a later writer's work. |
+
+**0.2.335-cast-recovery-test** rolls back only the destructive 0.2.334 cast text-mirror rewrite after a live Hearthstone cast showed no countdown. Native duration bindings preserve the fixed digit positions, and failed native alpha writes now recognize explicit `false` refusals. Source-level tests are not live validation. [Changelog](CHANGELOG.md)
 
 Version **0.2.334** repairs a modeled buff-timer regression: native `UpdateDuration` can be followed by identical `SetFontObject` and `SetPoint` calls. Those calls formerly retired prepared fixed digits during combat. The new regression follows that complete sequence and checks visible text, fixed positions, zero redundant glyph-geometry writes and reuse after combat. Fixed action/cast timers, fonts, thresholds and settings are preserved. [Changelog](CHANGELOG.md)
 
