@@ -1,6 +1,6 @@
 # Testing and packaging bjarkiUI
 
-Current test target: **0.2.342-party-presentation-test**, **15 manifest-loaded runtime modules**, and **31 top-level Lua scripts**: 30 behavioral suites plus `tests/syntax.lua`. Run both Lua 5.1 and Lua 5.4. The current aura suite reports **219 cases**; suite/assertion counts describe fixture coverage, not a percentage of live-client behavior covered.
+Current test target: **0.2.345-static-buff-text-test**, **15 manifest-loaded runtime modules**, and **32 top-level Lua scripts**: 31 behavioral suites plus `tests/syntax.lua`. Run both Lua 5.1 and Lua 5.4. The current aura suite reports **219 cases**; suite/assertion counts describe fixture coverage, not a percentage of live-client behavior covered.
 
 ## Portable verification
 
@@ -8,7 +8,7 @@ Run from the repository root with Python 3.10 or newer and native Lua/luac execu
 
 ```sh
 python tools/verify.py
-python tools/verify.py --output ../bjarkiUI-0.2.342-Party-Class-Status.zip
+python tools/verify.py --output ../bjarkiUI-0.2.345-Static-Buff-Numbers.zip
 ```
 
 The default uses Lua 5.1 and 5.4 with their matching compilers. `--output` is an optional ZIP filename **outside the checkout**, not a report path. Its parent directory must already exist and the file must be new. Packaging occurs only after verification succeeds. The [CI workflow](../.github/workflows/package-addon.yml) uses native interpreters and the same [verification tool](../tools/verify.py).
