@@ -1,6 +1,10 @@
 # Known issues and bugs
 
-Current test branch is **0.2.336-level-ring-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+Current test branch is **0.2.337-zzz-integrated-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+
+## 0.2.337 rested indicator integration — in-game check pending
+
+A new live screenshot showed the native resting ZZZ indicator still at the upper-right of PlayerPortrait. Root cause: prior 0.2.336 ZIP never packaged the standalone ZZZ PR #4 implementation. The .337 package integrates that module, its manifest entries and original tests, without touching the already repaired cast timer or level rings. Verify the Z's move to the upper-left during rest, while the secondary circle retains its upper-right position.
 
 ## 0.2.336 level-background clearance (live validation pending)
 
