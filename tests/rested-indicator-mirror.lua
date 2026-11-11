@@ -53,11 +53,16 @@ local function fixture()
     env.PlayerFrame={PlayerFrameContent={PlayerFrameContentContextual={PlayerRestLoop=loop}},
         PlayerFrameContainer={PlayerPortrait=portrait}}
     function env:event(ev)
+        -- Simulate a client whose current state precedes addon loading.
+        -- This permits combat-start, protected and late-discovery scenarios.
+        if not self.moduleLoaded then
+            self.moduleLoaded=true
+            assert(loadfile(root.."/RestIndicatorPlacement.lua","t",env))("bjarkiUI",{})
+        end
         for _,f in ipairs(self.frames) do
             if f.events[ev] then f.scripts.OnEvent(f,ev) end
         end
     end
-    assert(loadfile(root.."/RestIndicatorPlacement.lua","t",env))("bjarkiUI",{})
     return env,texture,portrait,loop
 end
 local function case(name,fn)
