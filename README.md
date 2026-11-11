@@ -1,6 +1,6 @@
 # bjarkiUI
 
-**0.2.336-level-ring-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
+**0.2.337-zzz-integrated-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
 
 ## Install
 
@@ -18,6 +18,8 @@
 | Tracked buff icons | Accessible native cooldown widgets receive the ten-second tenths threshold; timing, longer formats and visibility remain native. |
 | Unit frames and party | Unit names, status typography, readable class colors, cosmetic labels and vertical compact-party ordering use guarded native presentation hooks. Camelot level badge artwork stays hidden through native Show, SetShown and SetAlpha writes; the separate level number remains intact. Layout repairs touch displaced anchors and retain rollback state after partial failure. |
 | Soft Dark and icon borders | Eligible native artwork receives reversible tinting or nameplate-style icon decoration. Restoration checks current ownership before replacing a later writer's work. |
+
+**0.2.337-zzz-integrated-test** includes the previously isolated ZZZ animation fix: the native player resting indicator is mirrored to the upper-left of the portrait, away from bjarkiPortraits' upper-right secondary circle. It does not change the art, animation, fonts, secondary portrait or saved layout. Earlier builds omitted the ZZZ module. [Changelog](CHANGELOG.md)
 
 **0.2.336-level-ring-test** repairs the Camelot level-badge background/rim reappearing on player, target and focus. A Show-only hook missed SetShown/alpha updates; narrowly scoped hooks and lifecycle retries now suppress the native LevelBackgroundCircle without hiding the number or changing portrait artwork. Offline checks are not in-game verification. [Changelog](CHANGELOG.md)
 
@@ -42,7 +44,7 @@ For action/cast reports, capture while the affected cooldown or cast is active. 
 
 ## Development and verification
 
-Start with [AGENTS.md](AGENTS.md), then the [code map](docs/CODE_MAP.md). The two manifests load **13 runtime modules**. Current verification runs **28 top-level Lua scripts** (27 behavioral suites plus the manifest syntax script) under Lua 5.1 and Lua 5.4; the aura suite contains 217 cases. See [testing and packaging](docs/TESTING.md) for commands and the boundary between offline and live evidence.
+Start with [AGENTS.md](AGENTS.md), then the [code map](docs/CODE_MAP.md). The two manifests load **14 runtime modules**. Current verification runs **29 top-level Lua scripts** (28 behavioral suites plus the manifest syntax script) under Lua 5.1 and Lua 5.4; the aura suite contains 217 cases. See [testing and packaging](docs/TESTING.md) for commands and the boundary between offline and live evidence.
 
 - [Timer sources, native writers, hooks and cleanup](docs/TIMER_LIFECYCLE.md)
 - [Default manifest](bjarkiUI.toc) · [Camelot manifest](bjarkiUI_Camelot.toc)
