@@ -1191,6 +1191,13 @@ end
 local function putBuffGlyphs(state,tenth,revision)
     for i,cell in ipairs(state.cells) do
         local text=i==2 and '.' or tostring(i==1 and math.floor(tenth/10) or tenth%10)
+        -- A centered FontString does not center a proportional glyph's ink:
+        -- narrow '1' and wide '8' can still visually wobble in a fixed cell.
+        -- Use a *safely calibrated native-font* digit with transparent inline
+        -- spacing when supported; the physical cell anchors never move.
+        if i~=2 and state.buffGlyphs then
+            text=state.buffGlyphs[text] or text
+        end
         if not accepted(true,cell:SetText(text)) or revision~=state.revision then return false end
     end
     for i in pairs(state.muted) do
@@ -1452,6 +1459,22 @@ local function layoutBuff(label,state,parent,icon,path,size,flags,layout)
             end)) then return false end
         state.anchored=i
     end
+    -- Calibration is optional and fail-open. It uses only public font/style
+    -- metrics and proves the original Blizzard glyph/font/line-height is
+    -- unchanged. Unavailable or secret font information keeps plain digits.
+    local glyphs
+    local calibrate=private and private.GetFixedTimerGlyphs
+    if type(calibrate)=='function' then
+        local ok,map=pcall(calibrate,label)
+        if ok and type(map)=='table' then
+            local valid=true
+            for i=0,9 do
+                if type(map[tostring(i)])~='string' then valid=false;break end
+            end
+            if valid then glyphs=map end
+        end
+    end
+    state.buffGlyphs=glyphs
     state.layout,state.layoutDirty=layout,nil
     return true
 end

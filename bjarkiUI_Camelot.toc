@@ -2,7 +2,7 @@
 ## Title: bjarkiUI
 ## Notes: Ultralight unit-frame presentation for WoW: Forever
 ## Author: Bjarki / OpenAI
-## Version: 0.2.340-leader-crown-nudge-test
+## Version: 0.2.341-buff-glyph-stability-test
 ## SavedVariablesPerCharacter: bjarkiUISettings
 
 NativePrecision.lua
