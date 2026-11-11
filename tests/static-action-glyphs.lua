@@ -86,7 +86,7 @@ local another=assert(fix({glyphs=setB},plain))
 assert(another~=corrected and another[1]:FormatNumber(1.1)=="{1]",
     "font/scale change must use its own calibrated map")
 env.refuseMarkup=true
-local refused=glyphSet("<")
+local refused=glyphSet("[")
 local before=env.builds
 assert(fix({glyphs=refused},plain)==plain,"refused native markup returns stock mapping")
 assert(fix({glyphs=refused},plain)==plain and env.builds==before+1,
