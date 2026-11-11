@@ -289,10 +289,15 @@ local function actionDigitsForFont(label,ordinary)
     if type(get)~='function' then return ordinary end
     local readable,glyphs=pcall(get,label)
     if not readable or not public(glyphs) or type(glyphs)~='table' then return ordinary end
+    local alreadyTabular=true
     for number=0,9 do
-        local text=glyphs[tostring(number)]
+        local digit=tostring(number)
+        local text=glyphs[digit]
         if not public(text) or type(text)~='string' then return ordinary end
+        if text~=digit then alreadyTabular=false end
     end
+    -- Monospaced native numeral ink needs no replacement bindings at all.
+    if alreadyTabular then return ordinary end
     local cached=fixedActionDigits[glyphs]
     if cached~=nil then return cached or ordinary end
     local create=field(C_StringUtil,'CreateNumericRuleFormatter')
