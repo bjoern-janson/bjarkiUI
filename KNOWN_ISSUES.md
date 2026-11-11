@@ -1,6 +1,10 @@
 # Known issues and bugs
 
-Current test branch is **0.2.337-zzz-integrated-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+Current test branch is **0.2.338-zzz-inward-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+
+## 0.2.338 resting indicator optical alignment (in-game check pending)
+
+A live screenshot showed the upper-left native ZZZ animation too far from the portrait. This build nudges its native anchor 8 UI units inward while preserving the vertical position, animation and strict left-side guard. Mocked layout tests pass; confirm optical alignment in the client.
 
 ## 0.2.337 rested indicator integration — in-game check pending
 

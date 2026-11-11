@@ -2,6 +2,13 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.338-zzz-inward-test — tuck the rested Zs closer to the portrait
+
+- The native Blizzard resting ZZZ animation remains on the upper-left, but its mirrored horizontal anchor moves **8 UI units inward** (representative coordinate -20 → -12) with exactly the same vertical anchor.
+- Cap the inward offset at 2 UI units left of portrait center, preventing a narrow/scale-dependent placement from crossing to the secondary portrait's side.
+- Change only `RestIndicatorPlacement.lua`, version metadata, and its focused positioning regression. No cast, level, portrait, font, frame, skin, timer, or saved Edit Mode changes.
+- Verified the 17-file installable ZIP against branch sources; Lua 5.4 compiled all 14 modules, and 13 local resting-position scenarios passed. Live pixel placement remains to be checked.
+
 ## 0.2.337-zzz-integrated-test — include the missing rested indicator fix
 
 - The previous 0.2.336 ZIP contained the level-ring and cast-timer repairs but **not** the earlier rested-ZZZ change, which remained in separate draft PR #4. The player resting Zs therefore could not have moved.
