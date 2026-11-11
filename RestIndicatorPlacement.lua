@@ -1,7 +1,9 @@
 -- Move Blizzard's original resting ZZZ flipbook away from the secondary portrait.
 -- Only its native texture anchor changes; no new artwork, animation or polling.
--- A small inward nudge keeps the upper-left ZZZ close to the portrait rim.
-local RESTED_Z_INWARD = 8
+-- Position the native ZZZ to the RIGHT of the upper-right secondary
+-- portrait, not on the left of the player portrait. This offset is relative
+-- to the portrait's physical scale so it remains stable across UI scaling.
+local RESTED_Z_RIGHT_OF_PORTRAIT = 72
 local states=setmetatable({},{__mode="k"})
 local function public(v)
     if type(issecretvalue)=="function" then
@@ -79,18 +81,18 @@ apply=function()
     if state.applying then return end
     local point=pointOf(texture)
     if samePoint(point,state.applied) then return end
-    -- Only mirror the stock CENTER attachment to PlayerRestLoop.
-    -- Leave custom anchors and an already left-positioned Z alone.
+    -- Only reposition the stock CENTER attachment to PlayerRestLoop.
+    -- Leave unusual/customized anchors and already-left-native art alone.
     if point and point[1]=="CENTER" and rawequal(point[2],loop)
         and point[3]=="CENTER" then
         local tx,ty,ts=scaledCenter(texture)
-        local px,py=scaledCenter(portrait)
+        local px,py,ps=scaledCenter(portrait)
         if tx and px then
-            local x,y=(px-tx)/ts,(ty-py)/ts
-            if finite(x) and finite(y) and x<0 then
-                -- Nudge the mirrored Z 8 UI units inward, but never move it
-                -- past the portrait's center onto the secondary-portrait side.
-                x=math.min(x+RESTED_Z_INWARD,-2)
+            local originalX,y=(tx-px)/ts,(ty-py)/ts
+            if finite(originalX) and finite(y) and originalX>0 then
+                -- The player secondary circle occupies the upper-right
+                -- corner; place ZZZ beyond it, maintaining stock height.
+                local x=RESTED_Z_RIGHT_OF_PORTRAIT*ps/ts
                 x=math.floor(x*100+.5)/100
                 y=math.floor(y*100+.5)/100
                 local desired={"CENTER",portrait,"CENTER",x,y}
