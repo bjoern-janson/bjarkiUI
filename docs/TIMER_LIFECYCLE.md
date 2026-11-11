@@ -1,6 +1,6 @@
 # Timer lifecycle and diagnostics
 
-This guide describes the **0.2.345-static-buff-text-test** branch, including the prior v0.2.344 visual state. The former cast text-mirror mode is historical; the action and aura paths remain unchanged. It traces the displayed timer through its native writer, addon hook, ownership and cleanup. It is not a claim of live-client correctness. [Module map](CODE_MAP.md) · [Tests](TESTING.md) · [Open live reports](../KNOWN_ISSUES.md)
+This guide describes the **0.2.346-static-action-digits-test** branch, preserving the prior v0.2.345 buff and visual behavior. The former cast text-mirror mode is historical; the action and aura paths remain unchanged. It traces the displayed timer through its native writer, addon hook, ownership and cleanup. It is not a claim of live-client correctness. [Module map](CODE_MAP.md) · [Tests](TESTING.md) · [Open live reports](../KNOWN_ISSUES.md)
 
 ## Four distinct timer paths
 
@@ -92,6 +92,12 @@ The existing isolated three-glyph buff timer covers supported public times *belo
 In v0.2.345, the existing `NativeDigitCells` prepared glyph map is also used for **positively readable** original stock timer strings. After Blizzard's current native `UpdateDuration` has written the string, `StabilizeBuffStockText` verifies its physical owner, unchanged preparation, public text and no active split digits; then it wraps ASCII numerals in validated transparent spacing. Existing unit suffixes, decimal punctuation, original font, positioning, alpha, duration source and update cadence remain unchanged. No independent timer, numeric duration conversion, new in-combat geometry, or hidden source label is added. Secret, markup-containing, forbidden and unsupported data stay untouched.
 
 The tradeoff is an additional cosmetic native `SetText` for *each supported long-duration native refresh*; local tests cannot measure the WoW client's performance or pixel stability. The split fixed-digit path remains the native-public under-10s presenter. A transition between different display formats may still change overall string width; this build primarily stabilizes digit advances within a format.
+
+## Action numeral ink alignment (v0.2.346)
+
+The six action glyph cells already have fixed physical CENTER anchors, but `NativeDigitCells.buildFormatters` used proportional literal characters for four numeric tracks. v0.2.346 obtains the supported, currently native-font-width-calibrated glyph map from `ActionTimerSpacing.GetFixedTimerGlyphs`, then builds and validates four extra native numeric rule formatters with the same breakpoints and digits. These bind to the existing opaque duration objects, without Lua clock arithmetic or new update loops. The decimal separator and existing suffix formatter are unchanged. When style/scale changes, the presenter releases to Blizzard stock before switching its numeral formatter. A valid naturally tabular font retains its original formatters; unsupported or secret font reads and rejected formatter rules keep the existing native fallback.
+
+The profile cache is bounded by the underlying glyph-map calibration cache; one set of native formatters is reused across similarly styled buttons. Offline formatting checks establish output equivalence and failure-to-native policy but **not in-client visual glyph centering or performance**.
 
 ## Reading /buitimers
 

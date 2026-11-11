@@ -1,6 +1,10 @@
 # Known issues and bugs
 
-Current test branch is **0.2.345-static-buff-text-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+Current test branch is **0.2.346-static-action-digits-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+
+## 0.2.346 action-bar fixed digit ink (live confirmation pending)
+
+A new report states that action-bar timers still visibly shift. Source inspection confirms that the four individual action number bindings used literal proportional `0–9` glyphs, although their FontStrings were separately anchored. This patch forwards calibrated native-font digit strings to those bindings using the already present glyph-map helper, reusing native duration objects and fixed geometry. A secret/unsupported font or rejected inline markup stays with the native or original fixed-cell fallback, which may remain visually proportional. In-game render confirmation and performance testing are pending.
 
 ## 0.2.345 long buff static digit coverage (live validation pending)
 

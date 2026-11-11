@@ -2,6 +2,15 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.346-static-action-digits-test — stabilize ink inside action-bar numeral cells
+
+- The six native action text bindings had fixed positions, but four of them still rendered ordinary proportional single-glyph numerals. The visible ink of narrow `1` and broad `8` could shift even though their FontStrings never moved.
+- Reuse `ActionTimerSpacing.GetFixedTimerGlyphs` for the four numeral binding formatters (decimal integer/tenth and two-digit seconds tens/ones). Validate native numeric rule output at each transition before changing a binding. The decimal separator and minute/hour/day suffix formatters remain unchanged.
+- Cache one set of four calibrated native rule objects per usable font/scale profile and reuse it across buttons. A naturally tabular font requires no extra formatter. Unsupported font measurements or rejected numeric markup retain the proven uncalibrated bindings.
+- A native font/scale change rebinds the four formatters only after handing visibility back to stock, then reacquires the existing fixed presenter. Never read a restricted cooldown, add Lua time arithmetic, change fonts or frame geometry, or introduce an OnUpdate.
+- New targeted regression tests cover the complete 9.9 → 10 → 90 → 91s handoffs, all numerals, font-profile reuse and rejected markup. Offline formatter output isn't proof of live ink geometry; confirm visually and check combat FPS.
+- All existing buff, cast, portrait, crown, ZZZ and compact-party styles remain unchanged.
+
 ## 0.2.345-static-buff-text-test — cover long-buff numeral shift
 
 - Static three-cell buff decimals previously applied only under 10s; the readable 10s+ native stock FontString still used proportional digits and could visibly move. This build also applies the prepared native-font transparent-spacer mapping to readable long seconds/minutes/hours/days while retaining their exact native format, anchor, font, color, visibility and clock.
