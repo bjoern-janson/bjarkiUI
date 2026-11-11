@@ -1,13 +1,13 @@
 # Timer lifecycle and diagnostics
 
-This guide describes **0.2.334** source. It traces the displayed timer through its native writer, addon hook, ownership and cleanup. It is not a claim of live-client correctness. [Module map](CODE_MAP.md) · [Tests](TESTING.md) · [Open live reports](../KNOWN_ISSUES.md)
+This guide describes the **0.2.335-cast-recovery-test** branch based on 0.2.334. The former cast text-mirror mode is historical; the action and aura paths remain unchanged. It traces the displayed timer through its native writer, addon hook, ownership and cleanup. It is not a claim of live-client correctness. [Module map](CODE_MAP.md) · [Tests](TESTING.md) · [Open live reports](../KNOWN_ISSUES.md)
 
 ## Four distinct timer paths
 
 | Surface | Source and native writer | Addon presentation | Ownership and fallback |
 | --- | --- | --- | --- |
 | Action/pet-action button | Publicly identified action/spell/book slot → native cooldown duration object. The cooldown widget owns its swipe, timing and countdown policy. | `CooldownSeconds` installs native formatting; `NativeDigitCells` feeds the duration object to native text bindings for fixed glyph cells. `ActionTimerSpacing` measures the current font for cells and the native fallback formatter. | Per-button/widget state tracks binding epoch, cell readiness, native hidden-number ownership and restoration. Failed or unsupported fixed rendering returns the native countdown where permitted. |
-| Player cast/channel | Blizzard `UpdateCastTimeText` writes `PlayerCastingBarFrame.CastTimeText`. | `CastBarDigits` copies a publicly readable matching native string into fixed glyph regions. No alternate clock or duration query. | A native-write serial prevents an old callback from reclaiming newer text. Owned source text is restored only if it is still the cleared source. |
+| Player cast/channel | Blizzard `UpdateCastTimeText` keeps the original `PlayerCastingBarFrame.CastTimeText` current; opaque native `UnitCastingDuration`/`UnitChannelDuration` objects are available for the player. | The restored pinned .309 `CastBarDigits` forwards the native duration object untouched to native text bindings that paint fixed glyph cells; no Lua timer math or addon tick loop. | The native source text is **never cleared**. Hide it with an accepted alpha write only after bindings activate; always restore native alpha before clearing cells, retaining cells if restoration is refused. |
 | Ordinary player buff/debuff | Native `UpdateDuration` writes the current `Duration`/`duration` label. | `BuffPresentation.afterDuration` selects public short-duration cells or the supported native formatting route. `NativeDigitCells` owns the cells attached to the physical label. | Physical owner, generation, assignment and stock-text receipts govern takeover and recovery. Restricted identity/private/forbidden paths remain native. |
 | Tracked buff icon | Native viewer items own cooldown widgets and duration rendering. | `TrackedBuffSeconds` sets the widget's native decimal threshold to 10. | Current viewer pass and current item/widget association prevent a recycled item from styling its former widget. No custom countdown clock. |
 
@@ -23,17 +23,17 @@ Action formatting is **tenths below 10**, whole seconds for **10 ≤ time < 91**
 
 Failed minimum-gate calibration is retried at safe login/world-entry/combat-exit boundaries; successful calibration remains cached. Existing cells resynchronize native font/style rather than substituting a font. Countdown preference changes use the native visibility handoff; an off setting must not leave addon digits visible. Follow the current action test's recorded setters and displayed cells when investigating duplicate, blank or stale numbers.
 
-## Cast countdown: mirror the completed native text
+## Cast countdown: native duration bindings and non-destructive fallback
 
-The current cast module is text-driven. Historical cast implementations in `ARCHITECTURE.md` and the .309 snapshot describe different clock/calibration strategies.
+The 0.2.334 text-mirror renderer was removed from this test branch following an observed Hearthstone cast bar with no timer. That renderer erased the source FontString after painting another set of glyphs. A hidden, clipped or failed replacement could therefore leave nothing visible. This branch restores the pinned 0.2.309 duration-bound strategy.
 
-`prepare` discovers the player cast bar and measures its current native font outside combat. `configure` creates a bounded addon frame at the native label's public anchor and scale. Glyphs anchor to that frame, never to the intrinsic width of the native label that will be emptied. This matters when an empty native FontString has no geometry.
+At a safe lifecycle event, `prepare` confirms the player cast bar, its original `CastTimeText` label and font, then allocates nine native text bindings in fixed positions (one- and two-digit tracks). No `SetText('')` call is made on Blizzard's native label. The original text is still maintained by Blizzard's `UpdateCastTimeText`.
 
-A post-hook on `UpdateCastTimeText` calls `update/paint` after native text exists. A matching one- or two-integer-digit decimal string, including the locale prefix/suffix, can be copied to fixed cells. Only after the cells are prepared and shown does the source text clear. A refused read, cell write, clear, unsupported format, replaced source, disabled cast-time setting or Edit Mode preview leaves or returns control to native text.
+`refresh` observes the native player cast/channel mode through the existing cast-bar lifecycle and player `UNIT_SPELLCAST_*` events. `UnitCastingDuration('player')` or `UnitChannelDuration('player')` produces an opaque native duration object, forwarded **unchanged** to `SetDuration` on the bindings. Only if all bindings accept the new duration does `activate` try to hide the native text with `SetAlpha(0)`. An unsupported duration, disabled native Show Cast Time option, denied binding, or refused native alpha setter leaves/restores the original text.
 
-`sourceWritten` advances the serial on a newer native/external write and retires prior cells. `release` hides the addon group and restores remembered text only while it still owns the cleared source. Visibility and alpha are observed from the native label. A font invalidation in combat retires incompatible cells and waits for safe setup; it does not allocate a new layout there.
+On cast end, `disable` restores the native alpha **before** disabling native bindings. If the alpha setter throws or returns `false`, the existing cells remain active rather than clearing the only visible presenter. Later native lifecycle events can retry. The helper reports `cast=native-bindings`, `state=cells|stock` and `setting=on|off|unknown` through existing `/buitimers` output without reading hidden values.
 
-The focused fixture exercises repeated casts, channels and empowered-mode text updates. It does not validate Blizzard's live empowered clock semantics or hold-at-max timing.
+The original .309 fixture, restored as the current cast suite, exercises fixed glyph positions and threshold handoffs, cast/channel changes, unavailable duration objects, disabled Show Cast Time, thrown setters, explicit `false` setters, and subsequent restoration. These simulated tests do **not** prove live rendering, protected-call safety, or empowered hold-at-max behavior. Keep the live issue open until witnessed in WoW: Forever.
 
 ## Player auras: assignment, physical ownership and receipts
 
