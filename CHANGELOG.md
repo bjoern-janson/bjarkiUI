@@ -2,6 +2,52 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.341-buff-glyph-stability-test — stabilize ink inside fixed buff digits
+
+- User reported returning left/right wobble on player buff countdown numerals. The crown update did not change the buff renderer.
+- Existing buff cells had fixed anchors and centered FontStrings, but a proportional Blizzard font renders narrow `1` and broad `8` with different ink widths. Reuse the already validated native fixed-glyph calibration helper, with invisible inline spacers, **only in the three public short-buff digit cells**. Decimal punctuation and each cell's native font, scale, tint, color, anchor, and timing remain unchanged.
+- Upgrade that glyph calibration cache to 16 bounded font/scale profiles, preventing repeated font probing when differently sized buff icons alternate. Calibration happens on safe preparation **outside combat** and never on timer ticks.
+- Invalid/secret/inaccessible native font or unsupported inline markup keeps the existing plain-glyph behavior. No additional clock, polling, slash commands, font replacement, or protected duration reads.
+- Two additional aura regression cases verify digit mapping/constant anchors and unsupported calibration fallback; action-spacing tests check alternating cached profiles. Local Lua 5.4 syntax plus focused code-path tests passed; **live rendering and actual wobble root are not yet verified**.
+- Existing crowns, ZZZ, cast timers, level rings and all other visual presentation retain their v0.2.340 behavior.
+
+## 0.2.340-leader-crown-nudge-test — minimal leader crown alignment
+
+- Adjust only the native LeaderIcon position: **Player +2** UI units right, **Target/Focus −2** UI units left.
+- Retain each crown's existing vertical anchor, artwork, visibility, native relative frame and one-point attachment. GuideIcon, role/PvP icons and all portraits are unchanged.
+- Reuse FrameLabelTweaks' out-of-combat guarded native geometry and receipt tracking; observe subsequent native SetPoint without cumulative drift, and retry on existing lifecycle events.
+- Ten isolated Lua 5.4 runtime regressions passed locally; added focused source regression suite. The 17-file installable ZIP has verified source identities. Live client optical alignment remains pending.
+
+## 0.2.339-zzz-right-of-secondary-test — ZZZ belongs past the second portrait
+
+- Correct the mistakenly left-side ZZZ placement. The requested visual order is **player portrait → secondary portrait → native resting ZZZ** from left to right.
+- Reposition only the original `PlayerRestLoop.RestTexture` at +72 portrait-relative UI units horizontally, to the upper-right beyond bjarkiPortraits' secondary circle. Preserve its original vertical coordinate, flipbook animation, artwork, alpha, visibility and native frame ownership.
+- Guard unknown/secret/native-left layouts, reanchors, combat deferral and UI-scale differences. No more mirroring the ZZZ's position to the left. The original texture itself is not flipped.
+- Scope changes to the resting ZZZ source, its test, version metadata and documentation. All other runtime modules match the previous .338 package byte-for-byte.
+- Local verification: 14 runtime modules parse with Lua 5.4, 13 dedicated placement scenarios pass, and the installable 17-file ZIP has validated structure and hashes. In-game optical check remains pending.
+
+## 0.2.338-zzz-inward-test — tuck the rested Zs closer to the portrait
+
+- The native Blizzard resting ZZZ animation remains on the upper-left, but its mirrored horizontal anchor moves **8 UI units inward** (representative coordinate -20 → -12) with exactly the same vertical anchor.
+- Cap the inward offset at 2 UI units left of portrait center, preventing a narrow/scale-dependent placement from crossing to the secondary portrait's side.
+- Change only `RestIndicatorPlacement.lua`, version metadata, and its focused positioning regression. No cast, level, portrait, font, frame, skin, timer, or saved Edit Mode changes.
+- Verified the 17-file installable ZIP against branch sources; Lua 5.4 compiled all 14 modules, and 13 local resting-position scenarios passed. Live pixel placement remains to be checked.
+
+## 0.2.337-zzz-integrated-test — include the missing rested indicator fix
+
+- The previous 0.2.336 ZIP contained the level-ring and cast-timer repairs but **not** the earlier rested-ZZZ change, which remained in separate draft PR #4. The player resting Zs therefore could not have moved.
+- Include the already tested original Blizzard `PlayerRestLoop.RestTexture` mirror in the same package as the existing level-ring and cast fixes. The animation remains Blizzard-owned and only the validated native CENTER anchor is horizontally reflected across `PlayerPortrait` (upper right → upper left).
+- Preserve the original 0.2.336 level-ring behavior and 0.2.335 cast-timer recovery unchanged, with no custom art, additional timers, or Edit Mode layout changes.
+- Add the existing nine-case rested-portrait regression suite alongside the level-ring suite. Live optical positioning in WoW: Forever still needs confirmation.
+
+## 0.2.336-level-ring-test — keep Camelot level badge hidden
+
+- Fix the level background/rim returning around player, target and focus level numbers. The existing `LevelBackgroundCircle` hide observed native `Show` only, missing direct `SetShown` and `SetAlpha` restoration.
+- Guard the exact native Camelot ring by hiding it and holding alpha at zero. Observe `Show`, `SetShown`, and `SetAlpha` via secure post-hooks, with separate retryable registrations, refusal-safe writes, and a recursion guard. Leave `LevelText`, frame art, protected/secret objects and other textures untouched.
+- Reassert this narrowly scoped presentation at native UI load, target/focus changes, Edit Mode refresh, scale changes and combat exit. No per-frame update or global frame scan.
+- New isolated 13-case Lua regression suite tests native re-show/alpha, ring recycling, refused setters, forbidden objects, hook failures, and stable geometry. Live client verification remains pending.
+- The prior cast-timer recovery and all other timer/portrait behavior are unchanged.
+
 ## 0.2.335-cast-recovery-test — restore the cast timer
 
 - The 0.2.334 cast glyph renderer could clear `PlayerCastingBarFrame.CastTimeText` while its replacement became invisible or failed to paint. A live Hearthstone cast displayed no countdown.

@@ -882,7 +882,7 @@ test('a failed previous-label cleanup delays takeover until it can be concealed'
     e.bjarkiUINativeDigitCells.ClearBuff=normalClear;e.tick(e.buff,4.1)
     equal(visible[previous],nil);equal(visible[e.buff.Duration],41)
 end)
-local function realGlyphScene(initialFont)
+local function realGlyphScene(initialFont,glyphCalibrator)
     local e=scenario();local a,b=e.buff,e.debuff
     local all={}
     local function equip(font,parent)
@@ -943,7 +943,13 @@ local function realGlyphScene(initialFont)
     if initialFont then a.Duration:SetFontObject(initialFont) end
     a.CreateFontString=create;b.CreateFontString=create
     e.UIParent={CreateFontString=create,GetEffectiveScale=function()return 1 end}
-    assert(loadfile(addon..'/NativeDigitCells.lua','t',e))();e.load()
+    local private
+    if glyphCalibrator then
+        local calibrate=type(glyphCalibrator)=='function' and glyphCalibrator
+            or function()return glyphCalibrator end
+        private={GetFixedTimerGlyphs=calibrate}
+    end
+    assert(loadfile(addon..'/NativeDigitCells.lua','t',e))('bjarkiUI',private);e.load()
     return e,a,b,all,visible
 end
 -- Native orientation choices from AuraContainerMixin:UpdateGridLayout:
@@ -1004,6 +1010,55 @@ for _,layout in ipairs({{'below',true,false,false},{'above',true,true,false},{'r
         for i,cell in ipairs(cells)do close(glyphBounds(cell).cx,xs[i],'fixed glyph centers') end
     end)
 end
+
+test('calibrated buff glyphs keep ink spacing fixed without changing cell anchors',function()
+    local glyphs={}
+    for i=0,9 do
+        local digit=tostring(i)
+        glyphs[digit]='|Tspacer|t'..digit..'|Tspacer|t'
+    end
+    local calibrations=0
+    local e,a,_,all,visible=realGlyphScene(nil,function()
+        calibrations=calibrations+1
+        return glyphs
+    end)
+    a.Icon.box={left=100,right=130,bottom=200,top=230}
+    e.tick(a,1.8)
+    local cells=glyphsFor(all,a)
+    equal(#cells,3)
+    equal(visible(a),glyphs['1']..'.'..glyphs['8'])
+    equal(a.Duration.text,'','native text cleared only while three cells own it')
+    local initial={}
+    for i,cell in ipairs(cells)do initial[i]={cell.x,cell.y,cell.anchor,cell.point,cell.relativePoint}end
+    for _,time in ipairs({8.1,1.1,8.8,2.1,9.9}) do
+        e.tick(a,time)
+        local first=math.floor(time)
+        local tenth=math.floor(time*10+0.5)%10
+        equal(visible(a),glyphs[tostring(first)]..'.'..glyphs[tostring(tenth)])
+        for i,cell in ipairs(cells)do
+            local before=initial[i]
+            equal(cell.x,before[1]);equal(cell.y,before[2])
+            equal(cell.anchor,before[3]);equal(cell.point,before[4]);equal(cell.relativePoint,before[5])
+        end
+    end
+    equal(calibrations,1,'no repeated metrics calibration during timer ticks')
+    e.combat=true;e.tick(a,1.2)
+    equal(visible(a),glyphs['1']..'.'..glyphs['2'])
+    equal(calibrations,1,'no measurement or geometry change during combat')
+end)
+test('unavailable or incomplete font calibration falls back to plain fixed digits',function()
+    for _,calibrate in ipairs({
+        function()error('native font probe unavailable')end,
+        function()return {['1']='only one glyph'}end
+    }) do
+        local e,a,_,all,visible=realGlyphScene(nil,calibrate)
+        e.tick(a,4.2);equal(visible(a),'4.2');equal(a.Duration.text,'')
+        e.tick(a,1.1);equal(visible(a),'1.1')
+        local cells=glyphsFor(all,a)
+        equal(#cells,3)
+        for _,cell in ipairs(cells)do equal(cell.size,12,'native font preserved')end
+    end
+end)
 test('native buff layout setters refresh unchanged fonts and combat transitions stay on stock',function()
     local e,a,_,all,visible=realGlyphScene()
     a.Icon.box={left=100,right=130,bottom=200,top=230}
