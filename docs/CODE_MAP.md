@@ -1,6 +1,6 @@
 # bjarkiUI code map
 
-Current source: **0.2.334**. Start with the physical region that displays the symptom, then follow its native writer, addon observer, ownership record and cleanup. [Timer lifecycle detail](TIMER_LIFECYCLE.md) · [Verification commands and suite map](TESTING.md)
+Current test branch: **0.2.335-cast-recovery-test**. Start with the physical region that displays the symptom, then follow its native writer, addon observer, ownership record and cleanup. [Timer lifecycle detail](TIMER_LIFECYCLE.md) · [Verification commands and suite map](TESTING.md)
 
 ## Runtime load order
 
@@ -16,7 +16,7 @@ The [default manifest](../bjarkiUI.toc) and [Camelot manifest](../bjarkiUI_Camel
 | 6 | [ActionTimerSpacing.lua](../ActionTimerSpacing.lua) | Measures current native font glyphs, verifies spacing formatters and provides digit metrics. |
 | 7 | [CooldownSeconds.lua](../CooldownSeconds.lua) | Installs native action countdown formatting; observes settings and safe bar lifecycle events. |
 | 8 | [NativeDigitCells.lua](../NativeDigitCells.lua) | Action duration bindings, fixed action cells, buff glyph preparation and physical-label ownership. |
-| 9 | [CastBarDigits.lua](../CastBarDigits.lua) | Copies fresh native player cast text into fixed glyph positions with native fallback. |
+| 9 | [CastBarDigits.lua](../CastBarDigits.lua) | Native `UnitCastingDuration`/`UnitChannelDuration` objects drive fixed glyph bindings; retains Blizzard's original cast text as fallback and never clears it. |
 | 10 | [IconSkin.lua](../IconSkin.lua) | Native icon masks/rims, donor visibility restoration and `/buiborders`. |
 | 11 | [UnitAuraStyling.lua](../UnitAuraStyling.lua) | Inert compatibility stub reporting retirement of the custom target/focus aura route. |
 | 12 | [BuffPresentation.lua](../BuffPresentation.lua) | Accessible aura/cast/icon discovery; player duration post-hooks; `/buitimers` and `/buiicons`. |
@@ -31,7 +31,7 @@ The [default manifest](../bjarkiUI.toc) and [Camelot manifest](../bjarkiUI_Camel
 | Status text/shadow or pet text | `installUnitStatusFonts` → `installStatusFont` → `styleStatusFont`; the native font/style writes and effective scale determine the next application. | [status-style.lua](../tests/status-style.lua), [status-scale.lua](../tests/status-scale.lua), [status-combat.lua](../tests/status-combat.lua), [pet-status-text.lua](../tests/pet-status-text.lua) |
 | Incoming player hit-text placement | `anchorCombatText`; follow safe lifecycle retries and native write refusals separately from geometry math. | [hit-text-lifecycle.lua](../tests/hit-text-lifecycle.lua), [hit-text-write-recovery.lua](../tests/hit-text-write-recovery.lua) |
 | Action or pet-action countdown | `applyCooldownSeconds` → `InstallAction` → `prepareAction/setDuration/refreshAction`; native duration bindings drive cells. `restoreStock` and visibility ownership return the native countdown. Check minimum/GCD policy, preference, spell identity and current source style. | [cooldown-seconds.lua](../tests/cooldown-seconds.lua), [action-timer-spacing.lua](../tests/action-timer-spacing.lua), [native-digit-cells.lua](../tests/native-digit-cells.lua) |
-| Player cast/channel countdown | Native `UpdateCastTimeText` → `update/paint`; `sourceWritten` invalidates an older claim and `release` restores only still-owned text. The current module mirrors native text; it does not query a cast clock or duration object. | [castbar-digit-cells.lua](../tests/castbar-digit-cells.lua) |
+| Player cast/channel countdown | `UpdateCastTimeTextShown` and player cast/channel events → `prepare/refresh/activate` → opaque `UnitCastingDuration`/`UnitChannelDuration` passed unchanged to native duration text bindings. `disable` restores native alpha before disabling cells. Never clear `CastTimeText`; the mirrored-native-text approach is retired in this test build. | [castbar-digit-cells.lua](../tests/castbar-digit-cells.lua) |
 | Player buff/debuff countdown | Native `UpdateDuration` → `afterDuration/showTenths`; `PrepareBuff/BuffBinding/ReadyBuff/ShowBuff` manage the physical label and its generation. `releaseDigits/ClearBuff` and stock receipts handle retirement or handoff. Native font/layout setters can run after the duration hook. | [aura-presentation.lua](../tests/aura-presentation.lua) |
 | Tracked buff countdown | Viewer `RefreshLayout` → `updateViewer/setTenths/applyThreshold`; a pass identity and current item-to-cooldown association prevent recycled items from reclaiming old widgets. | [presentation.lua](../tests/presentation.lua) |
 | Missing icon rims/masks | `BuffPresentation.setupButton/styleIcon` → `Skin.Apply`; follow icon ownership, donor alpha, mask attachment and `release/restore`. Private/inaccessible icons are outside public skin coverage. | [icon-skin.lua](../tests/icon-skin.lua), [aura-presentation.lua](../tests/aura-presentation.lua) |
@@ -43,7 +43,7 @@ The [default manifest](../bjarkiUI.toc) and [Camelot manifest](../bjarkiUI_Camel
 
 ## Shared boundaries
 
-A duration object's existence is not permission to read its remaining time. Action cells use native bindings; the restricted public-identity aura route forwards native formatted text to its sink without parsing it. Secret or unavailable identity leaves that aura on the native fallback. Cast cells require a publicly readable native string. These are different permission paths, not interchangeable timer implementations.
+A duration object's existence is not permission to read its remaining time. The cast native duration object is forwarded without examining its protected remaining time. Action cells use native bindings; the restricted public-identity aura route forwards native formatted text to its sink without parsing it. Secret or unavailable identity leaves that aura on the native fallback. Cast cells require a publicly readable native string. These are different permission paths, not interchangeable timer implementations.
 
 Many modules intentionally repeat safe discovery at login, world entry, combat exit or addon load. Timer progression comes from existing native writers and bindings, not an addon-created polling loop. Recovery callbacks and bounded retries are still work: offline tests do not measure their live cost.
 
