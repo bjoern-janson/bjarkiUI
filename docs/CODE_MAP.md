@@ -1,6 +1,6 @@
 # bjarkiUI code map
 
-Current test branch: **0.2.340-leader-crown-nudge-test**. Start with the physical region that displays the symptom, then follow its native writer, addon observer, ownership record and cleanup. [Timer lifecycle detail](TIMER_LIFECYCLE.md) · [Verification commands and suite map](TESTING.md)
+Current test branch: **0.2.341-buff-glyph-stability-test**. Start with the physical region that displays the symptom, then follow its native writer, addon observer, ownership record and cleanup. [Timer lifecycle detail](TIMER_LIFECYCLE.md) · [Verification commands and suite map](TESTING.md)
 
 ## Runtime load order
 
@@ -13,9 +13,9 @@ The [default manifest](../bjarkiUI.toc) and [Camelot manifest](../bjarkiUI_Camel
 | 3 | [PartyOrder.lua](../PartyOrder.lua) | Vertical compact-party order, native layout observation and partial-write rollback. |
 | 4 | [SoftDark.lua](../SoftDark.lua) | Native artwork tinting, ownership-aware restoration and `/bdark`. |
 | 5 | [TrackedBuffSeconds.lua](../TrackedBuffSeconds.lua) | Native ten-second decimal threshold for active tracked-buff cooldown widgets. |
-| 6 | [ActionTimerSpacing.lua](../ActionTimerSpacing.lua) | Measures current native font glyphs, verifies spacing formatters and provides digit metrics. |
+| 6 | [ActionTimerSpacing.lua](../ActionTimerSpacing.lua) | Measures native font glyphs, verifies action formatters and prepares a bounded 16-style map of optional fixed-width glyph text for buff digit cells. |
 | 7 | [CooldownSeconds.lua](../CooldownSeconds.lua) | Installs native action countdown formatting; observes settings and safe bar lifecycle events. |
-| 8 | [NativeDigitCells.lua](../NativeDigitCells.lua) | Action duration bindings, fixed action cells, buff glyph preparation and physical-label ownership. |
+| 8 | [NativeDigitCells.lua](../NativeDigitCells.lua) | Action duration bindings, fixed action cells, public buff glyph preparation/calibration and physical-label ownership. |
 | 9 | [CastBarDigits.lua](../CastBarDigits.lua) | Native `UnitCastingDuration`/`UnitChannelDuration` objects drive fixed glyph bindings; retains Blizzard's original cast text as fallback and never clears it. |
 | 10 | [IconSkin.lua](../IconSkin.lua) | Native icon masks/rims, donor visibility restoration and `/buiborders`. |
 | 11 | [UnitAuraStyling.lua](../UnitAuraStyling.lua) | Inert compatibility stub reporting retirement of the custom target/focus aura route. |

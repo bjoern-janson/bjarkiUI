@@ -1,6 +1,10 @@
 # Known issues and bugs
 
-Current test branch is **0.2.340-leader-crown-nudge-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+Current test branch is **0.2.341-buff-glyph-stability-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+
+## 0.2.341 buff timer numeral wobble — in-game check pending
+
+The latest live report describes fixed buff timer numerals wobbling again. No buff-specific source changed between the .334 and .340 builds. This experimental patch normalizes visible glyph advances within **already fixed** three-cell public buff decimals, while retaining the native font and static anchors. It uses supported per-font measurement outside combat, with a bounded cache and native/uncalibrated fallback. This only addresses visual ink drift when the split-cell path is active. If the visible issue occurs on an opaque native-fallback aura, it can persist: capture the existing `/buitimers` information during the affected buff instead of guessing the aura ID or protected remaining time.
 
 ## 0.2.340 native leader crown alignment (live check pending)
 

@@ -1,6 +1,6 @@
 # bjarkiUI
 
-**0.2.340-leader-crown-nudge-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
+**0.2.341-buff-glyph-stability-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
 
 ## Install
 
@@ -9,6 +9,8 @@
 3. Enable the addon and reload the interface. Use `/bui help` for the main commands and `/bdark` for Soft Dark controls.
 
 Version **0.2.340-leader-crown-nudge-test** nudges only the native party-leader crown by 2 UI units horizontally: right on Player, left on Target/Focus. No GuideIcon, role icon, vertical anchor, font, portrait, cast bar or timer changes. The installable ZIP is saved in ChatGPT Library → Addon Versions.
+
+**0.2.341 buff-digit test:** For player buff/debuff timers with *public* remaining seconds, the three already-fixed digit cells may now use native-font glyph width calibration to keep the *visible numeral ink* from wobbling when a narrow `1` becomes a wide `8`. This only changes a supported, out-of-combat-prepared buff glyph's transparent inline spacing. If calibration fails, the original digits remain. Secret/native-fallback timers remain Blizzard-owned. No fonts, timers, frame anchors, other addons or settings are changed.
 
 ## Current behavior
 

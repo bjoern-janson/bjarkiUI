@@ -2,6 +2,15 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.341-buff-glyph-stability-test — stabilize ink inside fixed buff digits
+
+- User reported returning left/right wobble on player buff countdown numerals. The crown update did not change the buff renderer.
+- Existing buff cells had fixed anchors and centered FontStrings, but a proportional Blizzard font renders narrow `1` and broad `8` with different ink widths. Reuse the already validated native fixed-glyph calibration helper, with invisible inline spacers, **only in the three public short-buff digit cells**. Decimal punctuation and each cell's native font, scale, tint, color, anchor, and timing remain unchanged.
+- Upgrade that glyph calibration cache to 16 bounded font/scale profiles, preventing repeated font probing when differently sized buff icons alternate. Calibration happens on safe preparation **outside combat** and never on timer ticks.
+- Invalid/secret/inaccessible native font or unsupported inline markup keeps the existing plain-glyph behavior. No additional clock, polling, slash commands, font replacement, or protected duration reads.
+- Two additional aura regression cases verify digit mapping/constant anchors and unsupported calibration fallback; action-spacing tests check alternating cached profiles. Local Lua 5.4 syntax plus focused code-path tests passed; **live rendering and actual wobble root are not yet verified**.
+- Existing crowns, ZZZ, cast timers, level rings and all other visual presentation retain their v0.2.340 behavior.
+
 ## 0.2.340-leader-crown-nudge-test — minimal leader crown alignment
 
 - Adjust only the native LeaderIcon position: **Player +2** UI units right, **Target/Focus −2** UI units left.
