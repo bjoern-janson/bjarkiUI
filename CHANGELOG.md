@@ -2,6 +2,13 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.335 — native rested ZZZ clearance
+
+- Mirror Blizzard's animated PlayerRestLoop.RestTexture horizontally to the opposite side of the player portrait, retaining its original animation, art, scale, alpha, vertical placement and visibility.
+- Only write to a verified native one-point anchor outside combat; defer unsafe changes and leave custom/secret frames untouched. Nine isolated Lua regression cases were added.
+- Short buff whole-second fallbacks remain open until an in-game /buitimers capture establishes whether aura identity is public. No speculative secret-duration changes.
+- Live Forever optical placement and taint safety still need verification.
+
 ## 0.2.334
 
 - Retain prepared fixed buff digits when the native duration update repeats an unchanged font and anchor during combat. Identical layouts need no glyph geometry writes; actual changes still defer safely to native text.
@@ -9,7 +16,7 @@ This log covers the synchronized post-launch local test builds. Older implementa
 - Reuse the prepared layout only with unchanged native font, physical owner/generation and public geometry, and all three glyph anchors complete. The regression verifies the displayed tenth, fixed positions, zero redundant geometry writes and post-combat region reuse.
 - Preserve fixed action/cast timers, fonts, countdown thresholds and settings. Live rendering remains unverified.
 
-The current regression set is 27 top-level scripts under both Lua 5.1 and Lua 5.4, including 217 aura cases and the 13-module manifest syntax script. [Testing and packaging](docs/TESTING.md) · [Recorded build evidence](docs/BUILD_VERIFICATION.md)
+The 0.2.334 regression set was 27 top-level scripts under both Lua 5.1 and Lua 5.4, including 217 aura cases and the 13-module manifest syntax script. [Testing and packaging](docs/TESTING.md) · [Recorded build evidence](docs/BUILD_VERIFICATION.md)
 
 ## 0.2.333
 
