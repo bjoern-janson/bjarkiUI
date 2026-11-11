@@ -1024,6 +1024,8 @@ test('calibrated buff glyphs keep ink spacing fixed without changing cell anchor
     end)
     a.Icon.box={left=100,right=130,bottom=200,top=230}
     e.tick(a,1.8)
+    local preparedCalibrations=calibrations
+    assert(preparedCalibrations>=1,'native font calibration never prepared')
     local cells=glyphsFor(all,a)
     equal(#cells,3)
     equal(visible(a),glyphs['1']..'.'..glyphs['8'])
@@ -1041,8 +1043,6 @@ test('calibrated buff glyphs keep ink spacing fixed without changing cell anchor
             equal(cell.anchor,before[3]);equal(cell.point,before[4]);equal(cell.relativePoint,before[5])
         end
     end
-    local preparedCalibrations=calibrations
-    assert(preparedCalibrations>=1,'native font calibration never prepared')
     equal(calibrations,preparedCalibrations,'no repeated metrics calibration during timer ticks')
     e.combat=true;e.tick(a,1.2)
     equal(visible(a),glyphs['1']..'.'..glyphs['2'])
