@@ -1,6 +1,11 @@
 # Known issues and bugs
 
-Current source is **0.2.334**. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+Current source is **0.2.335**. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+
+## 0.2.335 live checks
+
+- Test the native rested ZZZ animation mirrored to the upper-left of PlayerPortrait, away from the new secondary portrait. Verify during rest-zone transitions and changes to UI scale / Edit Mode. Offline success is not proof of correct in-game positioning.
+- Short buffs still sometimes retain whole-second native labels (as in the 6 s / 4 s screenshot). Capture /buitimers before a rescan or reload, to identify unsupported/secret aura-identity fallbacks without accessing secret payloads.
 
 ## Current live follow-up
 
