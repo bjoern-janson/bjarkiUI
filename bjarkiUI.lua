@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.348-classic-party-health-material-test"
+local BJARKI_UI_VERSION = "0.2.349-party-aggro-visuals-test"
 -- Standalone PRD treatment is retained. Unit-frame resource bars stay native.
 local PRD_MANA_R, PRD_MANA_G, PRD_MANA_B = 0.10, 0.25, 1.00
 local WORLD_TEXT_SCREEN_Y = "0.0430"
@@ -1802,6 +1802,11 @@ local function anchorCombatText()
 end
 
 local HIGHLIGHT_SCALE = 0.25
+-- PetAttackModeTexture is the continuously pulsing, additive-red attack
+-- status, not the pet's actual threat flash. It can overlap the threat art.
+-- Halve only this persistent pet attack-mode pulse, without changing the
+-- 25% native threat flash shared by player, pet and party members.
+local PET_ATTACK_MODE_SCALE = 0.125
 local textureScaleGuards = setmetatable({}, { __mode = "k" })
 
 local function installVertexAlphaScale(texture, scale)
@@ -1837,6 +1842,20 @@ local function installVertexAlphaScale(texture, scale)
         if ok then apply(r, g, b, a) end
     end
 end
+-- Classic (non-raid-style) party frames expose one native threat flash
+-- each on their member/pet frames. Let their own pooled-frame presenter
+-- install the same 25%-intensity observer we use for Player/Target/Focus.
+-- One weak-key receipt per actual Texture prevents duplicate hooks after
+-- party frame release/reacquisition. Native threat and show/hide stay owned
+-- by Blizzard; this never edits the animation or its layout.
+if type(uiPrivate) == "table" then
+    uiPrivate.InstallClassicPartyThreatFlash = function(texture)
+        if texture and not isSecret(texture) then
+            installVertexAlphaScale(texture, HIGHLIGHT_SCALE)
+        end
+    end
+end
+
 -- The 70425 Camelot TargetFrame mixin anchors BOTH Target and Focus flash
 -- textures to TargetFrame.TargetFrameContainer. A live Focus warning can then
 -- look like a ghost Target after clearing Target. Repair only that exact binding.
@@ -1877,7 +1896,7 @@ local function installThreatAlphaHooks()
     installVertexAlphaScale(target and target.TargetFrameContainer and target.TargetFrameContainer.Flash, HIGHLIGHT_SCALE)
     installVertexAlphaScale(focus and focus.TargetFrameContainer and focus.TargetFrameContainer.Flash, HIGHLIGHT_SCALE)
     installVertexAlphaScale(_G.PetFrameFlash, HIGHLIGHT_SCALE)
-    installVertexAlphaScale(_G.PetAttackModeTexture, HIGHLIGHT_SCALE)
+    installVertexAlphaScale(_G.PetAttackModeTexture, PET_ATTACK_MODE_SCALE)
 end
 
 local playerRestFlashes = setmetatable({}, { __mode = "k" })

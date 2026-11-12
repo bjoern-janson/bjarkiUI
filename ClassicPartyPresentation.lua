@@ -135,11 +135,25 @@ local function darkChrome(frame)
     local tint = field(uiPrivate, "TintClassicPartyChrome")
     if type(tint) == "function" then pcall(tint, frame) end
 end
+local function styleThreatFlashes(frame)
+    if not memberUnit(frame) then return end
+    local install = field(uiPrivate, "InstallClassicPartyThreatFlash")
+    if type(install) ~= "function" then return end
+    -- Both are Blizzard's existing in-combat/threat textures; keep their
+    -- native visibility, geometry and animation. Exclude party Status and
+    -- attack/leader/PvP/portrait art, which are different visual states.
+    local flash = field(frame, "Flash")
+    if safe(flash) then pcall(install, flash) end
+    local pet = field(frame, "PetFrame")
+    local petFlash = field(pet, "Flash")
+    if safe(petFlash) then pcall(install, petFlash) end
+end
 local function refresh(frame)
     if not memberUnit(frame) then return end
     repaint(frame)
     repaint(frame, "pet")
     styleNumeric(frame)
+    styleThreatFlashes(frame)
     darkChrome(frame)
 end
 local function postHook(object, name, callback, state)
