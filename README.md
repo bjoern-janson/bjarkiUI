@@ -1,14 +1,14 @@
 # bjarkiUI
 
-**0.2.354-hide-party-faction-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
+**0.2.355-timer-spacing-recovery-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
 
 ## Latest test build
 
-**.354:** Removes the faction/PvP badges from classic party frames. Their original badge texture stays hidden through native faction and visibility refreshes, including combat refreshes once the hooks are prepared. Builds on the approved .353 crown spacing and .352 rested-Z removal. [Changes](CHANGELOG.md) · [Verification](docs/VERIFICATION_0.2.354.md)
+**.355:** Extends fixed digit spacing to supported native-formatted short buff timers, repairs missed buff typography retries and inherited-scale refreshes, and makes action cells inherit the scale used for their calibration. Rejected action glyph formatters retry at existing safe lifecycle boundaries. The existing timer diagnostic includes cached calibration stages. [Changes](CHANGELOG.md) · [Verification](docs/VERIFICATION_0.2.355.md)
 
 ## Install
 
-1. Open a successful [Package addon run](https://github.com/bjoern-janson/bjarkiUI/actions/workflows/package-addon.yml?query=branch%3Afix%2Fhide-party-faction-0.2.354) and download the `bjarkiUI` artifact.
+1. Download the supplied `bjarkiUI-0.2.355-Timer-Spacing-Recovery.zip` test package. The stacked development PR does not trigger the workflow restricted to `main`.
 2. Extract its `bjarkiUI` folder into the Forever client's `Interface/AddOns/` directory. Check that `Interface/AddOns/bjarkiUI/bjarkiUI.toc` exists.
 3. Enable the addon and reload the interface. Use `/bui help` for the main commands and `/bdark` for Soft Dark controls.
 
@@ -34,7 +34,7 @@ Historical **0.2.340-leader-crown-nudge-test** nudged the native crowns horizont
 | --- | --- |
 | Action and pet-action countdowns | Fixed digit cells retain the current native font. Tenths appear below 10 seconds; whole seconds continue through 90.99 seconds; rounded-up minutes begin at 91 seconds (`2m`), with hours/days at their existing boundaries. Blizzard still owns cooldown timing, swipes, countdown preferences and minimum/GCD policy. Unsupported fixed-cell paths use the guarded native countdown. |
 | Player cast/channel timer | Restores the pinned 0.2.309 native duration-bound fixed-digit renderer for casts/channels; Blizzard's original `CastTimeText` is never cleared. The original timer remains visible whenever binding setup or native alpha handoff fails. Native font, settings and Edit Mode remain authoritative. |
-| Player buff/debuff timer | Public short durations can use fixed tenths in the native font and native above/below/beside placement. An unchanged native font/anchor update retains already prepared cells in combat. Actual geometry changes defer to native text until safe preparation. Restricted identity, private anchors and forbidden frames retain their supported native route. |
+| Player buff/debuff timer | Public short durations use prepared fixed cells. Supported public-identity native duration objects can use a prepared fixed-width decimal formatter on the original label, without reading hidden timing or formatted text. Safe lifecycle refreshes retry missing typography and update changed scale profiles. Restricted identity, private anchors and forbidden frames retain their supported native route. |
 | Tracked buff icons | Accessible native cooldown widgets receive the ten-second tenths threshold; timing, longer formats and visibility remain native. |
 | Unit frames and party | Unit names, status typography, readable class colors, cosmetic labels and vertical compact-party ordering use guarded native presentation hooks. Compact party names/health fills are class colored and their native numeric text gets the same LoL-style outline-free shadow. Camelot level badge artwork stays hidden through native Show, SetShown and SetAlpha writes; the separate level number remains intact. Layout repairs touch displaced anchors and retain rollback state after partial failure. |
 | Soft Dark and icon borders | Eligible native artwork receives reversible tinting or nameplate-style icon decoration. Restoration checks current ownership before replacing a later writer's work. |
@@ -59,7 +59,7 @@ Capture the affected state before `/reload` or `/buiicons`, which can reapply st
 
 | Command | What it tells you |
 | --- | --- |
-| `/buitimers` | Aura-formatting outcomes and accessible-hook coverage, precise identity fallback reasons, plus cached action/cast renderer status. Counts describe observed bindings or writes, not unique spells or a live correctness verdict. |
+| `/buitimers` | Aura-formatting outcomes and accessible-hook coverage, identity fallback reasons, cached action/cast renderer status and typography preparation stages. Profile counts describe cached preparation, not active rendered timers or a live correctness verdict. |
 | `/buiborders` | Public icon-skin coverage, missing owned rims and restoration state. It cannot certify private or inaccessible icons. |
 | `/buicombat` | Player combat-icon anchor diagnostics. |
 | `/bui colors` | Readable identity and health-color evidence for unit-frame investigations. |
@@ -68,7 +68,7 @@ For action/cast reports, capture while the affected cooldown or cast is active. 
 
 ## Development and verification
 
-Start with [AGENTS.md](AGENTS.md), then the [code map](docs/CODE_MAP.md). The two manifests load **16 runtime modules**. Current verification runs **36 top-level Lua scripts** (35 behavioral suites plus the manifest syntax script) under Lua 5.1 and Lua 5.4; the aura suite contains 219 cases. See [testing and packaging](docs/TESTING.md) for commands and the boundary between offline and live evidence.
+Start with [AGENTS.md](AGENTS.md), then the [code map](docs/CODE_MAP.md). The two manifests load **16 runtime modules**. Current verification runs **36 top-level Lua scripts** (35 behavioral suites plus the manifest syntax script) under Lua 5.1 and Lua 5.4; the aura suite contains 226 cases. See [testing and packaging](docs/TESTING.md) for commands and the boundary between offline and live evidence.
 
 - [Timer sources, native writers, hooks and cleanup](docs/TIMER_LIFECYCLE.md)
 - [Default manifest](bjarkiUI.toc) · [Camelot manifest](bjarkiUI_Camelot.toc)

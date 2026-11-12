@@ -24,6 +24,7 @@ local function scenario(cfg)
     e.issecretvalue = function(v) return values[v] ~= nil end
     e.secret = secret; e.frames = {}; e.messages = {}; e.requests = 0; e.createdFormatters = 0
     e.remaining = {[101]=2.83, [202]=7.21}; e.modRate = 1; e.objects = {}
+    e.rejectFixedRules=cfg.rejectFixedRules
     e.now=0; e.GetTime=function() return e.now end
     e.Enum = {NumericRuleFormatRounding={Nearest=0,Up=1,Down=2}, DurationTimeModifier={RealTime=0,BaseTime=1}}
     e.SECOND_ONELETTER_ABBR = '%d s'; e.MINUTE_ONELETTER_ABBR='%d m'
@@ -64,8 +65,14 @@ local function scenario(cfg)
         e.C_StringUtil={CreateNumericRuleFormatter=function()
             e.createdFormatters=e.createdFormatters+1
             local f={}
-            function f:SetBreakpoints(rules) if cfg.badRules then error('rejected rules') end; self.rules=rules end
-            function f:FormatNumber() error('addon must not pass secret numbers into FormatNumber') end
+            function f:SetBreakpoints(rules)
+                if cfg.badRules or (e.rejectFixedRules and rules[1].format:find('|T',1,true)) then error('rejected rules') end
+                self.rules=rules
+            end
+            function f:FormatNumber(value)
+                assert(not e.issecretvalue(value),'addon must not pass secret numbers into FormatNumber')
+                return render(self,value)
+            end
             return f
         end}
     else e.C_StringUtil=false end
@@ -211,7 +218,7 @@ local function scenario(cfg)
     local target=e.button(202);target.UpdateDuration=nil
     e.TargetFrame={Auras=frame()};e.TargetFrame.Auras.children={target};e.target=target
     e.cast=frame();e.cast.Icon=texture('ARTWORK');e.cast.Icon.sub=4;e.PlayerCastingBarFrame=e.cast
-    function e.load() assert(loadfile(addon..'/IconSkin.lua','t',e))(); assert(loadfile(addon..'/BuffPresentation.lua','t',e))() end
+    function e.load() assert(loadfile(addon..'/IconSkin.lua','t',e))(); assert(loadfile(addon..'/BuffPresentation.lua','t',e))('bjarkiUI',e.private) end
     function e.tick(b,t) b.scripts.OnUpdate(b,t) end
     return e
 end
@@ -465,16 +472,18 @@ test('identity diagnostic reports metadata without changing the native fallback'
         assert(line:find('bjarkiUI aura timers |',1,true),'versionless diagnostic banner')
     end
 end)
-test('timer diagnostic joins cached action and cast status without querying frames',function()
+test('timer diagnostic joins cached action cast and typography status without querying frames',function()
     local e=scenario();local calls=0
     e.bjarkiUINativeDigitCells={GetActionTimerDiagnostics=function()calls=calls+1;return 'actions: cells=2'end}
-    local shared={GetCastTimerDiagnostics=function()calls=calls+1;return 'casts: cells=1'end}
+    local shared={GetCastTimerDiagnostics=function()calls=calls+1;return 'casts: cells=1'end,
+        GetTimerTypographyDiagnostics=function()calls=calls+1;return 'typography profiles: fixed=1'end}
     assert(loadfile(addon..'/BuffPresentation.lua','t',e))('bjarkiUI',shared)
     e.SlashCmdList.BJARKIUITIMERS()
-    equal(calls,2);equal(#e.messages,2)
-    equal(e.messages[2],'actions: cells=2 | casts: cells=1')
+    equal(calls,3);equal(#e.messages,2)
+    equal(e.messages[2],'actions: cells=2 | casts: cells=1 | typography profiles: fixed=1')
     e.bjarkiUINativeDigitCells.GetActionTimerDiagnostics=function()return e.secret('hidden status')end
     shared.GetCastTimerDiagnostics=function()error('diagnostic unavailable')end
+    shared.GetTimerTypographyDiagnostics=function()return e.secret('hidden typography')end
     e.SlashCmdList.BJARKIUITIMERS();equal(#e.messages,3,'unavailable statuses omitted')
 end)
 test('diagnostic records access lost after an earlier success',function()
@@ -882,8 +891,8 @@ test('a failed previous-label cleanup delays takeover until it can be concealed'
     e.bjarkiUINativeDigitCells.ClearBuff=normalClear;e.tick(e.buff,4.1)
     equal(visible[previous],nil);equal(visible[e.buff.Duration],41)
 end)
-local function realGlyphScene(initialFont,glyphCalibrator)
-    local e=scenario();local a,b=e.buff,e.debuff
+local function realGlyphScene(initialFont,glyphCalibrator,cfg)
+    local e=scenario(cfg);local a,b=e.buff,e.debuff
     local all={}
     local function equip(font,parent)
         font.parent=parent
@@ -947,11 +956,112 @@ local function realGlyphScene(initialFont,glyphCalibrator)
     if glyphCalibrator then
         local calibrate=type(glyphCalibrator)=='function' and glyphCalibrator
             or function()return glyphCalibrator end
-        private={GetFixedTimerGlyphs=calibrate}
+        private={GetFixedTimerGlyphs=calibrate,
+            GetTimerTypographyRetryEpoch=function()return e.typographyEpoch or 0 end}
+        assert(loadfile(addon..'/NativePrecision.lua','t',e))('bjarkiUI',private)
     end
+    e.private=private
     assert(loadfile(addon..'/NativeDigitCells.lua','t',e))('bjarkiUI',private);e.load()
     return e,a,b,all,visible
 end
+local function encodedBuffDigits(tag)
+    local glyphs={}
+    for i=0,9 do local d=tostring(i);glyphs[d]='|T'..tag..'|t'..d..'|T'..tag..'|t' end
+    return glyphs
+end
+test('opaque buff decimals use prepared glyph widths through the native formatter',function()
+    local glyphs=encodedBuffDigits('buff')
+    local calibrations=0
+    local e,a,_,all,visible=realGlyphScene(nil,function()calibrations=calibrations+1;return glyphs end)
+    local prepared=calibrations
+    for _,case in ipairs({{1.7,glyphs['1']..'.'..glyphs['7']},{8.1,glyphs['8']..'.'..glyphs['1']},
+        {9.999,glyphs['9']..'.'..glyphs['9']},{10,'10 s'},{90,'2 m'},{5400,'2 h'},{129600,'2 d'}}) do
+        e.remaining[101]=case[1];a:UpdateExpirationTime(a.buttonInfo)
+        e.tick(a,e.secret(case[1]))
+        equal(a.Duration.text,case[2]);equal(visible(a),'','opaque native text never split by Lua')
+    end
+    e.combat=true;e.remaining[101]=1.7;a:UpdateExpirationTime(a.buttonInfo);e.tick(a,e.secret(1.7))
+    equal(a.Duration.text,glyphs['1']..'.'..glyphs['7'])
+    equal(calibrations,prepared,'no metrics calibration on native duration ticks')
+end)
+test('padded native buff decimals preserve every native rounding midpoint and adjacent value',function()
+    local glyphs=encodedBuffDigits('rounding')
+    local e,a=realGlyphScene(nil,glyphs)
+    local plain,stock=realGlyphScene()
+    local function adjacent(value,direction)
+        local fraction,exponent=math.frexp(value)
+        local step=2^(exponent-53)
+        if direction<0 and fraction==0.5 then step=step/2 end
+        return value+direction*step
+    end
+    for tenth=1,99 do
+        local midpoint=(tenth-0.5)/10
+        local nativeFloat=e.private.RoundToFloat32(midpoint)
+        for _,value in ipairs({adjacent(midpoint,-1),midpoint,adjacent(midpoint,1),
+            adjacent(nativeFloat,-1),nativeFloat,adjacent(nativeFloat,1)}) do
+            plain.remaining[101]=value;stock:UpdateExpirationTime(stock.buttonInfo);plain.tick(stock,plain.secret(value))
+            e.remaining[101]=value;a:UpdateExpirationTime(a.buttonInfo);e.tick(a,e.secret(value))
+            equal(a.Duration.text,stock.Duration.text:gsub('%d',glyphs),'native midpoint '..string.format('%.17g',value))
+        end
+    end
+end)
+test('safe setup retries missing buff glyph calibration without rebuilding cells',function()
+    local glyphs=encodedBuffDigits('retry');local available=false;local calls=0
+    local e,a,_,all,visible=realGlyphScene(nil,function()calls=calls+1;return available and glyphs or nil end)
+    e.tick(a,1.7);equal(visible(a),'1.7')
+    for _,cell in ipairs(all) do
+        if cell.parent==a then
+            cell.SetPoint=function()error('unchanged cell geometry rebuilt')end
+            cell.SetSize=function()error('unchanged cell size rebuilt')end
+        end
+    end
+    local before=calls;available=true;e.typographyEpoch=1;e.event('PLAYER_REGEN_ENABLED');e.tick(a,1.7)
+    equal(visible(a),glyphs['1']..'.'..glyphs['7']);assert(calls>before,'missing calibration was never retried')
+    local settled=calls;e.tick(a,1.8);equal(calls,settled,'no retry on ordinary native ticks')
+end)
+test('safe setup refreshes inherited buff scale typography without reanchoring cells',function()
+    local maps={[1]=encodedBuffDigits('scale1'),[2]=encodedBuffDigits('scale2')}
+    local calls=0
+    local e,a,_,all,visible=realGlyphScene(nil,function(label)calls=calls+1;return maps[label:GetEffectiveScale()] end)
+    e.tick(a,1.7);equal(visible(a),maps[1]['1']..'.'..maps[1]['7'])
+    for _,cell in ipairs(all) do
+        if cell.parent==a then
+            cell.SetPoint=function()error('inherited scale reanchored unchanged cells')end
+            cell.SetSize=function()error('inherited scale resized unchanged cells')end
+        end
+    end
+    local before=calls;a.scale=2;e.event('UI_SCALE_CHANGED');e.tick(a,1.8)
+    equal(visible(a),maps[2]['1']..'.'..maps[2]['8']);assert(calls>before,'old effective-scale glyph map reused')
+end)
+test('unprepared or foreign opaque buff label retains supported plain native formatting',function()
+    local e,a=realGlyphScene(nil,function()return nil end)
+    e.tick(a,e.secret(2.83));equal(a.Duration.text,'2.8')
+    local glyphs=encodedBuffDigits('owner')
+    local env,source,other=realGlyphScene(nil,glyphs)
+    local old=source.Duration
+    old.parent=other
+    env.tick(source,env.secret(2.83))
+    assert(not old.text:find('|T',1,true),'old physical reader applied its prepared typography to another owner')
+end)
+test('rejected padded native buff formatter stays plain until safe epoch retry succeeds',function()
+    local glyphs=encodedBuffDigits('retryformat')
+    local e,a=realGlyphScene(nil,glyphs,{rejectFixedRules=true})
+    e.tick(a,e.secret(2.83));equal(a.Duration.text,'2.8')
+    local prepared=e.createdFormatters
+    e.event('EDIT_MODE_LAYOUTS_UPDATED')
+    equal(e.createdFormatters,prepared,'same retry epoch does not rebuild refused formatter')
+    e.combat=true;e.rejectFixedRules=false;e.tick(a,e.secret(2.83))
+    equal(a.Duration.text,'2.8');equal(e.createdFormatters,prepared,'no formatter creation/retry on native ticks')
+    e.combat=false;e.typographyEpoch=1;e.event('PLAYER_REGEN_ENABLED');e.tick(a,e.secret(2.83))
+    equal(a.Duration.text,glyphs['2']..'.'..glyphs['8'])
+end)
+test('public decimal fallback keeps prepared typography when split takeover is unavailable',function()
+    local glyphs=encodedBuffDigits('fallback')
+    local e,a,_,_,visible=realGlyphScene(nil,glyphs)
+    e.bjarkiUINativeDigitCells.ReadyBuff=function()return false end
+    e.tick(a,1.7)
+    equal(a.Duration.text,glyphs['1']..'.'..glyphs['7']);equal(visible(a),'')
+end)
 -- Native orientation choices from AuraContainerMixin:UpdateGridLayout:
 -- Gethe/wow-ui-source 9dc84f0d3bbae1768ac3405b3716000bd93eda06,
 -- Interface/AddOns/Blizzard_BuffFrame/BuffFrame.lua:143-175.

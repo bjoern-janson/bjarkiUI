@@ -82,6 +82,8 @@ end
 -- Keep values inside the duration object: FormatNumber(secretNumber) is NOT
 -- permitted here; FormatRemainingDuration(publicFormatter) is the native path.
 local durationFormatter
+local fixedDurationFormatters=setmetatable({}, {__mode="k"})
+local buffDecimalSamples
 local timerStats = { native = 0, fallback = 0, readable = 0,
     visibilityRestricted = 0, retries = 0, lastReason = "none" }
 local DURATION_RETRY_DELAY = 0.25
@@ -155,8 +157,66 @@ local function invalidateDurationObject(button)
     releaseDigits(button, state, accessible(button) and durationLabel(button) or nil)
 end
 
-local function getDurationFormatter()
-    if durationFormatter then return durationFormatter end
+local function typographyEpoch()
+    local get=shared and shared.GetTimerTypographyRetryEpoch
+    if type(get)=="function" then
+        local ok,value=pcall(get)
+        if ok and readable(value) and type(value)=="number" then return value end
+    end
+end
+local function readBuffDecimalSamples(base)
+    if buffDecimalSamples then return buffDecimalSamples end
+    local points,seen={},{}
+    local function add(value)
+        if value>=0 and value<10 and not seen[value] then
+            points[#points+1]=value;seen[value]=true
+        end
+    end
+    add(0)
+    -- Match the existing action typography sampler: native rounding can
+    -- change at an adjacent double or binary32 value, rather than the
+    -- mathematical midpoint. Only public probe values reach FormatNumber.
+    local round=shared and shared.RoundToFloat32
+    assert(type(round)=="function")
+    for tenth=1,100 do
+        local midpoint=(2*tenth-1)/20
+        local scale=2^math.floor(math.log(midpoint)/math.log(2))
+        if scale>midpoint then scale=scale/2 elseif 2*scale<=midpoint then scale=scale*2 end
+        local step=scale*2^-52
+        add(midpoint-(midpoint==scale and step/2 or step));add(midpoint);add(midpoint+step)
+        local center=round(midpoint)
+        local floatStep=scale*2^-23
+        add(center-(center==scale and floatStep/2 or floatStep));add(center)
+        add(center+(center==2*scale and 2*floatStep or floatStep))
+    end
+    table.sort(points)
+    local texts={}
+    for i,value in ipairs(points) do
+        local text=base:FormatNumber(value)
+        assert(readable(text) and type(text)=="string" and text:match("^%d[.,]%d$"))
+        texts[i]=text
+    end
+    local interior,expected={},{}
+    for tenth=0,99 do
+        for _,fraction in ipairs({0.25,0.75}) do
+            local value=(tenth+fraction)/10
+            local text=base:FormatNumber(value)
+            assert(readable(text) and type(text)=="string")
+            interior[#interior+1]=value;expected[#expected+1]=text
+        end
+    end
+    buffDecimalSamples={points=points,texts=texts,interior=interior,expected=expected}
+    return buffDecimalSamples
+end
+local function getDurationFormatter(glyphs)
+    if not glyphs and durationFormatter then return durationFormatter end
+    local base
+    if glyphs then
+        base=getDurationFormatter()
+        if not base then return end
+        local previous=fixedDurationFormatters[glyphs]
+        if previous and (previous.formatter or previous.epoch==typographyEpoch()) then return previous.formatter or base end
+    end
     local create = member(C_StringUtil, "CreateNumericRuleFormatter")
     local rounding = member(Enum, "NumericRuleFormatRounding")
     local nearest, down, up = member(rounding, "Nearest"), member(rounding, "Down"), member(rounding, "Up")
@@ -171,16 +231,72 @@ local function getDurationFormatter()
     if not ok or not readable(formatter) then return nil end
     local set = member(formatter, "SetBreakpoints")
     if type(set) ~= "function" then return nil end
-    local rules = {
-        { threshold = 0, step = 0.1, rounding = nearest, min = 0, max = 9.9, format = "%.1f" },
-        { threshold = 10, step = 1, rounding = down, format = sec },
-        { threshold = 90, step = 60, rounding = up, format = min, components = {{div = 60}} },
-        { threshold = 5400, step = 3600, rounding = up, format = hour, components = {{div = 3600}} },
-        { threshold = 129600, step = 86400, rounding = up, format = day, components = {{div = 86400}} },
-    }
-    if not pcall(set, formatter, rules) then return nil end
+    local rules={}
+    local samples
+    local built=pcall(function()
+        if glyphs then
+            -- Choose the literal inside the native duration formatter. The
+            -- opaque result is never decoded or split into digits by Lua.
+            for digit=0,9 do assert(type(member(glyphs,tostring(digit)))=="string") end
+            samples=readBuffDecimalSamples(base)
+            local previous
+            for i,value in ipairs(samples.points) do
+                local text=samples.texts[i]
+                if text~=previous then
+                    rules[#rules+1]={threshold=value,format=text:gsub("%d",glyphs)}
+                    previous=text
+                end
+            end
+        else
+            rules[1]={ threshold = 0, step = 0.1, rounding = nearest, min = 0, max = 9.9, format = "%.1f" }
+        end
+        rules[#rules+1]={ threshold = 10, step = 1, rounding = down, format = sec }
+        rules[#rules+1]={ threshold = 90, step = 60, rounding = up, format = min, components = {{div = 60}} }
+        rules[#rules+1]={ threshold = 5400, step = 3600, rounding = up, format = hour, components = {{div = 3600}} }
+        rules[#rules+1]={ threshold = 129600, step = 86400, rounding = up, format = day, components = {{div = 86400}} }
+        local result=set(formatter,rules)
+        assert(type(result)=="nil" or (readable(result) and result~=false))
+        if glyphs then
+            local function verify(value,original)
+                original=original or base:FormatNumber(value)
+                assert(readable(original) and type(original)=="string")
+                local expected=value<10 and original:gsub("%d",glyphs) or original
+                local actual=formatter:FormatNumber(value)
+                assert(readable(actual) and actual==expected)
+            end
+            for i,value in ipairs(samples.points) do verify(value,samples.texts[i]) end
+            for i,value in ipairs(samples.interior) do verify(value,samples.expected[i]) end
+            for _,value in ipairs({0,0.05,1.7,8.1,9.949,9.999,10,89.9,90,5399,5400,129599,129600}) do verify(value) end
+        end
+    end)
+    if glyphs then
+        fixedDurationFormatters[glyphs]={formatter=built and formatter or nil,epoch=typographyEpoch()}
+        return built and formatter or base
+    end
+    if not built then return nil end
     durationFormatter = formatter
     return formatter
+end
+
+local function preparedBuffGlyphs(duration,button)
+    local get=member(bjarkiUINativeDigitCells,"GetBuffGlyphs")
+    if type(get)~="function" then return end
+    local ok,glyphs=pcall(get,duration,button)
+    if ok and readable(glyphs) and type(glyphs)=="table" then return glyphs end
+end
+local function prepareDurationTypography(button,duration)
+    if not outOfCombat() then return end
+    local state=states[button]
+    if not state then return end
+    local glyphs=preparedBuffGlyphs(duration,button)
+    state.durationTypography=glyphs and {label=duration,glyphs=glyphs,formatter=getDurationFormatter(glyphs)} or nil
+end
+local function preparedDurationFormatter(button,duration)
+    local state=states[button]
+    local profile=state and state.durationTypography
+    if profile and profile.label==duration and profile.glyphs==preparedBuffGlyphs(duration,button) then
+        return profile.formatter
+    end
 end
 
 local function noteNativeTimer(state, reason)
@@ -304,9 +420,9 @@ local function showNativeDuration(button, duration)
         state.durationRetryAt = nil
         timerStats.retries = timerStats.retries + 1
     end
+    local formatter=preparedDurationFormatter(button,duration) or getDurationFormatter()
     if not state.durationObject then
         local get = member(C_UnitAuras, "GetAuraDuration")
-        local formatter = getDurationFormatter()
         -- The native default is RealTime: unlike BaseTime it applies the
         -- aura's time modifier. Use explicit RealTime where available and the
         -- documented native default when the enum isn't exposed.
@@ -332,9 +448,9 @@ local function showNativeDuration(button, duration)
     -- concatenate, stringify or secrecy-filter it; pass it to the text sink.
     local ok, text
     if type(state.durationModifier) == "number" then
-        ok, text = pcall(format, object, durationFormatter, state.durationModifier)
+        ok, text = pcall(format, object, formatter, state.durationModifier)
     else
-        ok, text = pcall(format, object, durationFormatter)
+        ok, text = pcall(format, object, formatter)
     end
     if ok then
         local wrote,result=pcall(set,duration,text)
@@ -607,7 +723,15 @@ local function showTenths(button, timeLeft)
         if nativeCleared and digitCells.RestoreBuffText then
             ok = digitCells.RestoreBuffText(duration, deci, button)
         else
-            local wrote,result=pcall(setText,duration,"%.1f",deci/10)
+            local glyphs=preparedBuffGlyphs(duration,button)
+            local encoded=glyphs and member(glyphs,tostring(math.floor(deci/10)))
+            local fraction=glyphs and member(glyphs,tostring(deci%10))
+            local wrote,result
+            if type(encoded)=="string" and type(fraction)=="string" then
+                wrote,result=pcall(member(duration,"SetText"),duration,encoded.."."..fraction)
+            else
+                wrote,result=pcall(setText,duration,"%.1f",deci/10)
+            end
             ok=wrote and (type(result)=="nil" or (readable(result) and result~=false))
         end
     end
@@ -743,7 +867,8 @@ local function setupButton(button)
             releaseDigits(button, state)
         end
         if not example and prepare then
-            if digitCells.PrepareBuff(current) == false and state.splitDuration then releaseDigits(button, state) end
+            if digitCells.PrepareBuff(current,true,false,true) == false and state.splitDuration then releaseDigits(button, state) end
+            prepareDurationTypography(button,current)
         end
     end
     local getAlpha = member(button, "GetAlpha")
@@ -1116,7 +1241,7 @@ if type(SlashCmdList) == "table" then
         if type(add) == "function" then pcall(add, DEFAULT_CHAT_FRAME, line)
         elseif type(print) == "function" then print(line) end
         local statuses = {}
-        for _, entry in ipairs({{bjarkiUINativeDigitCells, "GetActionTimerDiagnostics"}, {shared, "GetCastTimerDiagnostics"}}) do
+        for _, entry in ipairs({{bjarkiUINativeDigitCells, "GetActionTimerDiagnostics"}, {shared, "GetCastTimerDiagnostics"}, {shared, "GetTimerTypographyDiagnostics"}}) do
             local get = member(entry[1], entry[2])
             if type(get) == "function" then
                 local ok, status = pcall(get)

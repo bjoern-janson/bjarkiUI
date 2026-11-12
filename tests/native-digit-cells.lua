@@ -279,6 +279,23 @@ do
  ok(api.InstallAction(button),'source baseline can be restored')
  for i,cell in ipairs(digits)do cell.SetFont=setters[i]end
 end
+do
+ nativeLabel:SetScale(1.5);nativeLabel:SetTextScale(1.25)
+ ok(api.InstallAction(button),'native relative scale and text scale resynchronize')
+ for _,cell in ipairs(digits)do
+  eq(cell:GetEffectiveScale(),nativeLabel:GetEffectiveScale(),'receiving cell matches native physical scale')
+  eq(cell:GetTextScale(),1.25,'receiving cell matches native text scale')
+ end
+ local original=digits[3].SetTextScale
+ digits[3].SetTextScale=function()return false end
+ nativeLabel:SetTextScale(1.4)
+ ok(not api.InstallAction(button),'refused text scale leaves stock in charge')
+ eq(cooldown:GetHideCountdownNumbers(),false,'scale refusal restores stock')
+ digits[3].SetTextScale=original
+ ok(api.InstallAction(button),'safe retry completes changed text scale')
+ nativeLabel:SetScale(1);nativeLabel:SetTextScale(1)
+ ok(api.InstallAction(button),'source scale baseline restored')
+end
 for _,f in ipairs(digits) do
  eq(f.points[1],'CENTER','cell uses centered origin')
  ok(f.points[2]==cooldown,'cells anchored to cooldown, NOT its changing text label')

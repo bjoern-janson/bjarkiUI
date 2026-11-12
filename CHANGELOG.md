@@ -2,6 +2,15 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.355-timer-spacing-recovery-test — cover native buff decimals and repair typography recovery
+
+- The live report shows a short buff changing from whole seconds on one application to decimals on the next, with moving digits; action-bar digits also remain unstable. Source inspection reproduced an uncalibrated native buff decimal route, missed optional calibration retries and stale inherited-scale profiles.
+- Prepare fixed-width decimal rules for supported public-identity native buff duration objects. The engine chooses the rule and its opaque output goes unchanged to the original label. Preserve native localized formats at ten seconds and above, existing fonts, clock ownership and fallback on unsupported preparation.
+- Refresh optional buff typography during existing safe setup, including unchanged layouts, failed prior calibration and inherited effective-scale changes. Preserve the combat-time unchanged-layout fast path and physical-label ownership.
+- Apply the native countdown label's relative scale and text scale to action replacement cells and include them in style resynchronization. Retry rejected action numeral formatters once per existing safe retry epoch.
+- Add sanitized cached typography preparation stages to the existing `/buitimers` readout. No new command, timer loop, secret-ID lookup, minimum/GCD relaxation or change to the accepted crown/faction/rested-Z presentation.
+- Source regressions and package checks remain separate from live digit placement, intermittent secret-ID fallbacks, taint and performance validation.
+
 ## 0.2.354-hide-party-faction-test — remove classic-party faction badges
 
 - Hide the exact native `PartyMemberOverlay.PVPIcon` on active classic-party members. Blizzard uses this one texture for Alliance, Horde and free-for-all PvP badges.

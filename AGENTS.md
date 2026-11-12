@@ -1,6 +1,6 @@
 # Working on bjarkiUI
 
-This is the current **0.2.354-hide-party-faction-test** development tree. Read the [code map](docs/CODE_MAP.md) for the affected surface, [timer lifecycle guide](docs/TIMER_LIFECYCLE.md) for countdown work, and [testing guide](docs/TESTING.md) for verification commands. Both TOCs define the same 16-module runtime load order. Current regression scripts live directly under `tests/`.
+This is the current **0.2.355-timer-spacing-recovery-test** development tree. Read the [code map](docs/CODE_MAP.md) for the affected surface, [timer lifecycle guide](docs/TIMER_LIFECYCLE.md) for countdown work, and [testing guide](docs/TESTING.md) for verification commands. Both TOCs define the same 16-module runtime load order. Current regression scripts live directly under `tests/`.
 
 ## Trace the displayed result
 
@@ -13,6 +13,7 @@ This is the current **0.2.354-hide-party-faction-test** development tree. Read t
 
 - Retain fixed action/cast timers, exact current timer fonts, native countdown settings and saved character settings. Action thresholds are tenths below 10, seconds below 91, then rounded-up minutes; do not apply that action policy indiscriminately to buffs or cast text.
 - Keep action digit bindings on the existing native duration clock; only prepare calibrated single-glyph numeric rules when the font is safely readable, and never modify the separate decimal point/suffix formatters. Default to uncalibrated native strings if an inline-glyph formatter is refused.
+- Action receiving cells must inherit the native label's relative effective scale and text scale, with scale-only changes using the existing stock handoff. Retry rejected mapped formatters only at existing safe typography epochs. Buff native-duration decimal formatters may use already calibrated fixed-width literals; prepare outside combat, recheck current label/owner/profile, and forward opaque results unchanged. Safe buff setup must refresh failed or inherited-scale-changed typography without rebuilding unchanged geometry or measuring on timer ticks.
 - Keep native clock ownership. Forward opaque duration objects or formatted strings only to their supported native sink. Never infer hidden timing from spell names, guessed durations, inaccessible values or combat-log estimates.
 - Treat unavailable, secret, false and zero as different results. A failed secrecy/permission probe is not permission to inspect or write a value.
 - Keep restricted Target/Focus aura rows and private aura anchors native. `UnitAuraStyling.lua` is an intentional compatibility stub, not an unfinished custom-aura feature.

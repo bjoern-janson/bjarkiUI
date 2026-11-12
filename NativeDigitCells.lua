@@ -118,10 +118,23 @@ local actionStyleParts={
     {'shadowColor','GetShadowColor','SetShadowColor',4},
     {'shadowOffset','GetShadowOffset','SetShadowOffset',2},
 }
-local function readActionStyle(label)
+local function readActionStyle(label,center)
     local path,size,flags=getFont(label)
     if not path then return nil end
     local style={font={path,size,flags or ''}}
+    local function positive(object,name,default)
+        local getter=m(object,name)
+        if not getter then return default end
+        local ok,value=pcall(getter,object)
+        if ok and public(value) and type(value)=='number' and value>0 and value<math.huge then return value end
+    end
+    local sourceScale=positive(label,'GetEffectiveScale',1)
+    local parentScale=positive(center,'GetEffectiveScale',1)
+    local textScale=positive(label,'GetTextScale',1)
+    if not sourceScale or not parentScale or not textScale then return nil end
+    local relative=sourceScale/parentScale
+    if relative<=0 or relative>=math.huge then return nil end
+    style.scale={relative,textScale}
     for _,part in ipairs(actionStyleParts)do
         local get=m(label,part[2])
         if get then
@@ -138,7 +151,7 @@ local function readActionStyle(label)
 end
 local function sameActionStyle(a,b)
     if not a or not b then return false end
-    for _,key in ipairs({'font','color','shadowColor','shadowOffset'})do
+    for _,key in ipairs({'font','color','shadowColor','shadowOffset','scale'})do
         local left,right=a[key],b[key]
         if (left==nil)~=(right==nil) then return false end
         if left then for i=1,#left do if left[i]~=right[i] then return false end end end
@@ -148,6 +161,12 @@ end
 local function writeActionStyle(style,label)
     local spread=unpack or table.unpack
     if not accepted(pcall(m(label,'SetFont'),label,spread(style.font))) then return false end
+    for i,name in ipairs({'SetScale','SetTextScale'})do
+        local setter=m(label,name)
+        if setter then
+            if not accepted(pcall(setter,label,style.scale[i])) then return false end
+        elseif style.scale[i]~=1 then return false end
+    end
     for _,part in ipairs(actionStyleParts)do
         local values=style[part[1]]
         if values and not accepted(pcall(m(label,part[3]),label,spread(values))) then return false end
@@ -176,11 +195,12 @@ local function makeCells(native,center,withWhole,existing,keepText,actionStyle)
     local create=m(center,'CreateFontString')
     if not create then return nil end
     local cells=existing or {}
-    local decimal=decimalStep(width,dot,size)
-    local halfWhole=wholeStep(width,size)/2
+    local textScale=actionStyle and actionStyle.scale[2] or 1
+    local decimal=decimalStep(width,dot,size)*textScale
+    local halfWhole=wholeStep(width,size)*textScale/2
     -- Buffs need just the first three decimal cells. Actions also use a
     -- centered unit label and two slightly right-shifted whole-second digits.
-    local centers={-decimal,0,decimal,0,-halfWhole+WHOLE_RIGHT,halfWhole+WHOLE_RIGHT}
+    local centers={-decimal,0,decimal,0,-halfWhole+WHOLE_RIGHT*textScale,halfWhole+WHOLE_RIGHT*textScale}
     local widths={width,dot,width}
     for i=1,(withWhole and #centers or 3) do
         local fs=cells[i]
@@ -282,6 +302,7 @@ end
 -- Reuse the already tested native-font/scale glyph map. Never read a cooldown
 -- clock in Lua, change the native font or add timer callbacks.
 local fixedActionDigits=setmetatable({}, {__mode='k'})
+local failedActionEpochs=setmetatable({}, {__mode='k'})
 local actionDigits={1,3,5,6}
 
 local function actionDigitsForFont(label,ordinary)
@@ -299,7 +320,13 @@ local function actionDigitsForFont(label,ordinary)
     -- Monospaced native numeral ink needs no replacement bindings at all.
     if alreadyTabular then return ordinary end
     local cached=fixedActionDigits[glyphs]
-    if cached~=nil then return cached or ordinary end
+    local retry=field(private,'GetTimerTypographyRetryEpoch')
+    local epoch=0
+    if type(retry)=='function' then
+        local ok,value=pcall(retry)
+        if ok and public(value) and type(value)=='number' then epoch=value end
+    end
+    if cached~=nil and (cached~=false or failedActionEpochs[glyphs]==epoch) then return cached or ordinary end
     local create=field(C_StringUtil,'CreateNumericRuleFormatter')
     if type(create)~='function' then return ordinary end
     local mapped={ordinary[1],ordinary[2],ordinary[3],ordinary[4],ordinary[5],ordinary[6]}
@@ -348,6 +375,7 @@ local function actionDigitsForFont(label,ordinary)
     -- Failure leaves the six proven native binding formatters untouched.
     -- Memoizing a rejected glyph profile also bounds repeated bar discovery.
     fixedActionDigits[glyphs]=ok and mapped or false
+    failedActionEpochs[glyphs]=not ok and epoch or nil
     return ok and mapped or ordinary
 end
 
@@ -954,7 +982,7 @@ local function setCellFormatter(state,i,base)
     return ok and applied
 end
 local function prepareAction(state,label,formatters,createBinding)
-    local style=readActionStyle(label)
+    local style=readActionStyle(label,state.cooldown)
     if not style then return false end
     local desired=actionDigitsForFont(label,formatters)
     state.timerColor=style.color
@@ -1031,7 +1059,7 @@ local function prepareAction(state,label,formatters,createBinding)
 end
 local function resyncActionStyle(state)
     local got,label=pcall(m(state.cooldown,'GetCountdownFontString'),state.cooldown)
-    local style=got and safe(label) and readActionStyle(label)
+    local style=got and safe(label) and readActionStyle(label,state.cooldown)
     local formatters=nativeFormatters or buildFormatters()
     if not formatters then return false end
     local desired=actionDigitsForFont(label,formatters)
@@ -1317,7 +1345,7 @@ local function paintBuff(label,state,tenth,replay)
         end
         local ok,complete=pcall(putBuffGlyphs,state,tenth,revision)
         if revision~=state.revision then return false end
-        if ok and complete then state.last=tenth;state.dirty=false;return true end
+        if ok and complete then state.last=tenth;state.dirty=false;state.typographyDirty=nil;return true end
     end
     state.last=nil
     local concealed,cleared=clearCells(state,revision)
@@ -1500,6 +1528,71 @@ local function sameBuffLayout(a,b)
     return a and b and a.point==b.point and a.relative==b.relative and a.relativePoint==b.relativePoint
         and a.x==b.x and a.y==b.y and a.scale==b.scale and a.textScale==b.textScale
 end
+local function buffTypographyScale(label)
+    local ok,scale=pcall(m(label,'GetEffectiveScale'),label)
+    if not ok or not buffNumber(scale,true) then return end
+    local textScale=1
+    local get=m(label,'GetTextScale')
+    if get then
+        local known;known,textScale=pcall(get,label)
+        if not known or not buffNumber(textScale,true) then return end
+    end
+    return scale,textScale
+end
+local function prepareBuffTypography(label,state)
+    if not outOfCombat() then return end
+    local scale,textScale=buffTypographyScale(label)
+    if not scale then return end
+    local epoch
+    local retry=private and private.GetTimerTypographyRetryEpoch
+    if type(retry)=='function' then
+        local ok,value=pcall(retry)
+        if ok and public(value) and type(value)=='number' then epoch=value end
+    end
+    local same=state.typographyPath==state.path and state.typographySize==state.size
+        and state.typographyFlags==state.flags and state.typographyScale==scale
+        and state.typographyTextScale==textScale
+    if same and (state.buffGlyphs or (epoch~=nil and state.typographyEpoch==epoch)) then return end
+    local previous=state.buffGlyphs
+    local glyphs
+    local calibrate=private and private.GetFixedTimerGlyphs
+    if type(calibrate)=='function' then
+        local ok,map=pcall(calibrate,label)
+        if ok and public(map) and type(map)=='table' then
+            local valid=true
+            for i=0,9 do
+                local text=field(map,tostring(i))
+                if type(text)~='string' then valid=false;break end
+            end
+            if valid then glyphs=map end
+        end
+    end
+    state.buffGlyphs=glyphs
+    state.typographyPath,state.typographySize,state.typographyFlags=state.path,state.size,state.flags
+    state.typographyScale,state.typographyTextScale,state.typographyEpoch=scale,textScale,epoch
+    if previous~=glyphs then state.typographyDirty=true end
+end
+-- Read only a current prepared profile. Native duration callbacks may use
+-- this without measuring fonts, preparing geometry, or reading their clock.
+function api.GetBuffGlyphs(label,owner)
+    local state=buffCells[label]
+    if not state or not state.ready or state.ownerUncertain or state.pendingFontRetire
+        or state.layoutDirty or state.owner~=owner or not state.buffGlyphs
+        or not safe(label) or not safe(owner) then return end
+    local generation,ownerGeneration,glyphs=state.generation,state.ownerGeneration,state.buffGlyphs
+    local ok,parent=pcall(m(label,'GetParent'),label)
+    if not ok or not public(parent) or parent~=owner then return end
+    local path,size,flags=getFont(label)
+    if path~=state.path or size~=state.size or flags~=state.flags then return end
+    local scale,textScale=buffTypographyScale(label)
+    if scale~=state.typographyScale or textScale~=state.typographyTextScale then return end
+    ok,parent=pcall(m(label,'GetParent'),label)
+    if not ok or not public(parent) or parent~=owner or state.owner~=owner
+        or state.generation~=generation or state.ownerGeneration~=ownerGeneration
+        or not state.ready or state.ownerUncertain or state.pendingFontRetire
+        or state.layoutDirty or state.buffGlyphs~=glyphs then return end
+    return glyphs
+end
 local function layoutBuff(label,state,parent,icon,path,size,flags,layout)
     -- A failed old cleanup cannot be transferred into a newly prepared owner.
     if state.dirty and not writeBuff(label,state,nil) then return false end
@@ -1560,23 +1653,11 @@ local function layoutBuff(label,state,parent,icon,path,size,flags,layout)
     -- Calibration is optional and fail-open. It uses only public font/style
     -- metrics and proves the original Blizzard glyph/font/line-height is
     -- unchanged. Unavailable or secret font information keeps plain digits.
-    local glyphs
-    local calibrate=private and private.GetFixedTimerGlyphs
-    if type(calibrate)=='function' then
-        local ok,map=pcall(calibrate,label)
-        if ok and type(map)=='table' then
-            local valid=true
-            for i=0,9 do
-                if type(map[tostring(i)])~='string' then valid=false;break end
-            end
-            if valid then glyphs=map end
-        end
-    end
-    state.buffGlyphs=glyphs
+    prepareBuffTypography(label,state)
     state.layout,state.layoutDirty=layout,nil
     return true
 end
-function api.PrepareBuff(label,checkFont,afterFont)
+function api.PrepareBuff(label,checkFont,afterFont,refreshTypography)
     if not public(label) then return false end
     local state=buffCells[label]
     local ok,parent
@@ -1603,11 +1684,17 @@ function api.PrepareBuff(label,checkFont,afterFont)
     end
     local icon=field(parent,'Icon')
     local same=state and state.ready and state.parent==parent and state.icon==icon and safe(icon)
-    if same and not checkFont and not state.layoutDirty and not state.ownerUncertain then return true end
+    if same and not checkFont and not state.layoutDirty and not state.ownerUncertain then
+        if refreshTypography then prepareBuffTypography(label,state) end
+        return true
+    end
     if state and state.ready and not same then revokeBuff(state,label) end
     local path,size,flags=getFont(label)
     local sameFont=same and not state.ownerUncertain and path and state.path==path and state.size==size and state.flags==flags
-    if sameFont and not state.layoutDirty then return true end
+    if sameFont and not state.layoutDirty then
+        if refreshTypography then prepareBuffTypography(label,state) end
+        return true
+    end
     if not state then
         if not path or not safe(icon) or not outOfCombat() then return false end
         state={cells={},muted={},anchored=0,parent=parent}
@@ -1661,6 +1748,7 @@ function api.PrepareBuff(label,checkFont,afterFont)
         and state.ownerGeneration==ownerGeneration and state.layout==preparedLayout
         and sameBuffLayout(preparedLayout,layout) then
         state.layoutDirty=nil
+        if refreshTypography then prepareBuffTypography(label,state) end
         return true
     end
     if not path or not safe(icon) or not layout or not outOfCombat()
@@ -1773,7 +1861,7 @@ function api.ShowBuff(label,deci,owner,generation,prepared)
     local st=buffCells[label]
     if not st or not st.ready or not public(deci) or type(deci)~='number' or deci<1 or deci>99 then return false end
     if (owner and st.owner~=owner) or (generation and generation~=st.generation) then return false end
-    if st.last==deci and not st.writing then return true,st.generation end
+    if st.last==deci and not st.writing and not st.typographyDirty then return true,st.generation end
     if not st.last and st.rejectedTenth==deci then return false end
     if prepared and not st.last and not st.writing then
         -- Implicit native moves need not invoke the Lua SetParent observer.

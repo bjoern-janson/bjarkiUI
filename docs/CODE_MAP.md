@@ -1,6 +1,6 @@
 # bjarkiUI code map
 
-Current test branch: **0.2.354-hide-party-faction-test**. Start with the physical region that displays the symptom, then follow its native writer, addon observer, ownership record and cleanup. [Timer lifecycle detail](TIMER_LIFECYCLE.md) · [Verification commands and suite map](TESTING.md)
+Current test branch: **0.2.355-timer-spacing-recovery-test**. Start with the physical region that displays the symptom, then follow its native writer, addon observer, ownership record and cleanup. [Timer lifecycle detail](TIMER_LIFECYCLE.md) · [Verification commands and suite map](TESTING.md)
 
 ## Runtime load order
 
@@ -15,13 +15,13 @@ The [default manifest](../bjarkiUI.toc) and [Camelot manifest](../bjarkiUI_Camel
 | 5 | [SoftDark.lua](../SoftDark.lua) | Native artwork tinting, ownership-aware restoration and `/bdark`. |
 | 6 | [ClassicPartyPresentation.lua](../ClassicPartyPresentation.lua) | Native non-raid party member class names/health via `nativeHealthStyle` colorable fills, owner-colored pet health, shared 25%-alpha native threat flashes, LoL status text, Soft Dark chrome and scoped native faction/PvP-badge suppression, excluding compact/raid frames. |
 | 7 | [TrackedBuffSeconds.lua](../TrackedBuffSeconds.lua) | Native ten-second decimal threshold for active tracked-buff cooldown widgets. |
-| 8 | [ActionTimerSpacing.lua](../ActionTimerSpacing.lua) | Measures native font glyphs, verifies action formatters and prepares a bounded 16-style map of optional fixed-width glyph text for buff digit cells. |
+| 8 | [ActionTimerSpacing.lua](../ActionTimerSpacing.lua) | Measures native font glyphs, verifies action formatters, maintains bounded glyph profiles and safe retry epochs, and reports cached public preparation stages. |
 | 9 | [CooldownSeconds.lua](../CooldownSeconds.lua) | Installs native action countdown formatting; observes settings and safe bar lifecycle events. |
-| 10 | [NativeDigitCells.lua](../NativeDigitCells.lua) | Action duration bindings, native-font calibrated single-digit action cells, public buff glyph preparation/calibration, longer readable stock text digit mapping, and physical-label ownership. |
+| 10 | [NativeDigitCells.lua](../NativeDigitCells.lua) | Action duration bindings with native scale/style inheritance, bounded retry of mapped numeral formatters, safe buff typography/profile preparation, longer readable stock text digit mapping, and physical-label ownership. |
 | 11 | [CastBarDigits.lua](../CastBarDigits.lua) | Native `UnitCastingDuration`/`UnitChannelDuration` objects drive fixed glyph bindings; retains Blizzard's original cast text as fallback and never clears it. |
 | 12 | [IconSkin.lua](../IconSkin.lua) | Native icon masks/rims, donor visibility restoration and `/buiborders`. |
 | 13 | [UnitAuraStyling.lua](../UnitAuraStyling.lua) | Inert compatibility stub reporting retirement of the custom target/focus aura route. |
-| 14 | [BuffPresentation.lua](../BuffPresentation.lua) | Accessible aura/cast/icon discovery; player duration post-hooks; `/buitimers` and `/buiicons`. |
+| 14 | [BuffPresentation.lua](../BuffPresentation.lua) | Accessible aura/cast/icon discovery; player duration post-hooks and prepared fixed-width native decimal formatting; `/buitimers` and `/buiicons`. |
 | 15 | [FrameLabelTweaks.lua](../FrameLabelTweaks.lua) | Level offsets, combat-icon mirror, portrait-relative leader crowns with per-side optical spacing, guarded classic-party crown X+4, bag/ammunition count fonts and `/buicombat`. |
 | 16 | [RestIndicatorPlacement.lua](../RestIndicatorPlacement.lua) | Hide only the original player rested-Z texture; observe native Show/SetShown and retry safe lifecycle discovery. Historical filename retained; no placement writes. |
 
