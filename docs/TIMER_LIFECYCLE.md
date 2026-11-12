@@ -1,6 +1,6 @@
 # Timer lifecycle and diagnostics
 
-This guide describes the **0.2.346-static-action-digits-test** branch, preserving the prior v0.2.345 buff and visual behavior. The former cast text-mirror mode is historical; the action and aura paths remain unchanged. It traces the displayed timer through its native writer, addon hook, ownership and cleanup. It is not a claim of live-client correctness. [Module map](CODE_MAP.md) · [Tests](TESTING.md) · [Open live reports](../KNOWN_ISSUES.md)
+This guide describes the **0.2.355-timer-spacing-recovery-test** branch. It traces the displayed timer through its native writer, addon hook, typography preparation, ownership and cleanup. The former cast text-mirror mode is historical. Source/fixture checks are separate from live-client correctness. [Module map](CODE_MAP.md) · [Tests](TESTING.md) · [Open live reports](../KNOWN_ISSUES.md)
 
 ## Four distinct timer paths
 
@@ -44,7 +44,7 @@ The original .309 fixture, restored as the current cast suite, exercises fixed g
 After each native duration write, `showTenths` checks the current physical label, visibility/preference permission and `BuffBinding`:
 
 - **Public short sample:** `ReadyBuff` confirms preparation and ownership, the original label text is captured/cleared, then `ShowBuff` writes the fixed tenth. A failed takeover restores a current native receipt or uses the native formatting sink.
-- **Restricted remaining time with public unit and aura-instance identity:** `GetAuraDuration` supplies an opaque native object. `FormatRemainingDuration` selects formatting using native time-modifier behavior. Its result may itself be secret; it is forwarded unchanged to `SetText`, never parsed to build cells.
+- **Restricted remaining time with public unit and aura-instance identity:** `GetAuraDuration` supplies an opaque native object. `FormatRemainingDuration` selects formatting using native time-modifier behavior. A safely prepared native-font formatter can supply fixed-width short decimal strings. Its result may itself be secret; it is forwarded unchanged to `SetText`, never parsed to build cells. Missing preparation keeps the ordinary formatter.
 - **Secret, missing, invalid or inaccessible identity:** no guessed lookup or estimated duration is substituted. The native timer remains authoritative, and diagnostics describe the rejected identity stage without logging its value.
 - **Temporary enchant:** a supported public expiration can supply the remaining time; inaccessible expiration remains native.
 - **Hidden, permanent, replaced or inaccessible label:** release the addon's existing claim. An unknown visibility result is not automatically hidden; the restricted-visibility path separately checks the public `buffDurations` setting and never forces native visibility.
@@ -99,6 +99,14 @@ The six action glyph cells already have fixed physical CENTER anchors, but `Nati
 
 The profile cache is bounded by the underlying glyph-map calibration cache; one set of native formatters is reused across similarly styled buttons. Offline formatting checks establish output equivalence and failure-to-native policy but **not in-client visual glyph centering or performance**.
 
+## .355 typography coverage and recovery
+
+The .354 native-duration buff route used plain `%.1f` even when the physical label already had a calibrated glyph map. The .355 route prepares optional native decimal rules from that map, leaving selection of the actual time/precision inside the native duration object. Formatting a secret duration does not grant permission to inspect its output. Existing ten-second and longer localized rules remain unchanged.
+
+Buff typography is refreshed through existing safe setup even when the relative layout is already complete. A prior failed calibration can retry, and a changed absolute effective scale receives the correct map. This does not require moving the three cells when their relative geometry is unchanged. Current physical owner, preparation and profile still govern reuse; normal timer ticks do not remeasure fonts or construct new formatters.
+
+Action cells now inherit the source label's scale relative to the cooldown widget and its native text scale. Those properties join the existing font/color/shadow style receipt. Scale-only changes use the same restore-stock-before-resync ordering as font changes. Rejected mapped numeral formatters retry once per existing safe typography epoch; successful results stay cached. These repairs do not loosen the native minimum-duration/GCD gate or establish the client-specific mapping used by its synthetic calibration.
+
 ## Reading /buitimers
 
 The command reports cached outcomes plus read-only public coverage. It does not refresh the renderer, query an action/cast clock or expose secret aura values.
@@ -114,6 +122,7 @@ The command reports cached outcomes plus read-only public coverage. It does not 
 | `actions cells/stock/idle` | Cached prepared action states currently rendering cells, on fallback/restoration, or idle. | Full coverage of all native action widgets or a fresh live-clock measurement. |
 | `minimum-read-denied` | Count includes both direct denied reads and unsupported native-gate fallbacks. Up to three button samples give the more precise reason. | That every count was the same failed getter. |
 | `gate-unsupported/<stage>` | The recorded setup/binding failure, such as `probe-formatter`, `probe-mapping`, `combat-cold` or a color-binding stage. | A confirmed root cause of visible motion or stuttering. |
+| `typography profiles glyphs=... formats=... last=...` | Cached native-font preparation profiles: fixed spacing, naturally tabular/plain, or unavailable; the last fixed public stage records where preparation stopped. No live timer/text is read and no calibration runs for this diagnostic. | Active displayed timers, a current per-buff route, or proof of rendered glyph stability. |
 | `below/equal-minimum` | Native minimum policy prevented the fixed presenter. | An obligation to force a countdown visible. |
 | `cast=fixed-cells setup=... last=...` | Current setup state and last recorded cast outcome, e.g. `ready`/`cells`, `native-format-unmatched` or `native-clear-refused`. | That a cast is currently active or pixels are correctly spaced at every scale. |
 

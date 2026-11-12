@@ -1,6 +1,14 @@
 # Known issues and bugs
 
-Current test branch is **0.2.354-hide-party-faction-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+Current test branch is **0.2.355-timer-spacing-recovery-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+
+## 0.2.355 timer spacing recovery — live follow-up required
+
+The .354 screenshots show a short player buff displaying `2 s` on one application and `1.7` on the next; the user reports moving digits even when decimals appear, and action-bar digits often or always moving. The second screenshot establishes decimal availability on that application, not which renderer supplied it.
+
+Source fixtures reproduced three buff gaps: the public-identity native-duration route used plain `%.1f` despite a prepared glyph map; a failed optional map was not retried on unchanged safe setup; and inherited effective-scale changes could retain a map measured at the old absolute scale. The .355 correction covers that native decimal route and safe typography recovery. Action replacement cells also omitted native label scale/text scale, and rejected mapped action formatters outlived safe retry epochs; these source contracts are repaired without asserting they caused the pictured client behavior.
+
+Secret or missing aura identity can still retain native whole seconds. No supported alternate identity/clock source was established. Native action minimum-gate calibration also remains guarded: the exact client mapping between synthetic duration objects and cooldown-widget totals is not established by the Lua source, so its accepted mapping is not broadened speculatively. Cached typography-stage diagnostics can distinguish preparation failures from an active fixed renderer without reading hidden timings. Check actual buff and action digit stability across applications, combat and scale changes; local fixtures cannot close the live rendering/performance report.
 
 ## 0.2.354 classic-party faction badges — client follow-up
 

@@ -232,4 +232,54 @@ singleInput=false
 assert(get(label(22),newBase())==nil,"incompatible breakpoint precision wrongly accepted")
 local denied={GetFont=function()return secret,15,"OUTLINE" end,GetEffectiveScale=function()return 1 end}
 before=measures;assert(get(denied,original)==nil and measures==before)
+-- Diagnostics observe only cached style preparation, never the live timer.
+do
+    local epoch=assert(private.GetTimerTypographyRetryEpoch,"missing typography retry epoch")
+    local diagnose=assert(private.GetTimerTypographyDiagnostics,"missing cached typography diagnostics")
+    local digits=private.GetFixedTimerGlyphs
+    singleInput,singleThreshold=false,false
+    local font=label(30)
+    local initialEpoch=epoch()
+    invalidMarkup=true
+    assert(digits(font)==nil)
+    local failed=diagnose()
+    local failedFixed,failedPlain,failedUnavailable=failed:match("glyphs=fixed:(%d+)/plain:(%d+)/unavailable:(%d+)")
+    assert(failed:find("typography profiles glyphs=",1,true))
+    assert(failed:find("last=spacing |",1,true),"missing exact failed spacing stage: "..failed)
+    local measured,created=measures,formatterCount
+    assert(diagnose()==failed and measures==measured and formatterCount==created,
+        "diagnostics recalibrated or touched native rules")
+    invalidMarkup=false
+    assert(digits(font)==nil and measures==measured,"failed style retried before safe epoch")
+    private.RetryFixedActionFormatters()
+    assert(epoch()==initialEpoch+1)
+    assert(digits(font),"failed glyph style did not retry")
+    local recovered=diagnose()
+    assert(recovered:find("last=fixed |",1,true),"successful retry retained rejection stage")
+    local recoveredFixed,recoveredPlain,recoveredUnavailable=recovered:match("glyphs=fixed:(%d+)/plain:(%d+)/unavailable:(%d+)")
+    assert(tonumber(recoveredFixed)==tonumber(failedFixed)+1
+        and recoveredPlain==failedPlain and tonumber(recoveredUnavailable)==tonumber(failedUnavailable)-1,
+        "recovered profile retained unavailable status or inflated cache counts")
+    local poisoned=label(31)
+    poisoned.GetFont=function()error("PRIVATE ENGINE ERROR PAYLOAD")end
+    assert(digits(poisoned)==nil)
+    local rejected=diagnose()
+    assert(rejected:find("last=font |",1,true) and not rejected:find("PRIVATE",1,true),
+        "font diagnostics leaked native error text")
+    tallMarkup=true;assert(digits(label(32))==nil);tallMarkup=false
+    assert(diagnose():find("last=height |",1,true),"wrong line-height rejection stage")
+    ignoreFont=true;assert(digits(label(33))==nil);ignoreFont=false
+    assert(diagnose():find("last=font-readback |",1,true),"wrong font readback rejection stage")
+    rejectRules=true;assert(get(label(34),original)==nil);rejectRules=false
+    assert(diagnose():match("formats=.*last=rules$"),"wrong rule setter rejection stage")
+    private.RetryFixedActionFormatters();assert(get(label(34),original))
+    assert(diagnose():match("formats=.*last=fixed$"),"successful formatter retry retained rejection stage")
+    local savedWidths={}
+    for i=0,9 do local d=tostring(i);savedWidths[d]=widths[d];widths[d]=7.25 end
+    assert(digits(label(35)))
+    local plain=diagnose()
+    assert(plain:find("last=plain |",1,true) and plain:find("/plain:1/",1,true),
+        "naturally tabular profile was not reported as plain")
+    for d,w in pairs(savedWidths)do widths[d]=w end
+end
 print("PASS fixed stock action timer typography, thresholds, fallback and bounded calibration")

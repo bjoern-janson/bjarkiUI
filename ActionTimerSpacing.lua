@@ -7,6 +7,7 @@ local maxFontProfiles=32
 local day=86400
 local dynamicDays=99*day
 local retryEpoch=0
+local lastGlyphStage,lastFormatterStage="none","none"
 local spacer="|TInterface\\AddOns\\bjarkiUI\\Media\\TimerSpacer:1:%d:0:0|t"
 
 local function secret(value)
@@ -37,33 +38,42 @@ local function positive(value)
     return canRead(value) and type(value)=="number" and value>0 and value<math.huge
 end
 
-local function fontSignature(label)
+local function fontSignature(label,attempt)
+    attempt.stage="font"
     local forbidden=accessible(label.IsForbidden)
     if forbidden and accessible(forbidden(label))~=false then return end
     local file,size,flags=label:GetFont()
+    attempt.stage="scale"
     local scale=label:GetEffectiveScale()
+    attempt.stage="text-scale"
     local getTextScale=accessible(label.GetTextScale)
     local textScale=1
     if getTextScale then textScale=getTextScale(label) end
     if not canRead(file) or type(file)~="string" or file=="" or not positive(size)
-        or not canRead(flags) or (flags~=nil and type(flags)~="string")
-        or not positive(scale) or not positive(textScale) then return end
+        or not canRead(flags) or (flags~=nil and type(flags)~="string") then attempt.stage="font";return end
+    if not positive(scale) then attempt.stage="scale";return end
+    if not positive(textScale) then attempt.stage="text-scale";return end
     return file,size,flags,scale,textScale
 end
 
-local function prepareProbe(file,size,flags,scale,textScale)
+local function prepareProbe(file,size,flags,scale,textScale,attempt)
+    attempt.stage="probe"
     if not probe then probe=accessible(UIParent:CreateFontString(nil,"ARTWORK")) end
     accepted(probe:Hide())
     if probe.IsShown then assert(accessible(probe:IsShown())==false,"probe is visible") end
+    attempt.stage="scale"
     local rootScale=UIParent:GetEffectiveScale()
     assert(positive(rootScale),"unreadable root scale")
     accepted(probe:SetScale(scale/rootScale))
     local actual=probe:GetEffectiveScale()
     assert(positive(actual) and math.abs(actual-scale)<=scale*0.000001,"different probe scale")
+    attempt.stage="font"
     accepted(probe:SetFont(file,size,flags))
+    attempt.stage="font-readback"
     local appliedFile,appliedSize,appliedFlags=probe:GetFont()
     assert(accessible(appliedFile)==file and accessible(appliedSize)==size and (accessible(appliedFlags) or "")==(flags or ""),
         "different probe font")
+    attempt.stage="text-scale"
     if probe.SetTextScale then
         accepted(probe:SetTextScale(textScale))
         local applied=probe:GetTextScale()
@@ -125,8 +135,9 @@ local function readSamples(base)
     return {points=points,texts=texts,interior=interior,expected=expected}
 end
 
-local function measureGlyphs(file,size,flags,scale,textScale)
-    prepareProbe(file,size,flags,scale,textScale)
+local function measureGlyphs(file,size,flags,scale,textScale,attempt)
+    prepareProbe(file,size,flags,scale,textScale,attempt)
+    attempt.stage="measure"
     local function lineWidth(text)
         if probe.GetUnboundedStringWidthForText then return accessible(probe:GetUnboundedStringWidthForText(text)) end
         accepted(probe:SetText(text))
@@ -159,6 +170,7 @@ local function measureGlyphs(file,size,flags,scale,textScale)
     if natural then
         for i=0,9 do local d=tostring(i);glyphs[d]=d end
     else
+        attempt.stage="spacing"
         local tags,advances={[0]=""},{[0]=0}
         for i=1,2 do tags[i]=string.format(spacer,i);advances[i]=width(tags[i]) end
         local unit=advances[2]-advances[1]
@@ -171,6 +183,7 @@ local function measureGlyphs(file,size,flags,scale,textScale)
             tags[i]=string.format(spacer,i);advances[i]=width(tags[i])
             assert(advances[i]>advances[i-1],"spacer widths do not increase")
         end
+        attempt.stage="centering"
         for i=0,9 do
             local d=tostring(i)
             local digitWidth=width(d)
@@ -193,6 +206,7 @@ local function measureGlyphs(file,size,flags,scale,textScale)
     end
 
     if not natural and probe.GetStringHeight then
+        attempt.stage="height"
         local function height(text)
             accepted(probe:SetText(text))
             local h=probe:GetStringHeight()
@@ -208,10 +222,12 @@ local function measureGlyphs(file,size,flags,scale,textScale)
     return glyphs,broad,tolerance,natural,width,lineWidth
 end
 
-local function build(base,source,file,size,flags,scale,textScale)
-    local glyphs,broad,tolerance,natural,width,lineWidth=measureGlyphs(file,size,flags,scale,textScale)
+local function build(base,source,file,size,flags,scale,textScale,attempt)
+    local glyphs,broad,tolerance,natural,width,lineWidth=measureGlyphs(file,size,flags,scale,textScale,attempt)
+    attempt.stage="samples"
     if not source.samples then source.samples=readSamples(base) end
     local samples=source.samples
+    attempt.stage="layout"
     local encoded={[""]=""}
     local rules={}
     local requiredWidth=0
@@ -252,8 +268,10 @@ local function build(base,source,file,size,flags,scale,textScale)
     -- formatting beyond the measured two-digit vocabulary.
     rules[#rules+1]={threshold=dynamicDays,step=day,rounding=Enum.NumericRuleFormatRounding.Up,
         format="%.0fd",components={{div=day}}}
+    attempt.stage="rules"
     local formatter=accessible(C_StringUtil.CreateNumericRuleFormatter())
     accepted(formatter:SetBreakpoints(rules))
+    attempt.stage="rule-validation"
     for i,value in ipairs(samples.points) do
         assert(accessible(formatter:FormatNumber(value))==encoded[samples.texts[i]],"native formatter rejected literals or boundaries")
     end
@@ -271,10 +289,15 @@ function private.RetryFixedActionFormatters()
     retryEpoch=retryEpoch+1
 end
 
-local function readableStyle(label)
+function private.GetTimerTypographyRetryEpoch()
+    return retryEpoch
+end
+
+local function readableStyle(label,attempt)
+    attempt.stage="permission"
     local ok,combat=pcall(InCombatLockdown)
     if not ok or not canRead(combat) or combat~=false or not canRead(label) or not label then return nil end
-    local ok,file,size,flags,scale,textScale=pcall(fontSignature,label)
+    local ok,file,size,flags,scale,textScale=pcall(fontSignature,label,attempt)
     if not ok or not file then return nil end
     return string.format("%s\031%s\031%.17g\031%.17g\031%.17g",file,flags or "",size,scale,textScale),file,size,flags,scale,textScale
 end
@@ -285,10 +308,14 @@ end
 -- All measurement is outside combat and only on style preparation, never ticks.
 local fixedGlyphProfiles,fixedGlyphKeys,fixedGlyphSlot={},{},1
 function private.GetFixedTimerGlyphs(label)
-    local key,file,size,flags,scale,textScale=readableStyle(label)
-    if not key then return nil end
+    local attempt={}
+    local key,file,size,flags,scale,textScale=readableStyle(label,attempt)
+    if not key then lastGlyphStage=attempt.stage;return nil end
     local entry=fixedGlyphProfiles[key]
-    if entry and (entry.glyphs or entry.attempt==retryEpoch) then return entry.glyphs end
+    if entry and (entry.glyphs or entry.attempt==retryEpoch) then
+        lastGlyphStage=entry.stage
+        return entry.glyphs
+    end
     if not entry then
         if fixedGlyphKeys[fixedGlyphSlot] then
             fixedGlyphProfiles[fixedGlyphKeys[fixedGlyphSlot]]=nil
@@ -298,8 +325,11 @@ function private.GetFixedTimerGlyphs(label)
         entry={}
         fixedGlyphProfiles[key]=entry
     end
-    local ok,glyphs=pcall(measureGlyphs,file,size,flags,scale,textScale)
+    local ok,glyphs,_,_,natural=pcall(measureGlyphs,file,size,flags,scale,textScale,attempt)
     entry.attempt,entry.glyphs=retryEpoch,ok and glyphs or nil
+    entry.outcome=ok and (natural and "plain" or "fixed") or "unavailable"
+    entry.stage=ok and entry.outcome or attempt.stage
+    lastGlyphStage=entry.stage
     return entry.glyphs
 end
 
@@ -317,9 +347,10 @@ local function fitsWidget(widget,label,scale,required)
 end
 
 function private.GetFixedActionFormatter(label,base,widget)
-    local key,file,size,flags,scale,textScale=readableStyle(label)
-    if not key then return nil end
-    if not canRead(base) or not base then return nil end
+    local attempt={}
+    local key,file,size,flags,scale,textScale=readableStyle(label,attempt)
+    if not key then lastFormatterStage=attempt.stage;return nil end
+    if not canRead(base) or not base then lastFormatterStage="source";return nil end
     local source=sources[base]
     if not source then source={keys={},nextSlot=1};sources[base]=source end
     local entry=source[key]
@@ -333,13 +364,17 @@ function private.GetFixedActionFormatter(label,base,widget)
         source[key]=entry
     end
     if not entry.formatter then
-        if entry.epoch==retryEpoch then return nil end
+        if entry.epoch==retryEpoch then lastFormatterStage=entry.stage;return nil end
         entry.epoch=retryEpoch
-        local built,formatter,required=pcall(build,base,source,file,size,flags,scale,textScale)
+        local built,formatter,required=pcall(build,base,source,file,size,flags,scale,textScale,attempt)
+        entry.outcome=built and formatter and (rawequal(formatter,base) and "plain" or "fixed") or "unavailable"
+        entry.stage=entry.outcome=="unavailable" and attempt.stage or entry.outcome
+        lastFormatterStage=entry.stage
         if not built or not formatter then return nil end
         entry.formatter=rawequal(formatter,base) and true or formatter
         entry.requiredWidth=required
     end
+    lastFormatterStage=entry.stage
     if entry.formatter==true then return base end
     if not canRead(widget) then return base end
     if widget then
@@ -347,4 +382,22 @@ function private.GetFixedActionFormatter(label,base,widget)
         if not measured or not fits then return base end
     end
     return entry.formatter
+end
+
+-- Read only our bounded profile caches. These are prepared styles, not active
+-- timer counts; no font, live text, clock or native formatter is queried here.
+-- Failure stages are fixed public labels, never pcall error payloads.
+function private.GetTimerTypographyDiagnostics()
+    local glyphs={fixed=0,plain=0,unavailable=0}
+    local formats={fixed=0,plain=0,unavailable=0}
+    local function count(t,entry)
+        if entry and entry.outcome then t[entry.outcome]=t[entry.outcome]+1 end
+    end
+    for _,entry in pairs(fixedGlyphProfiles) do count(glyphs,entry) end
+    for _,source in pairs(sources) do
+        for _,key in pairs(source.keys) do count(formats,source[key]) end
+    end
+    return string.format("typography profiles glyphs=fixed:%d/plain:%d/unavailable:%d last=%s | formats=fixed:%d/plain:%d/unavailable:%d last=%s",
+        glyphs.fixed,glyphs.plain,glyphs.unavailable,lastGlyphStage,
+        formats.fixed,formats.plain,formats.unavailable,lastFormatterStage)
 end

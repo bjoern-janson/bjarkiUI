@@ -37,7 +37,7 @@ env.C_StringUtil.CreateNumericRuleFormatter=function()
     return formatter
 end
 local code=([[
-local private={GetFixedTimerGlyphs=function(label)return label and label.glyphs end}
+local private={GetTimerTypographyRetryEpoch=function()return _G.retryEpoch or 0 end,GetFixedTimerGlyphs=function(label)return label and label.glyphs end}
 local nativeFormatters
 local MINUTE_CUTOFF=91
 local function public(v)return v~=nil and v~="secret"end
@@ -97,10 +97,16 @@ assert(fix({glyphs=refused},plain)==plain,"refused native markup returns stock m
 assert(fix({glyphs=refused},plain)==plain and env.builds==before+1,
     "failed font profile must not be rebuilt every button")
 env.refuseMarkup=false
+env.retryEpoch=1
+local recovered=fix({glyphs=refused},plain)
+assert(recovered~=plain,"new safe retry epoch recovers previously refused mapped formatters")
+local recoveredBuilds=env.builds
+assert(fix({glyphs=refused},plain)==recovered and env.builds==recoveredBuilds,
+    "successful mapping remains cached within retry epoch")
 -- Verify actual installation/lifecycle paths, not only a disconnected helper.
 assert(source:find("local desired=actionDigitsForFont(label,formatters)",1,true))
 assert(source:find("state.actionFormatters=desired",1,true))
 assert(source:find("and setCellFormatter(state,i,desired[i])",1,true))
 assert(source:find("state.actionFormatters==desired then return true",1,true))
-assert(not segment:find("OnUpdate",1,true) and not segment:find("GetTime",1,true))
+assert(not segment:find("OnUpdate",1,true) and not segment:find("GetTime(",1,true))
 print("PASS static action numerals: "..checks.." public binding transitions, cached profiles, fallback, resync")
