@@ -93,6 +93,7 @@ local function fixture(route, desaturate, unit)
     if loadstring then chunk=assert(loadstring(code,"health-color-observer")); setfenv(chunk,env)
     else chunk=assert(load(code,"health-color-observer","t",env)) end
     f.style,f.apply,f.set,f.derived=chunk("bjarkiUI", addonPrivate)
+    f.partyPainter=addonPrivate.ApplyClassicPartyHealthColor
     f.bar,f.texture,f.env=bar,texture,env
     function f:install(mode)
         self.registration=mode
@@ -532,6 +533,52 @@ test("recovered colorable atlas releases only the earlier saturation override",f
     f.mode="pet";f.apply(f.bar,"target")
     expect(f.texture.atlas==colorable,"new explicit atlas choice was undone")
 end)
+test("classic party health uses class-colorable native atlas, not green RGB multiplication",function()
+    local f=fixture("fallback",false,"party1")
+    f.texture.atlas="UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health"
+    expect(type(f.partyPainter)=="function","native party helper unavailable")
+    expect(f.partyPainter(f.bar,"party1",.2,.7,1),"party health material preparation rejected")
+    color(f.bar,.2,.7,1,1)
+    expect(f.texture.atlas=="UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health-Status",
+        "party art stayed baked green despite class RGB")
+    f.style.Restore(f.bar)
+    expect(f.texture.atlas=="UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health",
+        "native party atlas was not restored")
+    color(f.bar,.1,.8,.1,.7)
+end)
+test("classic party pet health uses the owner class on a colorable material",function()
+    local f=fixture("fallback",false,"partypet2")
+    f.texture.atlas="ui-hud-unitframe-party-portraiton-bar-health"
+    expect(f.partyPainter(f.bar,"party2",.8,.4,.1),"party pet owner class material failed")
+    color(f.bar,.8,.4,.1,1)
+    expect(f.texture.atlas=="UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health-Status",
+        "pet health atlas still green")
+    f.style.Restore(f.bar)
+    expect(f.texture.atlas=="ui-hud-unitframe-party-portraiton-bar-health",
+        "pet original atlas not restored")
+end)
+test("classic party vehicle bar retains native atlas and desaturates baked green",function()
+    local f=fixture("fallback",false,"party3")
+    local nativeVehicle="UI-HUD-UnitFrame-Party-PortraitOn-Vehicle-Bar-Health"
+    f.texture.atlas=nativeVehicle
+    expect(f.partyPainter(f.bar,"party3",.9,.6,.3),"vehicle fallback preparation failed")
+    color(f.bar,.9,.6,.3,1)
+    expect(f.texture.atlas==nativeVehicle and f.texture.desaturated,
+        "vehicle health needs desaturation, not SetAtlas(nil) or class-tinted green")
+    f.style.Restore(f.bar)
+    expect(f.texture.atlas==nativeVehicle and not f.texture.desaturated,
+        "vehicle desaturation or native atlas was not restored")
+end)
+test("classic party color helper rejects a different physical unit and unsafe class identity",function()
+    local f=fixture("fallback",false,"raid1")
+    f.texture.atlas="UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health"
+    expect(not f.partyPainter(f.bar,"party1",.2,.7,1),"unrelated raid bar was overwritten")
+    expect(not f.partyPainter(f.bar,"party5",.2,.7,1),"unapproved party5 was overwritten")
+    color(f.bar,.1,.8,.1,.7)
+    expect(f.texture.atlas=="UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health",
+        "unrelated native art was modified")
+end)
+
 local failed=0
 for _, case in ipairs(cases) do
     local ok,err=pcall(case[2])
