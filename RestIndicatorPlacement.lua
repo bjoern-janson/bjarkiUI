@@ -1,9 +1,7 @@
--- Move Blizzard's original resting ZZZ flipbook opposite the secondary portrait.
--- Only its native texture anchor changes; no new artwork, animation or polling.
--- Mirror the previous +48 placement to the upper-left of the main portrait.
--- Keep the native animation/artwork intact: only its placement is mirrored.
--- The portrait's scale defines the offset, independently of the texture scale.
-local RESTED_Z_LEFT_OF_PORTRAIT = -48
+-- Keep Blizzard's original resting flipbook beside the player leader crown.
+-- Only its CENTER anchor changes; artwork, animation and visibility stay native.
+local _,uiPrivate=...
+local RESTED_CROWN_GAP=2
 local states=setmetatable({},{__mode="k"})
 local function public(v)
     if type(issecretvalue)=="function" then
@@ -48,9 +46,15 @@ local function pointOf(t)
         return {p,rel,rp,x,y}
     end
 end
-local function samePoint(a,b)
+local function sameNumber(a,b,allowFloat)
+    if a==b then return true end
+    local round=uiPrivate and uiPrivate.RoundToFloat32
+    return allowFloat and type(round)=="function" and a==round(b)
+end
+local function samePoint(a,b,allowFloat)
     return a and b and a[1]==b[1] and rawequal(a[2],b[2])
-        and a[3]==b[3] and a[4]==b[4] and a[5]==b[5]
+        and a[3]==b[3] and sameNumber(a[4],b[4],allowFloat)
+        and sameNumber(a[5],b[5],allowFloat)
 end
 local function scaledCenter(o)
     local get,scale=method(o,"GetCenter"),method(o,"GetEffectiveScale")
@@ -61,6 +65,13 @@ local function scaledCenter(o)
         return x*s,y*s,s
     end
 end
+local function nativeSize(o)
+    local width,height=method(o,"GetWidth"),method(o,"GetHeight")
+    if not width or not height then return end
+    local wok,w=pcall(width,o)
+    local hok,h=pcall(height,o)
+    if wok and hok and finite(w) and finite(h) and w>0 and h>0 then return w,h end
+end
 local apply
 apply=function()
     if not outsideCombat() then return end
@@ -68,8 +79,9 @@ apply=function()
     local context=field(field(frame,"PlayerFrameContent"),"PlayerFrameContentContextual")
     local loop=field(context,"PlayerRestLoop")
     local texture=field(loop,"RestTexture")
+    local crown=field(context,"LeaderIcon")
     local portrait=field(field(frame,"PlayerFrameContainer"),"PlayerPortrait")
-    if not safe(loop) or not safe(texture) or not safe(portrait) then return end
+    if not safe(loop) or not safe(texture) or not safe(portrait) or not safe(crown) then return end
     local kind=method(texture,"GetObjectType")
     if not kind then return end
     local ok,objectType=pcall(kind,texture)
@@ -80,22 +92,24 @@ apply=function()
     if not state then state={};states[texture]=state end
     if state.applying then return end
     local point=pointOf(texture)
-    if samePoint(point,state.applied) then return end
-    -- Only reposition the stock CENTER attachment to PlayerRestLoop.
-    -- Leave unusual/customized anchors and already-left-native art alone.
-    if point and point[1]=="CENTER" and rawequal(point[2],loop)
-        and point[3]=="CENTER" then
+    local owned=samePoint(point,state.applied)
+    -- Preserve foreign anchors and stock art that is already on the left.
+    -- An accepted anchor can be recalculated after native size/scale changes.
+    local stock=point and point[1]=="CENTER" and rawequal(point[2],loop)
+        and point[3]=="CENTER"
+    if owned or stock then
         local tx,ty,ts=scaledCenter(texture)
         local px,py,ps=scaledCenter(portrait)
-        if tx and px then
-            local originalX,y=(tx-px)/ts,(ty-py)/ts
-            if finite(originalX) and finite(y) and originalX>0 then
-                -- The secondary circle and crown occupy the upper-right;
-                -- give the original Z animation the opposite corner.
-                local x=RESTED_Z_LEFT_OF_PORTRAIT*ps/ts
-                x=math.floor(x*100+.5)/100
-                y=math.floor(y*100+.5)/100
-                local desired={"CENTER",portrait,"CENTER",x,y}
+        local cx,cy,cs=scaledCenter(crown)
+        local width=nativeSize(texture)
+        local crownWidth=nativeSize(crown)
+        if tx and px and cx and width and crownWidth and (owned or tx>px) then
+            -- Offset the center by half the real flipbook width so its left
+            -- edge clears the crown's right edge by two portrait UI units.
+            -- A hidden crown still supplies native geometry and is not shown.
+            local x=width/2+RESTED_CROWN_GAP*ps/ts
+            local desired={"CENTER",crown,"RIGHT",x,0}
+            if finite(x) and not (owned and samePoint(point,desired,true)) then
                 state.applying=true
                 local wrote,result=pcall(setter,texture,
                     desired[1],desired[2],desired[3],desired[4],desired[5])
@@ -103,7 +117,7 @@ apply=function()
                 -- The real WoW SetPoint usually succeeds with nil return.
                 if wrote and (result==nil or (public(result) and result~=false)) then
                     local observed=pointOf(texture)
-                    state.applied=samePoint(observed,desired) and observed or nil
+                    state.applied=samePoint(observed,desired,true) and observed or nil
                 end
             end
         end

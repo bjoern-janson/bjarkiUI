@@ -29,3 +29,10 @@ Mixed effective scales must keep symmetric screen-space crown gaps; native reanc
 - [x] Implement the narrow crown profiles, private party handoff and left-side resting placement; run focused fixtures until they pass.
 - [x] Set 0.2.350 metadata and document this test build; run both complete Lua suites and package identity validation.
 - [x] Obtain one independent code review, address material findings, and prepare the verified source and installable ZIP for branch/PR publication and delivery.
+
+## .351 corrective follow-up
+
+- [x] Inspect the two live .350 captures and compare actual secondary/crown source geometry, including bjarkiPortraits .252.
+- [x] Preserve player/classic-party positions and apply a two-unit target/focus optical correction.
+- [x] Replace left-side Zs with the approved right-of-crown fallback; exercise physical adjacency and safe lifecycle recovery.
+- [x] Run both native Lua verification sets and independently review the correction; prepare the verified regular .351 ZIP and development-source update.

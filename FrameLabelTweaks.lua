@@ -265,11 +265,12 @@ refreshCombatIcon = function()
     if state then moveCombatIcon(icon, state) end
 end
 
--- One mirrored portrait-corner position for the large-frame leader crowns.
--- The .349 target/focus clearance was (-3, 11); move two units farther
--- toward the bars, then mirror that same gap and height onto the player.
+-- Keep the player placement and use a small optical correction on target/focus.
+-- The .350 live capture showed that equal mirrored texture-anchor gaps still
+-- crowded the target/focus secondary rims; add two inward units of clearance.
 -- Small classic-party crowns retain their native attachment with +2 X.
-local LEADER_CROWN_GAP, LEADER_CROWN_HEIGHT, PARTY_CROWN_NUDGE = 5, 11, 2
+local PLAYER_CROWN_GAP, TARGET_CROWN_GAP = 5, 7
+local LEADER_CROWN_HEIGHT, PARTY_CROWN_NUDGE = 11, 2
 
 local function regionScale(region)
     if not readable(region) or not region then return end
@@ -409,7 +410,7 @@ local function apply()
     local frameContainer = field(_G.PlayerFrame, "PlayerFrameContainer")
     installCombatIcon(field(playerContext, "AttackIcon"), field(frameContainer, "PlayerPortrait"),
         _G.PlayerLevelText)
-    installLeaderIcon(field(playerContext, "LeaderIcon"), LEADER_CROWN_GAP,
+    installLeaderIcon(field(playerContext, "LeaderIcon"), PLAYER_CROWN_GAP,
         "TOPLEFT", playerContext, field(frameContainer, "PlayerPortrait"))
     for _, name in ipairs({ "TargetFrame", "FocusFrame" }) do
         local content = field(_G[name], "TargetFrameContent")
@@ -417,7 +418,7 @@ local function apply()
         installLevel(field(main, "LevelText"), LEVEL_OUTWARD)
         local contextual = field(content, "TargetFrameContentContextual")
         local container = field(_G[name], "TargetFrameContainer")
-        installLeaderIcon(field(contextual, "LeaderIcon"), -LEADER_CROWN_GAP,
+        installLeaderIcon(field(contextual, "LeaderIcon"), -TARGET_CROWN_GAP,
             "TOPRIGHT", contextual, field(container, "Portrait"))
     end
 
