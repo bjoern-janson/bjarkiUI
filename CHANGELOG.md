@@ -2,13 +2,20 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.351-portrait-spacing-test — crown clearance and adjacent rested Zs
+
+- The .350 live screenshots showed target/focus crowns touching their secondary rims while the player crown had clearance. Keep the player gap at 5 portrait units and move target/focus from -5 to -7 at the same height. This is a screenshot-calibrated optical correction; source inspection does not establish the exact native renderer/scale cause of the unequal visible gaps.
+- Replace the detached upper-left Z placement with the user's right-of-crown fallback. Anchor the original RestTexture CENTER to the native player LeaderIcon RIGHT, using half the actual Z texture width plus two portrait units for X and zero for Y. The bounding edges stay adjacent even while the crown is hidden.
+- Recalculate owned Z placement on existing safe scale/layout updates; leave foreign anchors and unavailable/forbidden/secret geometry untouched. Native artwork, animation and visibility remain unchanged, with no polling or replacement textures.
+- Classic-party crown X+2 and all other .350 behavior remain intact. Rested fixtures now check scaled physical edge adjacency and center alignment instead of only non-overlap. Live optical confirmation remains pending.
+
 ## 0.2.350-portrait-indicators-test — mirrored crowns and separate resting Zs
 
 - Use target/focus crown placement as the reference, two UI units farther inward toward the name/health bars. Player and Target/Focus use mirrored portrait-relative corners with the same height and gap, converted through actual portrait/texture scales.
 - Move the original rested Z flipbook from +48 to -48 portrait units, preserving native height, art, animation and visibility. This mirrors placement across the main portrait, separating it from the upper-right secondary circle and crown. The original Z artwork itself is not reversed.
 - Shift each active classic-party member's original crown two units right at its native height. Reuse the existing pool discovery and one private FrameLabelTweaks helper; native reanchors retain one hook and released/nonparty members cannot keep applying the offset.
 - Foreign, forbidden, unknown-permission and combat-time geometry remains guarded. Guide/role/PvP icons, portrait frames, .349 threat intensities, health materials, fonts and timers retain their previous behavior.
-- Existing real-module crown/rest fixtures cover mirrored geometry, mixed scales, native reset/refusal, no cumulative drift, full Z-texture clearance, actual TOC ordering, pooled reuse and raid permission. Full 36-suite runs passed on native Lua 5.1.5 and 5.4.6. Live optical placement remains pending.
+- Existing real-module crown/rest fixtures cover mirrored geometry, mixed scales, native reset/refusal, no cumulative drift, full Z-texture clearance, actual TOC ordering, pooled reuse and raid permission. Full 36-suite runs passed on native Lua 5.1.5 and 5.4.6. The subsequent live capture rejected this layout; .351 supersedes its crown spacing and left-side Z placement.
 
 ## 0.2.349-party-aggro-visuals-test — party threat parity, less aggressive pet attack mode
 

@@ -1,10 +1,12 @@
 # Known issues and bugs
 
-Current test branch is **0.2.350-portrait-indicators-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+Current test branch is **0.2.351-portrait-spacing-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
 
-## 0.2.350 crown alignment and resting Z separation — visual verification pending
+## 0.2.351 crown spacing and resting Z adjacency — live follow-up
 
-The reported player crown/Z overlap is addressed by mirrored crown geometry and opposite-side resting placement. The chosen layout uses two more units inward toward the bars from target/focus's .349 crown position, matching player portrait-relative geometry, classic-party crown X+2, and resting Z placement mirrored from +48 to -48 portrait units. Original Z artwork/animation remains native. Offline fixtures verify geometry and lifecycle rules; confirm the optical crown gap and left-side resting placement in the actual client. The right-of-crown alternative was unnecessary because native positional mirroring is supported.
+The .350 in-game screenshots rejected the earlier layout: target/focus crowns touched their secondary circles while the player crown had clearance, and the left-side Zs looked detached. Equal mirrored anchor offsets were insufficient to establish equal visible spacing. Both .248 and .252 bjarkiPortraits sources use the same large-frame secondary geometry; no exact native renderer cause for the crown asymmetry was established.
+
+The correction preserves the player crown and gives target/focus two more portrait units inward (-7 instead of -5). It uses the user's right-of-crown alternative for the original Z animation, with a two-portrait-unit gap between native texture bounds and aligned centers. This replaces .350's fixed X=-48 placement. Offline fixtures establish the chosen geometry, ownership and lifecycle rules; confirm the optical target/focus gap and animated Z appearance in the client. Classic-party crown X+2 is unchanged.
 
 ## 0.2.349 classic party threat flash and player pet attack-mode pulse — visual verification pending
 

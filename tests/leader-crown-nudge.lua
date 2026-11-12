@@ -100,13 +100,13 @@ local function test(name,fn)
     local ok,err=pcall(fn)
     assert(ok,name..': '..tostring(err));passed=passed+1
 end
-test('crowns mirror portrait corners despite different native parents and heights',function()
+test('crowns retain player clearance with the target and focus optical inset',function()
     local e=fixture();e:load();e:fire('PLAYER_LOGIN')
     eq(e.player.anchor[2],e.portraits[1]);eq(e.player.anchor[3],'TOPRIGHT')
     eq(e.player.anchor[4],5);eq(e.player.anchor[5],11)
     for i,t in ipairs({e.target,e.focus})do
         eq(t.anchor[2],e.portraits[i+1]);eq(t.anchor[3],'TOPLEFT')
-        eq(t.anchor[4],-5);eq(t.anchor[5],11)
+        eq(t.anchor[4],-7);eq(t.anchor[5],11)
     end
     for _,g in ipairs(e.guides)do eq(g.writes,0)end
 end)
@@ -131,17 +131,17 @@ end)
 test('native target reanchor returns to its portrait once',function()
     local e=fixture();e:load();e:fire('PLAYER_LOGIN')
     e.target:SetPoint('TOPRIGHT',e.parents[2],'TOPRIGHT',-85,-8)
-    eq(e.target.anchor[2],e.portraits[2]);eq(e.target.anchor[4],-5)
+    eq(e.target.anchor[2],e.portraits[2]);eq(e.target.anchor[4],-7)
     eq(e.target.anchor[5],11);eq(e.target.writes,3)
 end)
 test('combat defers geometry and recovers afterward',function()
     local e=fixture();e.combat=true;e:load();e:fire('PLAYER_LOGIN')
     eq(e.player.writes,0);eq(e.target.writes,0);eq(e.partyCrown.writes,0)
     e.combat=false;e:fire('PLAYER_REGEN_ENABLED')
-    eq(e.player.anchor[4],5);eq(e.target.anchor[4],-5)
+    eq(e.player.anchor[4],5);eq(e.target.anchor[4],-7)
     e.combat=true;e.focus:SetPoint('TOPRIGHT',e.parents[3],'TOPRIGHT',-85,-8)
     eq(e.focus.anchor[4],-85)
-    e.combat=false;e:fire('PLAYER_REGEN_ENABLED');eq(e.focus.anchor[4],-5)
+    e.combat=false;e:fire('PLAYER_REGEN_ENABLED');eq(e.focus.anchor[4],-7)
 end)
 test('foreign anchors and denied writes retain safe ownership',function()
     for _,mode in ipairs({'forbidden','different','parent','multiple','denied','portrait'})do
@@ -156,7 +156,7 @@ test('foreign anchors and denied writes retain safe ownership',function()
         eq(e.target.anchor[4],-85)
         if mode=='denied' then
             e.target.denied=false;e:fire('PLAYER_TARGET_CHANGED')
-            eq(e.target.anchor[4],-5);eq(e.target.writes,1)
+            eq(e.target.anchor[4],-7);eq(e.target.writes,1)
         end
     end
 end)

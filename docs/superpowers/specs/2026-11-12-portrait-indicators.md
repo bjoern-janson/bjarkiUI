@@ -18,3 +18,9 @@ The earlier proposal raised Zs above the crown while keeping them on the right. 
 ## Constraints and evidence
 
 Change only indicator geometry. Apply writes only when permissions positively allow them; party writes also require non-raid mode and current pooled membership. Preserve one hook per physical texture, accepted-write receipts, refusal retries, and other addons' foreign anchors. Native icons, animation, timers, saved layouts and all .349 visual treatment retain their existing behavior. Offline tests establish geometry/lifecycle behavior; the final in-game optical fit remains a user check.
+
+## .351 correction after the live screenshots
+
+The .350 optical result was rejected: target/focus crowns crowd their secondary circles and the left-side Zs look detached. Keep the player crown at (5, 11); use (-7, 11) for target/focus as a small screenshot-based optical correction. Equal mirrored anchors are not evidence of equal visible clearance. The inspected .248 and .252 bjarkiPortraits sources share geometry, and no exact live renderer cause was established.
+
+Use the user's already-authorized right-of-crown fallback: original RestTexture CENTER to native player LeaderIcon RIGHT, X = actual Z width / 2 + 2 portrait units converted to Z scale, Y = 0. The native crown supplies the attachment even while hidden. Preserve the original animation/artwork and recalibrate an owned anchor on existing safe scale/layout events. No cross-addon secondary-frame enumeration or new geometry API is needed. The former positional mirror was possible but visually unsuitable; it is superseded.
