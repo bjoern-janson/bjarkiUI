@@ -2,6 +2,13 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.352-hide-rested-zs-test — remove the rested Z animation
+
+- Hide only the original player `PlayerRestLoop.RestTexture`, as requested after the .351 screenshot. Retire all Z positioning code while keeping the existing module/manifest path for normal addon installation.
+- Reassert hidden state after the texture's native Show/SetShown calls, with one retryable hook per method and physical texture. Native parent-frame refreshes cannot undo the child texture's own hidden flag.
+- Safely discover the current region on login, world entry, resting updates, Blizzard unit-frame load and combat exit. Skip forbidden/secret regions and defer writes during combat; ignore retired texture callbacks after region replacement.
+- Preserve crown positions, native resting/XP state, the separate resting glow, original animation owner and other .351 presentation. No polling, alpha writes or replacement art.
+
 ## 0.2.351-portrait-spacing-test — crown clearance and adjacent rested Zs
 
 - The .350 live screenshots showed target/focus crowns touching their secondary rims while the player crown had clearance. Keep the player gap at 5 portrait units and move target/focus from -5 to -7 at the same height. This is a screenshot-calibrated optical correction; source inspection does not establish the exact native renderer/scale cause of the unequal visible gaps.

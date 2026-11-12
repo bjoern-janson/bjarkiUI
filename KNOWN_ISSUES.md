@@ -1,8 +1,12 @@
 # Known issues and bugs
 
-Current test branch is **0.2.351-portrait-spacing-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+Current test branch is **0.2.352-hide-rested-zs-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
 
-## 0.2.351 crown spacing and resting Z adjacency — live follow-up
+## 0.2.352 rested Z removal
+
+After the .351 screenshot, the user requested complete removal of the Zs. The current build hides only the original rested Z texture and retires both placement experiments. Native resting state, XP and separate frame glow remain active. Suppression is reapplied after native texture visibility writes and normal safe lifecycle updates. Geometry/visibility writes defer during combat; a new texture or explicit native texture re-show encountered there is reconciled on combat exit. Offline coverage checks this behavior; no local game client was available.
+
+## 0.2.351 crown spacing — Z placement superseded by .352
 
 The .350 in-game screenshots rejected the earlier layout: target/focus crowns touched their secondary circles while the player crown had clearance, and the left-side Zs looked detached. Equal mirrored anchor offsets were insufficient to establish equal visible spacing. Both .248 and .252 bjarkiPortraits sources use the same large-frame secondary geometry; no exact native renderer cause for the crown asymmetry was established.
 
