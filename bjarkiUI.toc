@@ -2,7 +2,7 @@
 ## Title: bjarkiUI
 ## Notes: Ultralight unit-frame presentation for WoW: Forever
 ## Author: Bjarki / OpenAI
-## Version: 0.2.346-static-action-digits-test
+## Version: 0.2.347-classic-party-presentation-test
 ## SavedVariablesPerCharacter: bjarkiUISettings
 
 NativePrecision.lua
@@ -10,6 +10,7 @@ bjarkiUI.lua
 PartyOrder.lua
 PartyPresentation.lua
 SoftDark.lua
+ClassicPartyPresentation.lua
 TrackedBuffSeconds.lua
 ActionTimerSpacing.lua
 CooldownSeconds.lua
