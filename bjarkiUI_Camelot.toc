@@ -2,7 +2,7 @@
 ## Title: bjarkiUI
 ## Notes: Ultralight unit-frame presentation for WoW: Forever
 ## Author: Bjarki / OpenAI
-## Version: 0.2.352-hide-rested-zs-test
+## Version: 0.2.353-party-crown-spacing-test
 ## SavedVariablesPerCharacter: bjarkiUISettings
 
 NativePrecision.lua

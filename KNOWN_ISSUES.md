@@ -1,6 +1,10 @@
 # Known issues and bugs
 
-Current test branch is **0.2.352-hide-rested-zs-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+Current test branch is **0.2.353-party-crown-spacing-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+
+## 0.2.353 classic-party crown clearance — visual follow-up
+
+The current live screenshot shows the classic-party crown crowded against its smaller secondary circle. The previous native X+2 nudge was insufficient. The new X+4 profile shifts the crown two more UI units right at its existing height. Existing pool and permission guards remain the placement owner; final optical spacing still needs an in-client look.
 
 ## 0.2.352 rested Z removal
 

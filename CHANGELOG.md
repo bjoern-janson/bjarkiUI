@@ -2,6 +2,12 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.353-party-crown-spacing-test — classic party crown clearance
+
+- The live party-frame screenshot shows the leader crown crowded against the secondary portrait. Increase the classic-party horizontal adjustment from native X+2 to X+4: two additional UI units toward the bars.
+- Keep the native crown height and attachment, current pooled-member/non-raid/combat guards, accepted-write receipts and single hook. This is a narrow optical correction; no new layout mechanism is added.
+- Retain the .352 rested-Z removal and current player/target/focus crown profiles.
+
 ## 0.2.352-hide-rested-zs-test — remove the rested Z animation
 
 - Hide only the original player `PlayerRestLoop.RestTexture`, as requested after the .351 screenshot. Retire all Z positioning code while keeping the existing module/manifest path for normal addon installation.

@@ -268,9 +268,10 @@ end
 -- Keep the player placement and use a small optical correction on target/focus.
 -- The .350 live capture showed that equal mirrored texture-anchor gaps still
 -- crowded the target/focus secondary rims; add two inward units of clearance.
--- Small classic-party crowns retain their native attachment with +2 X.
+-- Classic-party crowns keep their native height, with +4 X to clear the
+-- smaller secondary rim (the original +2 still touched it in the live capture).
 local PLAYER_CROWN_GAP, TARGET_CROWN_GAP = 5, 7
-local LEADER_CROWN_HEIGHT, PARTY_CROWN_NUDGE = 11, 2
+local LEADER_CROWN_HEIGHT, PARTY_CROWN_NUDGE = 11, 4
 
 local function regionScale(region)
     if not readable(region) or not region then return end
