@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.347-classic-party-presentation-test"
+local BJARKI_UI_VERSION = "0.2.348-classic-party-health-material-test"
 -- Standalone PRD treatment is retained. Unit-frame resource bars stay native.
 local PRD_MANA_R, PRD_MANA_G, PRD_MANA_B = 0.10, 0.25, 1.00
 local WORLD_TEXT_SCREEN_Y = "0.0430"
@@ -769,7 +769,19 @@ local COLORABLE_HEALTH_ATLASES = {
     ["UI-HUD-UnitFrame-Player-PortraitOn-Bar-Health"] = "UI-HUD-UnitFrame-Player-PortraitOn-Bar-Health-Status",
     ["UI-HUD-UnitFrame-Target-PortraitOn-Bar-Health"] = "UI-HUD-UnitFrame-Target-PortraitOn-Bar-Health-Status",
     ["UI-HUD-UnitFrame-TargetofTarget-PortraitOn-Bar-Health"] = "UI-HUD-UnitFrame-TargetofTarget-PortraitOn-Bar-Health-Status",
+    -- Native party frame portraits use the same pre-tinted green material.
+    -- The existing -Status variant is the Blizzard PartyFrameBarSegment
+    -- class-colorable fill (PartyFrameTemplates.xml).
+    ["UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health"] = "UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health-Status",
+    ["ui-hud-unitframe-party-portraiton-bar-health"] = "UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health-Status",
 }
+-- Vehicle art uses different mask/geometry. Preserve its original atlas and
+-- desaturate the material through the SAME guarded ownership system rather
+-- than swapping to an unverified colorable atlas.
+local CLASSIC_PARTY_DESAT_HEALTH_ATLASES = {
+    ["UI-HUD-UnitFrame-Party-PortraitOn-Vehicle-Bar-Health"] = true,
+}
+
 
 local function currentHealthTexture(bar)
     if not bar or type(bar.GetStatusBarTexture) ~= "function" then return nil end
@@ -960,7 +972,8 @@ function nativeHealthStyle.Prepare(bar)
         material.owner.owned[texture], nativeHealthStyle.materials[texture] = nil, nil
         material = nil
     end
-    if not material and not COLORABLE_HEALTH_ATLASES[atlas] then return false end
+    if not material and not COLORABLE_HEALTH_ATLASES[atlas]
+        and not CLASSIC_PARTY_DESAT_HEALTH_ATLASES[atlas] then return false end
     if not state then
         local color = readableColor(bar)
         if not color then return false end
@@ -1182,6 +1195,36 @@ function nativeHealthStyle.Install(bar, unit)
         if not scheduled then observer.pending = false end
     end)
     if ok and not isSecret(result) and result ~= false then nativeHealthStyle.textureHooks[texture] = observer end
+end
+
+-- Native (non-raid-style) party bars require the same health-material
+-- preparation as Player/Target/Focus. Setting an RGB color on the baked-green
+-- party atlas alone leaves the visible bar green or muddy/olive. Keep class
+-- identity in ClassicPartyPresentation and only accept positively identified
+-- actual party/party-pet physical bar recipients here. This helper delegates
+-- texture ownership, tint and restoration to nativeHealthStyle rather than
+-- maintaining a second independent color system.
+if type(uiPrivate) == "table" then
+    uiPrivate.ApplyClassicPartyHealthColor = function(bar, sourceUnit, r, g, b)
+        if not bar or isSecret(bar) or isSecret(sourceUnit)
+            or type(sourceUnit) ~= "string"
+            or not (sourceUnit == "player" or sourceUnit:match("^party[1-4]$"))
+            or type(bar.SetStatusBarColor) ~= "function" then return false end
+        local actualUnit = readableUnitToken(bar.unit)
+        if not actualUnit then return false end
+        local appropriate = actualUnit == sourceUnit
+        if not appropriate and sourceUnit ~= "player" then
+            appropriate = actualUnit == sourceUnit:gsub("^party", "partypet")
+        elseif not appropriate then
+            appropriate = actualUnit == "pet"
+        end
+        if not appropriate then return false end
+        nativeHealthStyle.Install(bar, actualUnit)
+        -- Only claim a class color if its stock material is prepared safely.
+        -- If a protected recipient or texture is inaccessible, do not claim
+        -- that a SetStatusBarColor on the original green fill solved it.
+        return setHealthColor(bar, r, g, b, 1)
+    end
 end
 
 local derivedColorHooks = setmetatable({}, { __mode = "k" })

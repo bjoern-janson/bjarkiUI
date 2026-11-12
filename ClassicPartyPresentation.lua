@@ -94,10 +94,10 @@ local function repaint(frame, mode)
         end
         if mode ~= "name" then
             local bar = mode == "pet" and field(field(frame, "PetFrame"), "HealthBar") or healthBar(frame)
-            local setter = method(bar, "SetStatusBarColor")
-            if setter and safe(bar) then
-                local ok, result = pcall(setter, bar, r, g, b)
-                painted = (ok and (not public(result) or result ~= false)) or painted
+            local apply = field(uiPrivate, "ApplyClassicPartyHealthColor")
+            if type(apply) == "function" and safe(bar) then
+                local ok, result = pcall(apply, bar, unit, r, g, b)
+                painted = (ok and result == true) or painted
             end
         end
         return painted
