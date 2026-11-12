@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.335-cast-recovery-test"
+local BJARKI_UI_VERSION = "0.2.349-party-aggro-visuals-test"
 -- Standalone PRD treatment is retained. Unit-frame resource bars stay native.
 local PRD_MANA_R, PRD_MANA_G, PRD_MANA_B = 0.10, 0.25, 1.00
 local WORLD_TEXT_SCREEN_Y = "0.0430"
@@ -749,6 +749,10 @@ end
 
 local healthColorWrites = setmetatable({}, { __mode = "k" })
 local _, uiPrivate = ...
+if type(uiPrivate) == "table" then
+    -- Reuse the existing LoL-style status-text shadow without a second stylist.
+    uiPrivate.InstallCompactStatusFont = installStatusFont
+end
 
 -- Native health artwork has a baked-in green color. Multiplying that image by
 -- a class RGB produced the olive bars seen in .210. Use only the corresponding
@@ -765,7 +769,19 @@ local COLORABLE_HEALTH_ATLASES = {
     ["UI-HUD-UnitFrame-Player-PortraitOn-Bar-Health"] = "UI-HUD-UnitFrame-Player-PortraitOn-Bar-Health-Status",
     ["UI-HUD-UnitFrame-Target-PortraitOn-Bar-Health"] = "UI-HUD-UnitFrame-Target-PortraitOn-Bar-Health-Status",
     ["UI-HUD-UnitFrame-TargetofTarget-PortraitOn-Bar-Health"] = "UI-HUD-UnitFrame-TargetofTarget-PortraitOn-Bar-Health-Status",
+    -- Native party frame portraits use the same pre-tinted green material.
+    -- The existing -Status variant is the Blizzard PartyFrameBarSegment
+    -- class-colorable fill (PartyFrameTemplates.xml).
+    ["UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health"] = "UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health-Status",
+    ["ui-hud-unitframe-party-portraiton-bar-health"] = "UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health-Status",
 }
+-- Vehicle art uses different mask/geometry. Preserve its original atlas and
+-- desaturate the material through the SAME guarded ownership system rather
+-- than swapping to an unverified colorable atlas.
+local CLASSIC_PARTY_DESAT_HEALTH_ATLASES = {
+    ["UI-HUD-UnitFrame-Party-PortraitOn-Vehicle-Bar-Health"] = true,
+}
+
 
 local function currentHealthTexture(bar)
     if not bar or type(bar.GetStatusBarTexture) ~= "function" then return nil end
@@ -956,7 +972,8 @@ function nativeHealthStyle.Prepare(bar)
         material.owner.owned[texture], nativeHealthStyle.materials[texture] = nil, nil
         material = nil
     end
-    if not material and not COLORABLE_HEALTH_ATLASES[atlas] then return false end
+    if not material and not COLORABLE_HEALTH_ATLASES[atlas]
+        and not CLASSIC_PARTY_DESAT_HEALTH_ATLASES[atlas] then return false end
     if not state then
         local color = readableColor(bar)
         if not color then return false end
@@ -979,7 +996,7 @@ function nativeHealthStyle.Prepare(bar)
         local found, info = pcall(C_Texture.GetAtlasInfo, material.colorable)
         validAtlas = found and not isSecret(info) and type(info) == "table"
     end
-    if (validAtlas or atlas == material.colorable) and type(texture.SetAtlas) == "function" then
+    if material.colorable and (validAtlas or atlas == material.colorable) and type(texture.SetAtlas) == "function" then
         if not restoreHealthSaturation(texture, material) then return false end
         if atlas ~= material.colorable then
             local observer = nativeHealthStyle.textureHooks[texture]
@@ -1178,6 +1195,36 @@ function nativeHealthStyle.Install(bar, unit)
         if not scheduled then observer.pending = false end
     end)
     if ok and not isSecret(result) and result ~= false then nativeHealthStyle.textureHooks[texture] = observer end
+end
+
+-- Native (non-raid-style) party bars require the same health-material
+-- preparation as Player/Target/Focus. Setting an RGB color on the baked-green
+-- party atlas alone leaves the visible bar green or muddy/olive. Keep class
+-- identity in ClassicPartyPresentation and only accept positively identified
+-- actual party/party-pet physical bar recipients here. This helper delegates
+-- texture ownership, tint and restoration to nativeHealthStyle rather than
+-- maintaining a second independent color system.
+if type(uiPrivate) == "table" then
+    uiPrivate.ApplyClassicPartyHealthColor = function(bar, sourceUnit, r, g, b)
+        if not bar or isSecret(bar) or isSecret(sourceUnit)
+            or type(sourceUnit) ~= "string"
+            or not (sourceUnit == "player" or sourceUnit:match("^party[1-4]$"))
+            or type(bar.SetStatusBarColor) ~= "function" then return false end
+        local actualUnit = readableUnitToken(bar.unit)
+        if not actualUnit then return false end
+        local appropriate = actualUnit == sourceUnit
+        if not appropriate and sourceUnit ~= "player" then
+            appropriate = actualUnit == sourceUnit:gsub("^party", "partypet")
+        elseif not appropriate then
+            appropriate = actualUnit == "pet"
+        end
+        if not appropriate then return false end
+        nativeHealthStyle.Install(bar, actualUnit)
+        -- Only claim a class color if its stock material is prepared safely.
+        -- If a protected recipient or texture is inaccessible, do not claim
+        -- that a SetStatusBarColor on the original green fill solved it.
+        return setHealthColor(bar, r, g, b, 1)
+    end
 end
 
 local derivedColorHooks = setmetatable({}, { __mode = "k" })
@@ -1544,19 +1591,58 @@ local function shrinkLevel(text)
     if applied and result ~= false then text._bjarkiUISized = true end
 end
 
+-- Forever's Camelot LevelBackgroundCircle contains the unwanted round
+-- badge/rim behind the separate LevelText. Blizzard can restore it through
+-- SetShown and SetAlpha as well as Show; a Show-only hook was insufficient.
 local hiddenLevelRings = setmetatable({}, { __mode = "k" })
 
-local function hideLevelRing(ring)
-    if not ring or not ring.Hide then return end
-    pcall(ring.Hide, ring)
+local function levelRingMethod(ring, name)
+    local ok, method = pcall(function() return ring[name] end)
+    if ok and not isSecret(method) and type(method) == "function" then return method end
+end
 
-    if hiddenLevelRings[ring] or type(hooksecurefunc) ~= "function" then return end
-    hiddenLevelRings[ring] = pcall(hooksecurefunc, ring, "Show", function(self)
-        if self._bjarkiUIHidingLevelRing then return end
-        self._bjarkiUIHidingLevelRing = true
-        pcall(self.Hide, self)
-        self._bjarkiUIHidingLevelRing = nil
-    end)
+local function hideLevelRing(ring)
+    if not ring or isSecret(ring) then return end
+    local forbidden = levelRingMethod(ring, "IsForbidden")
+    if forbidden then
+        local ok, value = pcall(forbidden, ring)
+        if not ok or isSecret(value) or value ~= false then return end
+    end
+    local state = hiddenLevelRings[ring]
+    if not state then
+        state = { hooks = {} }
+        hiddenLevelRings[ring] = state
+    end
+    local function enforce(self)
+        if state.applying then return end
+        state.applying = true
+        local getShown = levelRingMethod(self, "IsShown")
+        local shownOK, shown
+        if getShown then shownOK, shown = pcall(getShown, self) end
+        if not shownOK or isSecret(shown) or shown ~= false then
+            local hide = levelRingMethod(self, "Hide")
+            if hide then pcall(hide, self) end
+        end
+        -- Alpha is an independent native writer, so keep the visual badge
+        -- invisible even when a native SetShown/Hide cannot be honored.
+        local getAlpha = levelRingMethod(self, "GetAlpha")
+        local alphaOK, alpha
+        if getAlpha then alphaOK, alpha = pcall(getAlpha, self) end
+        if not alphaOK or isSecret(alpha) or alpha ~= 0 then
+            local setAlpha = levelRingMethod(self, "SetAlpha")
+            if setAlpha then pcall(setAlpha, self, 0) end
+        end
+        state.applying = nil
+    end
+    if type(hooksecurefunc) == "function" then
+        for _, method in ipairs({ "Show", "SetShown", "SetAlpha" }) do
+            if not state.hooks[method] and levelRingMethod(ring, method) then
+                local ok, result = pcall(hooksecurefunc, ring, method, enforce)
+                state.hooks[method] = ok and not isSecret(result) and result ~= false
+            end
+        end
+    end
+    enforce(ring)
 end
 
 local function applyPlainLevelRings()
@@ -1716,6 +1802,11 @@ local function anchorCombatText()
 end
 
 local HIGHLIGHT_SCALE = 0.25
+-- PetAttackModeTexture is the continuously pulsing, additive-red attack
+-- status, not the pet's actual threat flash. It can overlap the threat art.
+-- Halve only this persistent pet attack-mode pulse, without changing the
+-- 25% native threat flash shared by player, pet and party members.
+local PET_ATTACK_MODE_SCALE = 0.125
 local textureScaleGuards = setmetatable({}, { __mode = "k" })
 
 local function installVertexAlphaScale(texture, scale)
@@ -1751,6 +1842,20 @@ local function installVertexAlphaScale(texture, scale)
         if ok then apply(r, g, b, a) end
     end
 end
+-- Classic (non-raid-style) party frames expose one native threat flash
+-- each on their member/pet frames. Let their own pooled-frame presenter
+-- install the same 25%-intensity observer we use for Player/Target/Focus.
+-- One weak-key receipt per actual Texture prevents duplicate hooks after
+-- party frame release/reacquisition. Native threat and show/hide stay owned
+-- by Blizzard; this never edits the animation or its layout.
+if type(uiPrivate) == "table" then
+    uiPrivate.InstallClassicPartyThreatFlash = function(texture)
+        if texture and not isSecret(texture) then
+            installVertexAlphaScale(texture, HIGHLIGHT_SCALE)
+        end
+    end
+end
+
 -- The 70425 Camelot TargetFrame mixin anchors BOTH Target and Focus flash
 -- textures to TargetFrame.TargetFrameContainer. A live Focus warning can then
 -- look like a ghost Target after clearing Target. Repair only that exact binding.
@@ -1791,7 +1896,7 @@ local function installThreatAlphaHooks()
     installVertexAlphaScale(target and target.TargetFrameContainer and target.TargetFrameContainer.Flash, HIGHLIGHT_SCALE)
     installVertexAlphaScale(focus and focus.TargetFrameContainer and focus.TargetFrameContainer.Flash, HIGHLIGHT_SCALE)
     installVertexAlphaScale(_G.PetFrameFlash, HIGHLIGHT_SCALE)
-    installVertexAlphaScale(_G.PetAttackModeTexture, HIGHLIGHT_SCALE)
+    installVertexAlphaScale(_G.PetAttackModeTexture, PET_ATTACK_MODE_SCALE)
 end
 
 local playerRestFlashes = setmetatable({}, { __mode = "k" })
@@ -2787,6 +2892,7 @@ events:SetScript("OnEvent", function(_, event, unit)
         if unit == "Blizzard_ActionBar" then
             hideActionBarMacroLabels()
         elseif unit == "Blizzard_UnitFrame" then
+            applyPlainLevelRings()
             installNameplateClassNameColors()
             installDerivedFrameAlignment()
             applyAll()
@@ -2854,6 +2960,7 @@ events:SetScript("OnEvent", function(_, event, unit)
         anchorCombatText()
         applyAll()
     elseif event == "EDIT_MODE_LAYOUTS_UPDATED" then
+        applyPlainLevelRings()
         retryThreatAlphaHooks()
         hideActionBarMacroLabels()
         hideMinimapDayNightIndicator()
@@ -2864,6 +2971,7 @@ events:SetScript("OnEvent", function(_, event, unit)
         anchorCombatText()
         applyAll()
     elseif event == "UI_SCALE_CHANGED" or event == "DISPLAY_SIZE_CHANGED" then
+        applyPlainLevelRings()
         -- Refresh scale-dependent status fonts and incoming hit-text anchors.
         -- Combat deferrals retry on regeneration.
         for _, token in ipairs({ "player", "target", "focus", "targettarget", "focustarget", "pet" }) do
@@ -2874,6 +2982,7 @@ events:SetScript("OnEvent", function(_, event, unit)
     elseif event == "UNIT_PET" or event == "PET_UI_UPDATE" or event == "UNIT_DISPLAYPOWER" then
         installUnitStatusFonts("pet")
     elseif event == "PLAYER_REGEN_ENABLED" then
+        applyPlainLevelRings()
         raiseFramerateCounter()
         retryThreatAlphaHooks()
         installMicroMenuChildOffset()
@@ -2892,9 +3001,11 @@ events:SetScript("OnEvent", function(_, event, unit)
         applyAll()
 
     elseif event == "PLAYER_TARGET_CHANGED" then
+        applyPlainLevelRings()
         installDerivedFrameAlignment()
         applyUnit("target"); applyUnit("targettarget")
     elseif event == "PLAYER_FOCUS_CHANGED" then
+        applyPlainLevelRings()
         installDerivedFrameAlignment()
         applyUnit("focus"); applyUnit("focustarget")
     end

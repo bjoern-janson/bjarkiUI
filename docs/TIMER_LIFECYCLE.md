@@ -1,6 +1,6 @@
 # Timer lifecycle and diagnostics
 
-This guide describes the **0.2.335-cast-recovery-test** branch based on 0.2.334. The former cast text-mirror mode is historical; the action and aura paths remain unchanged. It traces the displayed timer through its native writer, addon hook, ownership and cleanup. It is not a claim of live-client correctness. [Module map](CODE_MAP.md) · [Tests](TESTING.md) · [Open live reports](../KNOWN_ISSUES.md)
+This guide describes the **0.2.346-static-action-digits-test** branch, preserving the prior v0.2.345 buff and visual behavior. The former cast text-mirror mode is historical; the action and aura paths remain unchanged. It traces the displayed timer through its native writer, addon hook, ownership and cleanup. It is not a claim of live-client correctness. [Module map](CODE_MAP.md) · [Tests](TESTING.md) · [Open live reports](../KNOWN_ISSUES.md)
 
 ## Four distinct timer paths
 
@@ -78,6 +78,26 @@ The .334 fast path reuses a complete prepared receipt only when:
 It then clears layout dirtiness without issuing glyph geometry writes. This is reuse of an existing layout, not a combat-time rebuild. Changed font/owner/layout, denied reads and incomplete preparation retain the guarded restoration/native fallback path. Safe lifecycle setup can prepare the changed geometry later.
 
 The 217-case [aura suite](../tests/aura-presentation.lua) includes **repeated native font and anchor writes preserve fixed buff digits in combat**. Its sequence models native `UpdateDuration` → `SetFontObject` → `SetPoint`, asserts fixed visible text and unchanged positions, counts geometry/font/parent setters, and verifies region reuse after combat. Companion cases retain actual-change, denial, partial-transfer and nested-write coverage. These checks do not establish the cause of live stuttering.
+
+## Buff numeral glyph calibration (v0.2.341 test build)
+
+An already-fixed FontString can still appear to wobble when the *visible ink* of narrow `1` and broad `8` is centered differently by Blizzard's proportional font. When `NativeDigitCells.layoutBuff` prepares a public, supported short-buff layout **out of combat**, it asks the previously implemented `ActionTimerSpacing.GetFixedTimerGlyphs` helper for optional font-specific, transparent-spacer glyph strings. The cache is bounded to 16 complete font/size/effective-scale/text-scale profiles. The mapping is attached to the existing physical buffer state and read only when writing its current integer and tenth; the decimal point remains native. No geometry setters, font measurements or timers run during the native per-frame duration update. A failed calibration leaves plain existing glyphs. A secret buff timer with no usable public identity remains under Blizzard's native formatting and may still show proportionally spaced text.
+
+This is a source-grounded **possible fix for ink wobble** in existing public fixed digit cells, not proof of the cause of every live wobble report. Verify by watching a known readable buff transition between `1.x` and `8.x` and around the ten-second handoff in-game. Capture `/buitimers` before a reload for non-fixed/native fallback samples.
+
+## Long readable buff text and fixed numeral advances
+
+The existing isolated three-glyph buff timer covers supported public times *below 10 seconds*. At **10 seconds or more**, `BuffPresentation` previously returned to Blizzard's original centered, proportional FontString. Changing numeral ink widths can appear as wobble even with the underlying label anchored.
+
+In v0.2.345, the existing `NativeDigitCells` prepared glyph map is also used for **positively readable** original stock timer strings. After Blizzard's current native `UpdateDuration` has written the string, `StabilizeBuffStockText` verifies its physical owner, unchanged preparation, public text and no active split digits; then it wraps ASCII numerals in validated transparent spacing. Existing unit suffixes, decimal punctuation, original font, positioning, alpha, duration source and update cadence remain unchanged. No independent timer, numeric duration conversion, new in-combat geometry, or hidden source label is added. Secret, markup-containing, forbidden and unsupported data stay untouched.
+
+The tradeoff is an additional cosmetic native `SetText` for *each supported long-duration native refresh*; local tests cannot measure the WoW client's performance or pixel stability. The split fixed-digit path remains the native-public under-10s presenter. A transition between different display formats may still change overall string width; this build primarily stabilizes digit advances within a format.
+
+## Action numeral ink alignment (v0.2.346)
+
+The six action glyph cells already have fixed physical CENTER anchors, but `NativeDigitCells.buildFormatters` used proportional literal characters for four numeric tracks. v0.2.346 obtains the supported, currently native-font-width-calibrated glyph map from `ActionTimerSpacing.GetFixedTimerGlyphs`, then builds and validates four extra native numeric rule formatters with the same breakpoints and digits. These bind to the existing opaque duration objects, without Lua clock arithmetic or new update loops. The decimal separator and existing suffix formatter are unchanged. When style/scale changes, the presenter releases to Blizzard stock before switching its numeral formatter. A valid naturally tabular font retains its original formatters; unsupported or secret font reads and rejected formatter rules keep the existing native fallback.
+
+The profile cache is bounded by the underlying glyph-map calibration cache; one set of native formatters is reused across similarly styled buttons. Offline formatting checks establish output equivalence and failure-to-native policy but **not in-client visual glyph centering or performance**.
 
 ## Reading /buitimers
 
