@@ -149,7 +149,12 @@ do
     combat=true;assert(digits(label(15,.8))==nil and measures==initial);combat=false
     tallMarkup=true;assert(digits(label(15,.8))==nil,"cast markup changed native line height")
     tallMarkup=false;private.RetryFixedActionFormatters()
-    assert(digits(label(15,.8)),"new safe refresh did not recover a cast style")
+    local glyphsB=assert(digits(label(15,.8)),"new safe refresh did not recover a cast style")
+    -- Buff and cast sources often use different fonts. Alternating between
+    -- already calibrated styles must not rerun the native font measurements.
+    local cachedMeasures=measures
+    assert(digits(label(14,.75))==glyphs and digits(label(15,.8))==glyphsB
+        and measures==cachedMeasures,"alternating native font profiles recalibrated")
     C_StringUtil=savedUtil
     outlined=true
     local outlinedGlyphs=assert(digits(label(17,.75)),"outlined cast font lost its fixed digits")
