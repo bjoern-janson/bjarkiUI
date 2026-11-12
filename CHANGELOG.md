@@ -2,6 +2,13 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.349-party-aggro-visuals-test — party threat parity, less aggressive pet attack mode
+
+- Native `PartyMemberFrame.Flash` and `PartyMemberPetFrame.Flash` use the **same 25%-strength native threat-flash treatment** already applied to Player/Target/Focus. A shared private callback reuses the existing weak-key alpha observer and retains one hook per physical pooled texture across group, vehicle and Edit Mode updates.
+- The continuously pulsing, additive-red `PetAttackModeTexture` on **the player's pet** is a separate *attacking* indicator, not the actual pet threat frame. Reduce only that pulse to **12.5% native strength** (formerly 25% in bjarkiUI); keep the genuine `PetFrameFlash` at 25%, matching the player.
+- No new threat calculations, visibility toggles, new event loop, CVar, font, frame geometry or replacement art. Existing class health fills, party colors, Soft Dark, cooldowns and ZZZ remain unchanged.
+- A new test suite executes the existing native alpha routine and the classic party module, verifying the correct textures are styled once, native pulses scale without multiplying, attack mode has distinct lower alpha, and unrelated status/icon textures remain untouched. Live WoW: Forever visual approval remains outstanding.
+
 ## 0.2.348-classic-party-health-material-test — class color requires the health material too
 
 - In-game screenshot shows **green non-raid party health bars** despite v0.2.347's attempts to set class RGB. The underlying `UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health` atlas is precolored green; simple vertex/status-bar tinting is insufficient (the same issue previously fixed on Player/Target/Focus).

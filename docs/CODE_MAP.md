@@ -1,6 +1,6 @@
 # bjarkiUI code map
 
-Current test branch: **0.2.348-classic-party-health-material-test**. Start with the physical region that displays the symptom, then follow its native writer, addon observer, ownership record and cleanup. [Timer lifecycle detail](TIMER_LIFECYCLE.md) · [Verification commands and suite map](TESTING.md)
+Current test branch: **0.2.349-party-aggro-visuals-test**. Start with the physical region that displays the symptom, then follow its native writer, addon observer, ownership record and cleanup. [Timer lifecycle detail](TIMER_LIFECYCLE.md) · [Verification commands and suite map](TESTING.md)
 
 ## Runtime load order
 
@@ -13,7 +13,7 @@ The [default manifest](../bjarkiUI.toc) and [Camelot manifest](../bjarkiUI_Camel
 | 3 | [PartyOrder.lua](../PartyOrder.lua) | Vertical compact-party order, native layout observation and partial-write rollback. |
 | 4 | [PartyPresentation.lua](../PartyPresentation.lua) | Compact party names/health class colors and native numeric LoL-style status shadows, without altering native layout or text. |
 | 5 | [SoftDark.lua](../SoftDark.lua) | Native artwork tinting, ownership-aware restoration and `/bdark`. |
-| 6 | [ClassicPartyPresentation.lua](../ClassicPartyPresentation.lua) | Native non-raid party member class names/health via `nativeHealthStyle` colorable fills, owner-colored pet health, LoL status text and Soft Dark chrome, excluding compact/raid frames. |
+| 6 | [ClassicPartyPresentation.lua](../ClassicPartyPresentation.lua) | Native non-raid party member class names/health via `nativeHealthStyle` colorable fills, owner-colored pet health, shared 25%-alpha native threat flashes, LoL status text and Soft Dark chrome, excluding compact/raid frames. |
 | 7 | [TrackedBuffSeconds.lua](../TrackedBuffSeconds.lua) | Native ten-second decimal threshold for active tracked-buff cooldown widgets. |
 | 8 | [ActionTimerSpacing.lua](../ActionTimerSpacing.lua) | Measures native font glyphs, verifies action formatters and prepares a bounded 16-style map of optional fixed-width glyph text for buff digit cells. |
 | 9 | [CooldownSeconds.lua](../CooldownSeconds.lua) | Installs native action countdown formatting; observes settings and safe bar lifecycle events. |

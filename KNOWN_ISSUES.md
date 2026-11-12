@@ -1,6 +1,10 @@
 # Known issues and bugs
 
-Current test branch is **0.2.348-classic-party-health-material-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+Current test branch is **0.2.349-party-aggro-visuals-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+
+## 0.2.349 classic party threat flash and player pet attack-mode pulse — visual verification pending
+
+The non-raid-style party `Flash` and attached `PetFrame.Flash` textures previously had no bjarkiUI alpha scaling, unlike the Player's 25% intensity. They now share the native vertex-alpha observer. The player's own pet has two visually overlapping red states: true threat (`PetFrameFlash`, still 25%) and its continuously animated attack-mode `PetAttackModeTexture` (new 12.5% intensity, down from 25%). These are independent; no threat/event state is altered. The exact overly-bright in-game case was not identified by screenshot, so visually confirm which indicator appears too strong.
 
 ## 0.2.348 non-raid-style health still green — material-level repair (live check pending)
 
