@@ -32,3 +32,7 @@ The user rejected the animated Z appearance after .351 and explicitly requested 
 ## .353 classic-party visual follow-up
 
 The user's party-frame screenshot shows the crown touching/crowding the smaller secondary portrait. Increase only the classic-party native horizontal nudge from +2 to +4 UI units, preserving native height and the existing membership/permission/ownership checks. This adds clearance toward the name/health bars and keeps the .352 rested-Z removal. The adjustment is calibrated from the screenshot, not a claim of live pixel verification.
+
+## .354 remove classic-party faction badges
+
+Build from the user-approved .353 crown spacing. The latest request removes the small faction shields from classic-party portraits. Hide only PartyMemberOverlay.PVPIcon, which native UpdatePvPStatus reuses for Alliance, Horde and FFA. Reuse current pool discovery and events, prepare Show/SetShown hooks outside combat, and let installed observers apply guarded cosmetic Hide during combat. Recheck current ownership and non-raid/public/nonforbidden permission on every callback. Avoid persistent alpha state, which would require extra restoration on recycled icons. Keep actual PvP state, atlas selection and other icons native.

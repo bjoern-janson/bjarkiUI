@@ -2,6 +2,13 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.354-hide-party-faction-test — remove classic-party faction badges
+
+- Hide the exact native `PartyMemberOverlay.PVPIcon` on active classic-party members. Blizzard uses this one texture for Alliance, Horde and free-for-all PvP badges.
+- Keep one Show/SetShown observer per physical texture. Native UpdatePvPStatus and UNIT_FACTION redraws remain hidden, including combat redraws after safe hook preparation. Preserve native atlas selection and actual PvP state.
+- Recheck the active pool lease, current texture path, nonforbidden/public access and positive non-raid mode. Released, replaced, nonparty and raid icons receive no suppression callbacks. Refused calls/hook installation retry through existing lifecycle refreshes.
+- Reuse ClassicPartyPresentation discovery and events; no additional event frame, polling, alpha state, artwork or geometry writes. Keep the approved .353 crown spacing and rested-Z removal.
+
 ## 0.2.353-party-crown-spacing-test — classic party crown clearance
 
 - The live party-frame screenshot shows the leader crown crowded against the secondary portrait. Increase the classic-party horizontal adjustment from native X+2 to X+4: two additional UI units toward the bars.

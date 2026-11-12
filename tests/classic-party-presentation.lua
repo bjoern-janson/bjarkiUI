@@ -4,9 +4,11 @@ local function eq(got,expected,reason)
     assert(got==expected,(reason or 'mismatch')..': '..tostring(got)..' /= '..tostring(expected))
 end
 local function fixture()
-    local env={events={},hooks={},styles={},tints={},active={},colors={}}
+    local env={events={},hooks={},styles={},tints={},active={},colors={},combat=false,raid=false,hooksByObject={},reject={}}
     setmetatable(env,{__index=_G});env._G=env
     env.issecretvalue=function(v)return type(v)=='table' and v.secret==true end
+    env.InCombatLockdown=function()return env.combat end
+    env.IsInRaid=function()return env.raid end
     env.CreateFrame=function()
         local frame={registered={},callbacks={}}
         function frame:RegisterEvent(e)self.registered[e]=true end
@@ -31,6 +33,17 @@ local function fixture()
         end
         return n
     end
+    local function badge()
+        local t={shown=true,atlas='Alliance',hides=0}
+        function t:IsForbidden()return self.forbidden or false end
+        function t:GetObjectType()return 'Texture' end
+        function t:IsShown()return self.shown end
+        function t:Show()self.shown=true end
+        function t:SetShown(value)self.shown=value end
+        function t:Hide()self.hides=self.hides+1;if self.denied then return false end;self.shown=false end
+        function t:SetAtlas(value)self.atlas=value end
+        return t
+    end
     local function member(token)
         local health={CenterText=shadowText(),LeftText=shadowText(),RightText=shadowText()}
         health.HealthBar=bar()
@@ -39,9 +52,15 @@ local function fixture()
         health.HealthBar.unit=token
         pet.HealthBar.unit=token:gsub('^party','partypet')
         local f={unitToken=token,unit=token,Name=label(),HealthBarContainer=health,
-            ManaBar=mana,PetFrame=pet,Texture={kind='Texture'},VehicleTexture={kind='Texture'}}
+            ManaBar=mana,PetFrame=pet,Texture={kind='Texture'},VehicleTexture={kind='Texture'},
+            PartyMemberOverlay={PVPIcon=badge(),LeaderIcon=badge(),GuideIcon=badge()}}
         function f:GetUnit()return self.overrideUnit or self.unit end
+        function f:UpdatePvPStatus()
+            self.PartyMemberOverlay.PVPIcon:SetAtlas(self.faction or 'Alliance')
+            self.PartyMemberOverlay.PVPIcon:Show()
+        end
         function f:UpdateMember()
+            self:UpdatePvPStatus()
             self.Name:SetTextColor(1,1,0)
             self.HealthBarContainer.HealthBar:SetStatusBarColor(0,1,0)
             self.PetFrame.HealthBar:SetStatusBarColor(0,1,0)
@@ -64,7 +83,10 @@ local function fixture()
     for k,c in pairs(rgb)do env.RAID_CLASS_COLORS[k]={r=c[1],g=c[2],b=c[3]}end
     env.hooksecurefunc=function(obj,name,fn)
         if type(obj)=='string' then fn=name;name=obj;obj=env end
+        if env.reject[name]then error('hook refused')end
         local old=assert(obj[name])
+        env.hooksByObject[obj]=env.hooksByObject[obj]or {}
+        env.hooksByObject[obj][name]=(env.hooksByObject[obj][name]or 0)+1
         obj[name]=function(...)
             local result=old(...)
             fn(...)
@@ -226,5 +248,64 @@ end)
 test('Edit Mode preview may show player class in a missing party slot',function()
     local e=make();e.pool.frames[1].unit='player';e:load()
     eq(e.pool.frames[1].Name.color[1],1);eq(e.pool.frames[1].Name.color[2],.49)
+end)
+test('only native faction badges are hidden on active classic party members',function()
+    local e=make();e:load()
+    for _,f in ipairs(e.pool.frames)do
+        eq(f.PartyMemberOverlay.PVPIcon.shown,false)
+        eq(f.PartyMemberOverlay.PVPIcon.atlas,'Alliance')
+        eq(f.PartyMemberOverlay.LeaderIcon.shown,true);eq(f.PartyMemberOverlay.GuideIcon.shown,true)
+    end
+    local other=e.makeMember('party1');e.UnitFrame_SetUnit(other,'party1')
+    eq(other.PartyMemberOverlay.PVPIcon.shown,true)
+end)
+test('native faction atlas and visibility refreshes cannot revive the badge',function()
+    local e=make();e:load();local f=e.pool.frames[1];local icon=f.PartyMemberOverlay.PVPIcon
+    for _,faction in ipairs({'Alliance','Horde','FFA'})do
+        f.faction=faction;f:UpdatePvPStatus();eq(icon.shown,false);eq(icon.atlas,faction)
+    end
+    icon:SetShown(true);eq(icon.shown,false)
+    f:UpdateMember();eq(icon.shown,false)
+end)
+test('released and replaced faction badges stop receiving suppression',function()
+    local e=make();e:load();local f=e.pool.frames[1];local icon=f.PartyMemberOverlay.PVPIcon
+    e.pool.frames={};e.group:UpdatePartyFrames();icon:Show();eq(icon.shown,true)
+    e.pool.frames={f};e.group:UpdatePartyFrames();eq(icon.shown,false)
+    eq(e.hooksByObject[icon].Show,1);eq(e.hooksByObject[icon].SetShown,1)
+    f.PartyMemberOverlay.PVPIcon=e.makeMember('party1').PartyMemberOverlay.PVPIcon
+    f:UpdateMember();eq(f.PartyMemberOverlay.PVPIcon.shown,false)
+    icon:Show();eq(icon.shown,true)
+    e.UnitFrame_SetUnit(f,'raid1');f.PartyMemberOverlay.PVPIcon:Show()
+    eq(f.PartyMemberOverlay.PVPIcon.shown,true)
+    e.UnitFrame_SetUnit(f,'party1');e.raid=true
+    f.PartyMemberOverlay.PVPIcon:Show();eq(f.PartyMemberOverlay.PVPIcon.shown,true)
+end)
+test('faction suppression requires positive safe non-raid permission',function()
+    for _,mode in ipairs({'combat','raid','unknownCombat','unknownRaid','secretRaid','forbidden','secret'})do
+        local e=make();local icon=e.pool.frames[1].PartyMemberOverlay.PVPIcon
+        if mode=='combat'then e.combat=true
+        elseif mode=='raid'then e.raid=true
+        elseif mode=='unknownCombat'then e.combat=nil
+        elseif mode=='unknownRaid'then e.raid=nil
+        elseif mode=='secretRaid'then e.raid={secret=true}
+        elseif mode=='forbidden'then icon.forbidden=true
+        else icon.secret=true end
+        e:load();eq(icon.hides,0,mode)
+    end
+    local e=make();e.combat=true;e:load();local icon=e.pool.frames[1].PartyMemberOverlay.PVPIcon
+    e.combat=false;e:fire('PLAYER_REGEN_ENABLED');eq(icon.shown,false)
+    e.combat=true;icon:Show();eq(icon.shown,false)
+    icon:SetShown(true);eq(icon.shown,false)
+    e.combat=false;e:fire('PLAYER_REGEN_ENABLED');eq(icon.shown,false)
+end)
+test('faction hide and hook refusals retry without duplicate hidden writes',function()
+    local e=make();local icon=e.pool.frames[1].PartyMemberOverlay.PVPIcon
+    icon.denied=true;e.reject.SetShown=true;e:load();eq(icon.shown,true)
+    icon.denied=false;e.reject.SetShown=nil;e:fire('GROUP_ROSTER_UPDATE');eq(icon.shown,false)
+    eq(e.hooksByObject[icon].Show,1);eq(e.hooksByObject[icon].SetShown,1)
+    local hides=icon.hides
+    for i=1,8 do e.group:UpdatePartyFrames()end
+    eq(icon.hides,hides)
+    icon:SetShown(true);eq(icon.shown,false)
 end)
 print('Classic party presentation: '..passed..' cases passed')
