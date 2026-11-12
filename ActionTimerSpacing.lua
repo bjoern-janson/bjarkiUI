@@ -279,17 +279,28 @@ local function readableStyle(label)
     return string.format("%s\031%s\031%.17g\031%.17g\031%.17g",file,flags or "",size,scale,textScale),file,size,flags,scale,textScale
 end
 
--- There is one physical player cast-time label. Replacement labels with
--- the same font and scale can reuse this table on consecutive casts.
-local castStyleKey,castGlyphs,castAttempt
+-- Buffs can use two or more native fonts, so one global "last style" entry
+-- would repeatedly recalibrate alternating buff icons. Cache a bounded set of
+-- proven glyph maps by the *native* font, effective scale and text scale.
+-- All measurement is outside combat and only on style preparation, never ticks.
+local fixedGlyphProfiles,fixedGlyphKeys,fixedGlyphSlot={},{},1
 function private.GetFixedTimerGlyphs(label)
     local key,file,size,flags,scale,textScale=readableStyle(label)
     if not key then return nil end
-    if key==castStyleKey and (castGlyphs or castAttempt==retryEpoch) then return castGlyphs end
+    local entry=fixedGlyphProfiles[key]
+    if entry and (entry.glyphs or entry.attempt==retryEpoch) then return entry.glyphs end
+    if not entry then
+        if fixedGlyphKeys[fixedGlyphSlot] then
+            fixedGlyphProfiles[fixedGlyphKeys[fixedGlyphSlot]]=nil
+        end
+        fixedGlyphKeys[fixedGlyphSlot]=key
+        fixedGlyphSlot=fixedGlyphSlot%16+1
+        entry={}
+        fixedGlyphProfiles[key]=entry
+    end
     local ok,glyphs=pcall(measureGlyphs,file,size,flags,scale,textScale)
-    castStyleKey,castAttempt=key,retryEpoch
-    castGlyphs=ok and glyphs or nil
-    return castGlyphs
+    entry.attempt,entry.glyphs=retryEpoch,ok and glyphs or nil
+    return entry.glyphs
 end
 
 local function fitsWidget(widget,label,scale,required)

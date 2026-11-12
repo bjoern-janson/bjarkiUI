@@ -1,6 +1,6 @@
 # Testing and packaging bjarkiUI
 
-Current test target: **0.2.335-cast-recovery-test**, **13 manifest-loaded runtime modules**, and **27 top-level Lua scripts**: 26 behavioral suites plus `tests/syntax.lua`. Run both Lua 5.1 and Lua 5.4. The current aura suite reports **217 cases**; suite/assertion counts describe fixture coverage, not a percentage of live-client behavior covered.
+Current test target: **0.2.350-portrait-indicators-test**, **16 manifest-loaded runtime modules**, and **36 top-level Lua scripts**: 35 behavioral suites plus `tests/syntax.lua`. Run both Lua 5.1 and Lua 5.4. The current aura suite reports **219 cases**; suite/assertion counts describe fixture coverage, not a percentage of live-client behavior covered.
 
 ## Portable verification
 
@@ -8,7 +8,7 @@ Run from the repository root with Python 3.10 or newer and native Lua/luac execu
 
 ```sh
 python tools/verify.py
-python tools/verify.py --output ../bjarkiUI-0.2.335-cast-recovery-test.zip
+python tools/verify.py --output ../bjarkiUI-0.2.350-Crowns-and-Rested.zip
 ```
 
 The default uses Lua 5.1 and 5.4 with their matching compilers. `--output` is an optional ZIP filename **outside the checkout**, not a report path. Its parent directory must already exist and the file must be new. Packaging occurs only after verification succeeds. The [CI workflow](../.github/workflows/package-addon.yml) uses native interpreters and the same [verification tool](../tools/verify.py).
@@ -47,19 +47,19 @@ Substitute another top-level script for a focused regression. `tests/syntax.lua`
 
 | Route | Current scripts | What to inspect |
 | --- | --- | --- |
-| Action timers | [cooldown-seconds.lua](../tests/cooldown-seconds.lua), [action-timer-spacing.lua](../tests/action-timer-spacing.lua), [native-digit-cells.lua](../tests/native-digit-cells.lua) | Exact thresholds, native formatter support, fixed cells, font/style refresh, minimum/GCD gates, preference changes, duration binding and stock restoration. |
+| Action timers | [cooldown-seconds.lua](../tests/cooldown-seconds.lua), [action-timer-spacing.lua](../tests/action-timer-spacing.lua), [native-digit-cells.lua](../tests/native-digit-cells.lua), [static-action-glyphs.lua](../tests/static-action-glyphs.lua) | Exact thresholds, native formatter support, fixed cells, font/style refresh, minimum/GCD gates, preference changes, duration binding and stock restoration. |
 | Player aura timers | [aura-presentation.lua](../tests/aura-presentation.lua) | Public/opaque timing, assignment and expiry, native update order, font/layout changes, combat, physical owner changes, nested writes and fallback text. |
 | Player cast timers | [castbar-digit-cells.lua](../tests/castbar-digit-cells.lua) | Frozen 0.2.309 native duration-to-text bindings, unmodified Blizzard source text, fixed positions and thresholds, casts/channels, permission refusals, and rejected alpha handoffs returning native text. |
 | Tracked buffs and decoration | [presentation.lua](../tests/presentation.lua), [icon-skin.lua](../tests/icon-skin.lua) | Active pool iteration, item/widget reuse, threshold resets, masks/rims, external writes and restoration. |
 | Health/name ownership | [health-color-observer.lua](../tests/health-color-observer.lua), [name-color-ownership.lua](../tests/name-color-ownership.lua) | Native color observation, recipient changes, partial restoration, stale ownership and combat-exit reconciliation. |
 | Unit status typography | [status-style.lua](../tests/status-style.lua), [status-scale.lua](../tests/status-scale.lua), [status-combat.lua](../tests/status-combat.lua), [pet-status-text.lua](../tests/pet-status-text.lua) | Current native font, shadow/style, scale refresh and pet presentation. |
 | Hit-text placement | [hit-text-lifecycle.lua](../tests/hit-text-lifecycle.lua), [hit-text-write-recovery.lua](../tests/hit-text-write-recovery.lua) | Geometry, lifecycle refresh and refused setter recovery. |
-| Party order | [party-order-recovery.lua](../tests/party-order-recovery.lua) | Changed anchors only, dependent-anchor rollback, denied permission, roster/pet changes and later repair. |
-| Cosmetic frame labels | [frame-label-tweaks.lua](../tests/frame-label-tweaks.lua), [combat-icon-level-mirror.lua](../tests/combat-icon-level-mirror.lua), [combat-icon-portrait-anchor.lua](../tests/combat-icon-portrait-anchor.lua) | Native geometry, write receipts, float precision, combat-icon alignment and count-font changes. |
+| Party order | [party-order-recovery.lua](../tests/party-order-recovery.lua), [party-presentation.lua](../tests/party-presentation.lua) | Changed anchors only, dependent-anchor rollback, denied permission, roster/pet changes and later repair. |
+| Cosmetic frame labels | [frame-label-tweaks.lua](../tests/frame-label-tweaks.lua), [leader-crown-nudge.lua](../tests/leader-crown-nudge.lua), [level-ring-suppression.lua](../tests/level-ring-suppression.lua), [rested-indicator-mirror.lua](../tests/rested-indicator-mirror.lua), [combat-icon-level-mirror.lua](../tests/combat-icon-level-mirror.lua), [combat-icon-portrait-anchor.lua](../tests/combat-icon-portrait-anchor.lua) | Native geometry, write receipts, float precision, combat-icon alignment and count-font changes. |
 | Soft Dark | [softdark-restore.lua](../tests/softdark-restore.lua), [softdark-discovery-handoff.lua](../tests/softdark-discovery-handoff.lua), [softdark-callback-recovery.lua](../tests/softdark-callback-recovery.lua) | Discovery, ownership transfer, native precision, refused restoration and incomplete callback registration. |
 | Common lifecycle | [lifecycle.lua](../tests/lifecycle.lua), [hardening.lua](../tests/hardening.lua), [initialization-recovery.lua](../tests/initialization-recovery.lua) | Native hook retry, failed initialization, inaccessible/protected paths and broader module integration. |
 | Retired aura route | [unit-aura-retirement.lua](../tests/unit-aura-retirement.lua) | Custom Target/Focus aura rendering remains inactive. |
-| Manifest syntax | [syntax.lua](../tests/syntax.lua) | All 13 runtime modules parse in the selected Lua version. |
+| Manifest syntax | [syntax.lua](../tests/syntax.lua) | All 16 runtime modules parse in the selected Lua version. |
 
 Tests run each script in its own interpreter invocation. Do not turn the archived snapshot into an additional current-suite glob: it targets different source behavior.
 
