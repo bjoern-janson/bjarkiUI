@@ -1,6 +1,10 @@
 # Known issues and bugs
 
-Current test branch is **0.2.346-static-action-digits-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+Current test branch is **0.2.347-classic-party-presentation-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+
+## 0.2.347 non-raid-style party presentation (in-game validation pending)
+
+A screenshot of Blizzard's **non-raid-style** party members showed default gold artwork, non-class-colored green health bars and native status text. Previous .342 compact-party presentation only covered raid-style members. New .347 code discovers the separate real PartyMemberFramePool, uses native name/bar class colors, existing LoL numeric shadow treatment, and Soft Dark's reversible party/vehicle/pet chrome tint. The client still needs visual checks for normal party, vehicle, party-pet, preview, combat and swapping party-style layouts. No native status contents or frame geometry are changed.
 
 ## 0.2.346 action-bar fixed digit ink (live confirmation pending)
 

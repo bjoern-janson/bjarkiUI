@@ -2,6 +2,15 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.347-classic-party-presentation-test — native party frame visual parity
+
+- Extend styling to **non-raid-style party frames**. These are dynamically pooled `PartyFrame.PartyMemberFramePool` members, not the compact `CompactPartyFrame.memberUnitFrames` used for raid-style party.
+- New isolated `ClassicPartyPresentation.lua` applies Blizzard class RGB to native party names and health bars and to attached pet-health fills, reasserting after the original setters, vehicle/party changes and pool reuse. Non-party frames are excluded. Unknown/secret/forbidden units remain native.
+- Reuse the existing `installStatusFont` presentation for health/power Center/Left/Right and known numeric status regions. Native text, values, fonts, size, positioning and power colors remain unchanged; outline-free black one-screen-pixel shadow matches the primary frames.
+- Expand the existing reversible Soft Dark pass to **decorative native party/vehicle/pet artwork only**, retaining original atlas, visibility and undo ownership. Do not darken portraits, debuff/PvP/leader icons, health fills, masks, overlay statuses, or aura art.
+- No new options, new OnUpdate, frame replacements, saved Edit Mode layout or per-update generic UI tree scans. The existing 15 runtime modules and timers are otherwise unchanged. Full Lua 5.1/5.4 CI and in-game visual parity are distinct validation.
+- Two new focused tests cover native pool changes, class redraws, nonparty isolation, status treatment, theme opt-out, combat deferral and narrow tint scope.
+
 ## 0.2.346-static-action-digits-test — stabilize ink inside action-bar numeral cells
 
 - The six native action text bindings had fixed positions, but four of them still rendered ordinary proportional single-glyph numerals. The visible ink of narrow `1` and broad `8` could shift even though their FontStrings never moved.

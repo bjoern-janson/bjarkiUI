@@ -1,6 +1,6 @@
 # bjarkiUI
 
-**0.2.346-static-action-digits-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
+**0.2.347-classic-party-presentation-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
 
 ## Install
 
@@ -17,6 +17,8 @@ Version **0.2.340-leader-crown-nudge-test** nudges only the native party-leader 
 **v0.2.345 readable long buff timers:** The previous three fixed glyphs covered only public timers below 10 seconds. At 10 seconds and above, buffs used Blizzard's original proportional text, allowing visible digits to shift. This build applies the existing native-font equal-advance glyph map to *readable stock buff text* (seconds, minutes, hours and days), while preserving Blizzard's time formats, font, color, anchor, visibility and clock. Secret or unsupported values remain native; no extra timer or setting is introduced. Also includes the requested resting ZZZ X 49 → 48 adjustment.
 
 **v0.2.346 action timer numerals:** The six action binding positions were fixed, but four individual numeral tracks (whole/tenths, seconds tens/ones) still printed proportional native digits. This build applies the existing validated font/scale-specific transparent-spacing map to those four **native duration-text binding formatters**. Their physical cell positions, original Blizzard fonts, colors, timer lengths, swipes, GCD filtering, and minute/hour units remain unchanged. A rejected/unsupported markup rule falls back to the original fixed-cell or native formatter; no independent timer is added. [Changelog](CHANGELOG.md)
+
+**v0.2.347 native (non-raid-style) party frames:** Extends the existing bjarkiUI look to Blizzard's classic pooled `PartyFrame` members, separate from the compact raid-style party renderer. Each party member receives class-colored native names, health-bar fills and owner-colored pet health, the same outline-free LoL-style shadow treatment on native health/power status numbers, and Soft Dark's reversible 60% tint on decorative party/vehicle/pet frame art. Portraits, health/power values, icons, power colors, aura frames, UI layout and settings remain native. No in-game options or custom frame implementations.
 
 ## Current behavior
 
@@ -58,7 +60,7 @@ For action/cast reports, capture while the affected cooldown or cast is active. 
 
 ## Development and verification
 
-Start with [AGENTS.md](AGENTS.md), then the [code map](docs/CODE_MAP.md). The two manifests load **15 runtime modules**. Current verification runs **33 top-level Lua scripts** (32 behavioral suites plus the manifest syntax script) under Lua 5.1 and Lua 5.4; the aura suite contains 219 cases. See [testing and packaging](docs/TESTING.md) for commands and the boundary between offline and live evidence.
+Start with [AGENTS.md](AGENTS.md), then the [code map](docs/CODE_MAP.md). The two manifests load **16 runtime modules**. Current verification runs **35 top-level Lua scripts** (34 behavioral suites plus the manifest syntax script) under Lua 5.1 and Lua 5.4; the aura suite contains 219 cases. See [testing and packaging](docs/TESTING.md) for commands and the boundary between offline and live evidence.
 
 - [Timer sources, native writers, hooks and cleanup](docs/TIMER_LIFECYCLE.md)
 - [Default manifest](bjarkiUI.toc) · [Camelot manifest](bjarkiUI_Camelot.toc)
