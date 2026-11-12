@@ -36,6 +36,8 @@ local function fixture()
         health.HealthBar=bar()
         local mana={CenterText=shadowText(),LeftText=shadowText(),RightText=shadowText(),color={0,0,1}}
         local pet={Texture={kind='Texture'},HealthBar=bar()}
+        health.HealthBar.unit=token
+        pet.HealthBar.unit=token:gsub('^party','partypet')
         local f={unitToken=token,unit=token,Name=label(),HealthBarContainer=health,
             ManaBar=mana,PetFrame=pet,Texture={kind='Texture'},VehicleTexture={kind='Texture'}}
         function f:GetUnit()return self.overrideUnit or self.unit end
@@ -100,6 +102,16 @@ local function make()
         f('bjarkiUI',{
             InstallCompactStatusFont=function(text)self.styles[text]=(self.styles[text]or 0)+1 end,
             TintClassicPartyChrome=function(frame)self.tints[frame]=(self.tints[frame]or 0)+1 end,
+            -- Model the existing nativeHealthStyle material preparation. A
+            -- SetStatusBarColor alone would leave the baked-green fill, so
+            -- this test must observe a material treatment as well as RGB.
+            ApplyClassicPartyHealthColor=function(bar,owner,r,g,b)
+                local actual=bar.unit
+                if actual~=owner and actual~=owner:gsub('^party','partypet')then return false end
+                bar.material='class-colorable'
+                bar:SetStatusBarColor(r,g,b,1)
+                return true
+            end,
         })
     end
     return e
@@ -117,6 +129,8 @@ test('native pooled party1-4 receive class names health and pet fills',function(
             eq(frame.PetFrame.HealthBar.color[i],rgb[i])
         end
         eq(frame.ManaBar.color[3],1)
+        eq(frame.HealthBarContainer.HealthBar.material,'class-colorable','real health material must be colorable')
+        eq(frame.PetFrame.HealthBar.material,'class-colorable','pet-health material must be colorable')
         assert(e.tints[frame]>=1)
     end
 end)
@@ -125,6 +139,16 @@ test('native name/health setters after initial style cannot restore stale colors
     f.Name:SetTextColor(1,1,0);f.HealthBarContainer.HealthBar:SetStatusBarColor(0,1,0)
     eq(f.Name.color[1],.2);eq(f.HealthBarContainer.HealthBar.color[3],1)
     f:UpdateMember();eq(f.Name.color[1],.2)
+end)
+test('class RGB alone is insufficient: real health material must also be prepared',function()
+    local e=make()
+    local frame=e.pool.frames[1]
+    frame.HealthBarContainer.HealthBar:SetStatusBarColor(.2,.7,1)
+    eq(frame.HealthBarContainer.HealthBar.material,nil,'RGB setter cannot change green atlas')
+    e:load()
+    eq(frame.HealthBarContainer.HealthBar.material,'class-colorable')
+    eq(frame.PetFrame.HealthBar.material,'class-colorable')
+    eq(frame.HealthBarContainer.HealthBar.color[3],1)
 end)
 test('the LoL shadow only styles known native numeric regions',function()
     local e=make();e:load()
