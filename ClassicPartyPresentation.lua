@@ -1,6 +1,7 @@
 -- Native (non-raid-style) PartyFrame member presentation.
 -- Reuse bjarkiUI's class colors, LoL-like numeric shadows and Soft Dark.
--- No custom frame, font, options, OnUpdate, status values, or anchor changes.
+-- No custom frame, font, options, OnUpdate or status values. Only the native
+-- leader crown receives the small, guarded FrameLabelTweaks geometry shift.
 local _, uiPrivate = ...
 local members = setmetatable({}, { __mode = "k" })
 local activeMembers = setmetatable({}, { __mode = "k" })
@@ -155,6 +156,10 @@ local function refresh(frame)
     styleNumeric(frame)
     styleThreatFlashes(frame)
     darkChrome(frame)
+    -- The crown helper loads later in the TOC. Existing login/pool lifecycle
+    -- refreshes discover it without another event frame or polling loop.
+    local crown = field(uiPrivate, "InstallClassicPartyLeaderCrown")
+    if type(crown) == "function" then pcall(crown, frame, memberUnit) end
 end
 local function postHook(object, name, callback, state)
     if state[name] or type(hooksecurefunc) ~= "function" or not method(object, name) then return end

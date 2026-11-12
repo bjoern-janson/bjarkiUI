@@ -1,6 +1,6 @@
 # bjarkiUI code map
 
-Current test branch: **0.2.349-party-aggro-visuals-test**. Start with the physical region that displays the symptom, then follow its native writer, addon observer, ownership record and cleanup. [Timer lifecycle detail](TIMER_LIFECYCLE.md) · [Verification commands and suite map](TESTING.md)
+Current test branch: **0.2.350-portrait-indicators-test**. Start with the physical region that displays the symptom, then follow its native writer, addon observer, ownership record and cleanup. [Timer lifecycle detail](TIMER_LIFECYCLE.md) · [Verification commands and suite map](TESTING.md)
 
 ## Runtime load order
 
@@ -22,8 +22,8 @@ The [default manifest](../bjarkiUI.toc) and [Camelot manifest](../bjarkiUI_Camel
 | 12 | [IconSkin.lua](../IconSkin.lua) | Native icon masks/rims, donor visibility restoration and `/buiborders`. |
 | 13 | [UnitAuraStyling.lua](../UnitAuraStyling.lua) | Inert compatibility stub reporting retirement of the custom target/focus aura route. |
 | 14 | [BuffPresentation.lua](../BuffPresentation.lua) | Accessible aura/cast/icon discovery; player duration post-hooks; `/buitimers` and `/buiicons`. |
-| 15 | [FrameLabelTweaks.lua](../FrameLabelTweaks.lua) | Level offsets, combat-icon and native leader-crown ±2 UI-unit geometry, bag/ammunition count fonts and `/buicombat`. |
-| 16 | [RestIndicatorPlacement.lua](../RestIndicatorPlacement.lua) | Place Blizzard's original resting-ZZZ flipbook to the upper-right beyond the secondary portrait; guard owner and protected geometry without changing the native animation. |
+| 15 | [FrameLabelTweaks.lua](../FrameLabelTweaks.lua) | Level offsets, combat-icon mirror, shared portrait-relative leader crowns, guarded classic-party crown X+2, bag/ammunition count fonts and `/buicombat`. |
+| 16 | [RestIndicatorPlacement.lua](../RestIndicatorPlacement.lua) | Place Blizzard's original resting-ZZZ flipbook at mirrored upper-left X=-48 portrait units; guard owner and protected geometry without changing the native animation. |
 
 ## Find a symptom
 
@@ -31,7 +31,7 @@ The [default manifest](../bjarkiUI.toc) and [Camelot manifest](../bjarkiUI_Camel
 | --- | --- | --- |
 | Health colors or stale class tint | `applyUnit` → `applyHealthColor` → `nativeHealthStyle.Prepare/ObserveColor/Restore`. Separate unit identity from class availability and native color writes. Restore only the current recipient and owned color/material state. | [health-color-observer.lua](../tests/health-color-observer.lua), [lifecycle.lua](../tests/lifecycle.lua) |
 | Name color after target/focus replacement | `applyClassNameColor`, `prepareNameColor`, `restoreNativeNameColor`; check alias/owner identity and native setter order. The combat-exit route performs one name-color reconciliation pass. | [name-color-ownership.lua](../tests/name-color-ownership.lua) |
-| Native non-raid party art, colors, numbers | `PartyFrame.PartyMemberFramePool` → `ClassicPartyPresentation` guarded native setters; `SoftDark.TintClassicPartyChrome` tints only original decorative art. No geometry or protected status changes. | [classic-party-presentation.lua](../tests/classic-party-presentation.lua), [classic-party-softdark.lua](../tests/classic-party-softdark.lua) |
+| Native non-raid party art, colors, numbers | `PartyFrame.PartyMemberFramePool` → `ClassicPartyPresentation` guarded native setters; `SoftDark.TintClassicPartyChrome` tints only original decorative art. Only the leader crown delegates geometry to `InstallClassicPartyLeaderCrown` with the current member validator; protected status values stay native. | [classic-party-presentation.lua](../tests/classic-party-presentation.lua), [classic-party-softdark.lua](../tests/classic-party-softdark.lua) |
 | Status text/shadow or pet text | `installUnitStatusFonts` → `installStatusFont` → `styleStatusFont`; the native font/style writes and effective scale determine the next application. | [status-style.lua](../tests/status-style.lua), [status-scale.lua](../tests/status-scale.lua), [status-combat.lua](../tests/status-combat.lua), [pet-status-text.lua](../tests/pet-status-text.lua) |
 | Incoming player hit-text placement | `anchorCombatText`; follow safe lifecycle retries and native write refusals separately from geometry math. | [hit-text-lifecycle.lua](../tests/hit-text-lifecycle.lua), [hit-text-write-recovery.lua](../tests/hit-text-write-recovery.lua) |
 | Action or pet-action countdown | `applyCooldownSeconds` → `InstallAction` → `prepareAction/setDuration/refreshAction`; native duration bindings drive cells. `restoreStock` and visibility ownership return the native countdown. Check minimum/GCD policy, preference, spell identity and current source style. | [cooldown-seconds.lua](../tests/cooldown-seconds.lua), [action-timer-spacing.lua](../tests/action-timer-spacing.lua), [native-digit-cells.lua](../tests/native-digit-cells.lua) |
@@ -56,4 +56,4 @@ For protected-frame changes, inspect the permission check immediately before the
 
 ## Current versus historical material
 
-`tests/*.lua` is the current 30-script verification set. `tests/snapshot-0.2.309/`, `tools/audit/`, the `CODEX_*` audit prompts and [AUDIT_BASELINE.md](AUDIT_BASELINE.md) describe the pinned .309 audit. [ARCHITECTURE.md](../ARCHITECTURE.md) preserves historical design notes, some of which describe superseded cast/timer implementations. Use current source and this map when changing main.
+`tests/*.lua` is the current 36-script verification set. `tests/snapshot-0.2.309/`, `tools/audit/`, the `CODEX_*` audit prompts and [AUDIT_BASELINE.md](AUDIT_BASELINE.md) describe the pinned .309 audit. [ARCHITECTURE.md](../ARCHITECTURE.md) preserves historical design notes, some of which describe superseded cast/timer implementations. Use current source and this map when changing main.

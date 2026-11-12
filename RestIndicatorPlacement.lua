@@ -1,9 +1,9 @@
--- Move Blizzard's original resting ZZZ flipbook away from the secondary portrait.
+-- Move Blizzard's original resting ZZZ flipbook opposite the secondary portrait.
 -- Only its native texture anchor changes; no new artwork, animation or polling.
--- Position the native ZZZ to the RIGHT of the upper-right secondary
--- portrait, not on the left of the player portrait. This offset is relative
--- to the portrait's physical scale so it remains stable across UI scaling.
-local RESTED_Z_RIGHT_OF_PORTRAIT = 48
+-- Mirror the previous +48 placement to the upper-left of the main portrait.
+-- Keep the native animation/artwork intact: only its placement is mirrored.
+-- The portrait's scale defines the offset, independently of the texture scale.
+local RESTED_Z_LEFT_OF_PORTRAIT = -48
 local states=setmetatable({},{__mode="k"})
 local function public(v)
     if type(issecretvalue)=="function" then
@@ -90,9 +90,9 @@ apply=function()
         if tx and px then
             local originalX,y=(tx-px)/ts,(ty-py)/ts
             if finite(originalX) and finite(y) and originalX>0 then
-                -- The player secondary circle occupies the upper-right
-                -- corner; place ZZZ just beyond it, maintaining stock height.
-                local x=RESTED_Z_RIGHT_OF_PORTRAIT*ps/ts
+                -- The secondary circle and crown occupy the upper-right;
+                -- give the original Z animation the opposite corner.
+                local x=RESTED_Z_LEFT_OF_PORTRAIT*ps/ts
                 x=math.floor(x*100+.5)/100
                 y=math.floor(y*100+.5)/100
                 local desired={"CENTER",portrait,"CENTER",x,y}

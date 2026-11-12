@@ -70,10 +70,10 @@ local function case(name,fn)
     assert(ok,name..": "..tostring(err))
     passed=passed+1
 end
-case("places native resting texture beyond upper-right secondary circle",function()
+case("mirrors native resting placement to the opposite side of the main portrait",function()
     local e,t,p=fixture();e:event("PLAYER_LOGIN")
     eq(t.point[1],"CENTER");eq(t.point[2],p);eq(t.point[3],"CENTER")
-    eq(t.point[4],48);eq(t.point[5],32);eq(t.writes,1)
+    eq(t.point[4],-48);eq(t.point[5],32);eq(t.writes,1)
     eq(t.atlas,"UI-HUD-UnitFrame-Player-Rest-Flipbook")
     eq(t.animation,"running");eq(t.shown,true)
 end)
@@ -89,7 +89,7 @@ end)
 case("native reset restores mirrored position once",function()
     local e,t,p,loop=fixture();e:event("PLAYER_LOGIN")
     t:SetPoint("CENTER",loop,"CENTER",0,0)
-    eq(t.point[2],p);eq(t.point[4],48);eq(t.point[5],32)
+    eq(t.point[2],p);eq(t.point[4],-48);eq(t.point[5],32)
     eq(t.writes,3)
 end)
 case("combat refuses geometry and recovers on regeneration",function()
@@ -132,13 +132,20 @@ case("client without PlayerRestLoop has no writes",function()
     e.PlayerFrame.PlayerFrameContent.PlayerFrameContentContextual.PlayerRestLoop=nil
     e:event("PLAYER_LOGIN");eq(t.writes,0)
 end)
-case("ZZZ passes the upper-right secondary circle with clearance",function()
+case("full native Z texture clears both secondary portrait and crown",function()
     local e,t,portrait,loop=fixture()
     t.x=105;loop.x=105
     e:event("PLAYER_LOGIN")
-    eq(t.point[2],portrait);eq(t.point[4],48);eq(t.point[5],32)
-    -- Secondary circle's design center is around +20; its 50-unit cell and
-    -- the ZZZ's 30-unit native texture require >40 units total separation.
-    assert(t.point[4]>20,"ZZZ must remain right of secondary portrait center")
+    eq(t.point[2],portrait);eq(t.point[4],-48);eq(t.point[5],32)
+    -- Native flipbook width is 30; secondary stays upper-right, and the
+    -- player crown's new inner edge is portrait x=35.
+    assert(t.point[4]+15 < -5,"full Z texture must clear the secondary cell")
+    assert(t.point[4]+15 < 35,"full Z texture must clear the crown")
+end)
+case("mirrored placement uses portrait units across different effective scales",function()
+    local e,t,p=fixture()
+    p.scale=.8;t.scale=.4;t.x=240;t.y=264
+    e:event("PLAYER_LOGIN")
+    eq(t.point[4],-96);eq(t.point[5],64)
 end)
 print("Rested ZZZ mirror: "..passed.." cases passed")

@@ -1,0 +1,20 @@
+# Portrait crown and resting indicator placement
+
+## User choice
+
+Use the target crown as the reference, move it a little farther inward, mirror the player crown, and move the rested Zs to the opposite side of the main player portrait if supported. Keep the earlier requested slight rightward adjustment for classic party crowns.
+
+## Design
+
+- Interpret inward as toward the name/health bars: left on target/focus, right on player/classic party. Use two additional portrait UI units from target/focus's existing crown position.
+- Use portrait-relative crown corners with one mirrored clearance: Player TOPLEFT to portrait TOPRIGHT at (5, 11), Target/Focus TOPRIGHT to portrait TOPLEFT at (-5, 11), with effective-scale conversion.
+- Classic pooled party crowns retain their BOTTOM-to-overlay-TOP native attachment and vertical coordinate, shifted two UI units right. They keep a separate profile because their native geometry is smaller.
+- Reflect the existing rested position from +48 to -48 portrait units, retaining native height, original texture, animation, visibility and ownership. This mirrors placement; the native FlipBook has no established persistent artwork-mirroring control. Supported positional mirroring means the user's right-of-crown alternative is not needed.
+
+## Approaches considered
+
+The earlier proposal raised Zs above the crown while keeping them on the right. The user instead chose opposite-side placement, which separates the two indicators without depending on leader visibility. Native-relative crown nudges preserve differing player/target geometry; shared portrait-relative crown geometry resolves that mismatch.
+
+## Constraints and evidence
+
+Change only indicator geometry. Apply writes only when permissions positively allow them; party writes also require non-raid mode and current pooled membership. Preserve one hook per physical texture, accepted-write receipts, refusal retries, and other addons' foreign anchors. Native icons, animation, timers, saved layouts and all .349 visual treatment retain their existing behavior. Offline tests establish geometry/lifecycle behavior; the final in-game optical fit remains a user check.

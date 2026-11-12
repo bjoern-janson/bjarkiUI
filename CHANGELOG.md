@@ -2,6 +2,14 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.350-portrait-indicators-test — mirrored crowns and separate resting Zs
+
+- Use target/focus crown placement as the reference, two UI units farther inward toward the name/health bars. Player and Target/Focus use mirrored portrait-relative corners with the same height and gap, converted through actual portrait/texture scales.
+- Move the original rested Z flipbook from +48 to -48 portrait units, preserving native height, art, animation and visibility. This mirrors placement across the main portrait, separating it from the upper-right secondary circle and crown. The original Z artwork itself is not reversed.
+- Shift each active classic-party member's original crown two units right at its native height. Reuse the existing pool discovery and one private FrameLabelTweaks helper; native reanchors retain one hook and released/nonparty members cannot keep applying the offset.
+- Foreign, forbidden, unknown-permission and combat-time geometry remains guarded. Guide/role/PvP icons, portrait frames, .349 threat intensities, health materials, fonts and timers retain their previous behavior.
+- Existing real-module crown/rest fixtures cover mirrored geometry, mixed scales, native reset/refusal, no cumulative drift, full Z-texture clearance, actual TOC ordering, pooled reuse and raid permission. Full 36-suite runs passed on native Lua 5.1.5 and 5.4.6. Live optical placement remains pending.
+
 ## 0.2.349-party-aggro-visuals-test — party threat parity, less aggressive pet attack mode
 
 - Native `PartyMemberFrame.Flash` and `PartyMemberPetFrame.Flash` use the **same 25%-strength native threat-flash treatment** already applied to Player/Target/Focus. A shared private callback reuses the existing weak-key alpha observer and retains one hook per physical pooled texture across group, vehicle and Edit Mode updates.

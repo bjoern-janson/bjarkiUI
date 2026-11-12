@@ -1,6 +1,10 @@
 # Known issues and bugs
 
-Current test branch is **0.2.349-party-aggro-visuals-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+Current test branch is **0.2.350-portrait-indicators-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+
+## 0.2.350 crown alignment and resting Z separation — visual verification pending
+
+The reported player crown/Z overlap is addressed by mirrored crown geometry and opposite-side resting placement. The chosen layout uses two more units inward toward the bars from target/focus's .349 crown position, matching player portrait-relative geometry, classic-party crown X+2, and resting Z placement mirrored from +48 to -48 portrait units. Original Z artwork/animation remains native. Offline fixtures verify geometry and lifecycle rules; confirm the optical crown gap and left-side resting placement in the actual client. The right-of-crown alternative was unnecessary because native positional mirroring is supported.
 
 ## 0.2.349 classic party threat flash and player pet attack-mode pulse — visual verification pending
 

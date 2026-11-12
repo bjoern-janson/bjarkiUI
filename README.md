@@ -1,14 +1,18 @@
 # bjarkiUI
 
-**0.2.349-party-aggro-visuals-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
+**0.2.350-portrait-indicators-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
+
+## Latest test build
+
+**.350:** Leader crowns use matching portrait-relative corners, two units farther toward the bars than .349's target/focus position, mirrored on the player. Classic party crowns move two units right at their native height. The original resting Z animation moves to the upper-left of the main player portrait (X +48 to -48), opposite the secondary portrait and crown. Only placement is mirrored; the native flipbook artwork and animation remain intact. [Changes](CHANGELOG.md) · [Verification](docs/VERIFICATION_0.2.350.md)
 
 ## Install
 
-1. Open a successful [Package addon run](https://github.com/bjoern-janson/bjarkiUI/actions/workflows/package-addon.yml?query=branch%3Amain) and download the `bjarkiUI` artifact.
+1. Open a successful [Package addon run](https://github.com/bjoern-janson/bjarkiUI/actions/workflows/package-addon.yml?query=branch%3Afix%2Fportrait-indicators-0.2.350) and download the `bjarkiUI` artifact.
 2. Extract its `bjarkiUI` folder into the Forever client's `Interface/AddOns/` directory. Check that `Interface/AddOns/bjarkiUI/bjarkiUI.toc` exists.
 3. Enable the addon and reload the interface. Use `/bui help` for the main commands and `/bdark` for Soft Dark controls.
 
-Version **0.2.340-leader-crown-nudge-test** nudges only the native party-leader crown by 2 UI units horizontally: right on Player, left on Target/Focus. No GuideIcon, role icon, vertical anchor, font, portrait, cast bar or timer changes. The installable ZIP is saved in ChatGPT Library → Addon Versions.
+Historical **0.2.340-leader-crown-nudge-test** nudged the native crowns horizontally. The .350 portrait-relative placement above supersedes those native-relative offsets.
 
 **0.2.341 buff-digit test:** For player buff/debuff timers with *public* remaining seconds, the three already-fixed digit cells may now use native-font glyph width calibration to keep the *visible numeral ink* from wobbling when a narrow `1` becomes a wide `8`. This only changes a supported, out-of-combat-prepared buff glyph's transparent inline spacing. If calibration fails, the original digits remain. Secret/native-fallback timers remain Blizzard-owned. No fonts, timers, frame anchors, other addons or settings are changed.
 
@@ -35,7 +39,7 @@ Version **0.2.340-leader-crown-nudge-test** nudges only the native party-leader 
 | Unit frames and party | Unit names, status typography, readable class colors, cosmetic labels and vertical compact-party ordering use guarded native presentation hooks. Compact party names/health fills are class colored and their native numeric text gets the same LoL-style outline-free shadow. Camelot level badge artwork stays hidden through native Show, SetShown and SetAlpha writes; the separate level number remains intact. Layout repairs touch displaced anchors and retain rollback state after partial failure. |
 | Soft Dark and icon borders | Eligible native artwork receives reversible tinting or nameplate-style icon decoration. Restoration checks current ownership before replacing a later writer's work. |
 
-**0.2.339-zzz-right-of-secondary-test** moves Blizzard's original resting ZZZ animation to the **upper-right beyond the secondary portrait**, leaving height, animation and all previous cast/level fixes unchanged. The prior left-side position was a misinterpretation. The installable ZIP is saved in Library → Addon Versions.
+Historical **0.2.339-zzz-right-of-secondary-test** placed the original resting animation beyond the upper-right secondary portrait. The user's newer .350 choice supersedes it with mirrored upper-left placement.
 
 **0.2.338-zzz-inward-test** moves the mirrored player resting Zs 8 UI units to the right (toward the portrait rim), retaining their original vertical position and Blizzard animation. The cast-timer and level-ring fixes are unchanged. A verified ZIP is saved to Library → Addon Versions.
 

@@ -265,19 +265,59 @@ refreshCombatIcon = function()
     if state then moveCombatIcon(icon, state) end
 end
 
--- Tiny optical adjustment of Blizzard's *leader crown only*.
--- Player: +2 right. Target/Focus: -2 left. Guide/role/PvP icons
--- and the frame's original vertical position stay native.
-local LEADER_CROWN_NUDGE = 2
+-- One mirrored portrait-corner position for the large-frame leader crowns.
+-- The .349 target/focus clearance was (-3, 11); move two units farther
+-- toward the bars, then mirror that same gap and height onto the player.
+-- Small classic-party crowns retain their native attachment with +2 X.
+local LEADER_CROWN_GAP, LEADER_CROWN_HEIGHT, PARTY_CROWN_NUDGE = 5, 11, 2
+
+local function regionScale(region)
+    if not readable(region) or not region then return end
+    local forbidden = field(region, "IsForbidden")
+    if type(forbidden) == "function" then
+        local ok, value = pcall(forbidden, region)
+        if not ok or not readable(value) or value ~= false then return end
+    end
+    local getter = field(region, "GetEffectiveScale")
+    if type(getter) ~= "function" then return end
+    local ok, value = pcall(getter, region)
+    if ok and finite(value) and value > 0 then return value end
+end
+
+local function partyCrownAllowed(state)
+    if type(IsInRaid) ~= "function" or type(state.memberUnit) ~= "function" then return false end
+    local ok, raid = pcall(IsInRaid)
+    if not ok or not readable(raid) or raid ~= false then return false end
+    local found, unit = pcall(state.memberUnit, state.owner)
+    return found and readable(unit) and type(unit) == "string"
+        and (unit == "player" or unit:match("^party[1-4]$") ~= nil)
+end
 
 local function moveLeaderIcon(texture, state)
     if state.applying or not outsideCombat() or not accessibleCombatIcon(texture) then return end
+    if state.owner and not partyCrownAllowed(state) then return end
     local point = pointOf(texture)
-    if not point or point[1] ~= state.nativePoint or point[3] ~= state.nativePoint
-        or ownsReceipt(state, point, samePoint) then return end
+    if not point then return end
+    local owned = ownsReceipt(state, point, samePoint)
+    -- Only the known native attachment or our own accepted write is eligible.
+    -- A different addon's anchor must not be converted to our layout.
+    if not owned and (point[1] ~= state.nativePoint or point[2] ~= state.nativeRelative
+        or point[3] ~= (state.owner and "TOP" or state.nativePoint)) then return end
+    local desired
+    if state.owner then
+        if owned then return end
+        desired = { point[1], point[2], point[3], point[4] + state.dx, point[5] }
+    else
+        local ps, ts = regionScale(state.portrait), regionScale(texture)
+        if not ps or not ts then return end
+        local x, y = state.dx * ps / ts, LEADER_CROWN_HEIGHT * ps / ts
+        if not finite(x) or not finite(y) then return end
+        local corner = state.nativePoint == "TOPLEFT" and "TOPRIGHT" or "TOPLEFT"
+        desired = { state.nativePoint, state.portrait, corner, x, y }
+        if owned and samePoint(point, desired, true) then return end
+    end
     local setter = field(texture, "SetPoint")
     if type(setter) ~= "function" then return end
-    local desired = { point[1], point[2], point[3], point[4] + state.dx, point[5] }
     state.applying = true
     local ok, result = pcall(setter, texture,
         desired[1], desired[2], desired[3], desired[4], desired[5])
@@ -287,7 +327,7 @@ local function moveLeaderIcon(texture, state)
     end
 end
 
-local function installLeaderIcon(texture, dx, nativePoint)
+local function installLeaderIcon(texture, dx, nativePoint, nativeRelative, portrait, owner, memberUnit)
     if not outsideCombat() or not accessibleCombatIcon(texture) then return end
     local state = leaderIcons[texture]
     if not state then
@@ -297,10 +337,21 @@ local function installLeaderIcon(texture, dx, nativePoint)
     -- Never treat a reused physical texture with a different role as an
     -- opportunity to add a second offset on top of the first.
     if state.dx ~= dx or state.nativePoint ~= nativePoint then return end
+    state.nativeRelative, state.portrait = nativeRelative, portrait
+    state.owner, state.memberUnit = owner, memberUnit
     moveLeaderIcon(texture, state)
     hookOnce(texture, state, "SetPoint", function(self)
         if not state.applying then moveLeaderIcon(self, state) end
     end)
+end
+
+-- ClassicPartyPresentation owns active-pool discovery. Retain its validator
+-- in the texture's observer so a released/rebound member cannot keep writing.
+uiPrivate.InstallClassicPartyLeaderCrown = function(frame, memberUnit)
+    if type(memberUnit) ~= "function" then return end
+    local overlay = field(frame, "PartyMemberOverlay")
+    installLeaderIcon(field(overlay, "LeaderIcon"), PARTY_CROWN_NUDGE,
+        "BOTTOM", overlay, nil, frame, memberUnit)
 end
 
 local function fontOf(text)
@@ -358,13 +409,16 @@ local function apply()
     local frameContainer = field(_G.PlayerFrame, "PlayerFrameContainer")
     installCombatIcon(field(playerContext, "AttackIcon"), field(frameContainer, "PlayerPortrait"),
         _G.PlayerLevelText)
-    installLeaderIcon(field(playerContext, "LeaderIcon"), LEADER_CROWN_NUDGE, "TOPLEFT")
+    installLeaderIcon(field(playerContext, "LeaderIcon"), LEADER_CROWN_GAP,
+        "TOPLEFT", playerContext, field(frameContainer, "PlayerPortrait"))
     for _, name in ipairs({ "TargetFrame", "FocusFrame" }) do
         local content = field(_G[name], "TargetFrameContent")
         local main = field(content, "TargetFrameContentMain")
         installLevel(field(main, "LevelText"), LEVEL_OUTWARD)
         local contextual = field(content, "TargetFrameContentContextual")
-        installLeaderIcon(field(contextual, "LeaderIcon"), -LEADER_CROWN_NUDGE, "TOPRIGHT")
+        local container = field(_G[name], "TargetFrameContainer")
+        installLeaderIcon(field(contextual, "LeaderIcon"), -LEADER_CROWN_GAP,
+            "TOPRIGHT", contextual, field(container, "Portrait"))
     end
 
     -- Forever uses a separate FreeSlots region on the backpack and the normal

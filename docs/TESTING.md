@@ -1,6 +1,6 @@
 # Testing and packaging bjarkiUI
 
-Current test target: **0.2.349-party-aggro-visuals-test**, **16 manifest-loaded runtime modules**, and **36 top-level Lua scripts**: 35 behavioral suites plus `tests/syntax.lua`. Run both Lua 5.1 and Lua 5.4. The current aura suite reports **219 cases**; suite/assertion counts describe fixture coverage, not a percentage of live-client behavior covered.
+Current test target: **0.2.350-portrait-indicators-test**, **16 manifest-loaded runtime modules**, and **36 top-level Lua scripts**: 35 behavioral suites plus `tests/syntax.lua`. Run both Lua 5.1 and Lua 5.4. The current aura suite reports **219 cases**; suite/assertion counts describe fixture coverage, not a percentage of live-client behavior covered.
 
 ## Portable verification
 
@@ -8,7 +8,7 @@ Run from the repository root with Python 3.10 or newer and native Lua/luac execu
 
 ```sh
 python tools/verify.py
-python tools/verify.py --output ../bjarkiUI-0.2.349-Party-Aggro-Visuals.zip
+python tools/verify.py --output ../bjarkiUI-0.2.350-Crowns-and-Rested.zip
 ```
 
 The default uses Lua 5.1 and 5.4 with their matching compilers. `--output` is an optional ZIP filename **outside the checkout**, not a report path. Its parent directory must already exist and the file must be new. Packaging occurs only after verification succeeds. The [CI workflow](../.github/workflows/package-addon.yml) uses native interpreters and the same [verification tool](../tools/verify.py).
@@ -59,7 +59,7 @@ Substitute another top-level script for a focused regression. `tests/syntax.lua`
 | Soft Dark | [softdark-restore.lua](../tests/softdark-restore.lua), [softdark-discovery-handoff.lua](../tests/softdark-discovery-handoff.lua), [softdark-callback-recovery.lua](../tests/softdark-callback-recovery.lua) | Discovery, ownership transfer, native precision, refused restoration and incomplete callback registration. |
 | Common lifecycle | [lifecycle.lua](../tests/lifecycle.lua), [hardening.lua](../tests/hardening.lua), [initialization-recovery.lua](../tests/initialization-recovery.lua) | Native hook retry, failed initialization, inaccessible/protected paths and broader module integration. |
 | Retired aura route | [unit-aura-retirement.lua](../tests/unit-aura-retirement.lua) | Custom Target/Focus aura rendering remains inactive. |
-| Manifest syntax | [syntax.lua](../tests/syntax.lua) | All 13 runtime modules parse in the selected Lua version. |
+| Manifest syntax | [syntax.lua](../tests/syntax.lua) | All 16 runtime modules parse in the selected Lua version. |
 
 Tests run each script in its own interpreter invocation. Do not turn the archived snapshot into an additional current-suite glob: it targets different source behavior.
 
