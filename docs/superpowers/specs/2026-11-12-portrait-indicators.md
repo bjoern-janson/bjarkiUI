@@ -28,3 +28,7 @@ Use the user's already-authorized right-of-crown fallback: original RestTexture 
 ## .352 user decision: remove Zs completely
 
 The user rejected the animated Z appearance after .351 and explicitly requested removal. Retire placement calculations and hide only the original RestTexture, observing Show/SetShown so native refreshes cannot restore it. Keep native resting state and the parent animation owner separate. Apply only with positive safe, out-of-combat permission and current physical-region identity. Existing crown placements remain the .351 profiles. No new options, polling, assets or cross-addon dependency.
+
+## .353 classic-party visual follow-up
+
+The user's party-frame screenshot shows the crown touching/crowding the smaller secondary portrait. Increase only the classic-party native horizontal nudge from +2 to +4 UI units, preserving native height and the existing membership/permission/ownership checks. This adds clearance toward the name/health bars and keeps the .352 rested-Z removal. The adjustment is calibrated from the screenshot, not a claim of live pixel verification.

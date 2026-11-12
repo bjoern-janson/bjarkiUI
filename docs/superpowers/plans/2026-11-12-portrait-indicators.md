@@ -43,3 +43,9 @@ Mixed effective scales must keep symmetric screen-space crown gaps; native reanc
 - [x] Update the obsolete resting fixture; observe the initial visibility failure against .351 and pass the seven suppression/recovery cases on native Lua 5.1/5.4.
 - [x] Obtain a scoped independent read-only review; no actionable findings.
 - [x] Verify both full native suites and package identity; prepare the .352 source update and installable ZIP for delivery.
+
+## .353 classic-party crown spacing
+
+- [x] Inspect the screenshot and confirm the existing classic-party profile; apply two additional rightward UI units with no new layout mechanism.
+- [x] Update existing crown expectations and observe the expected -8 versus -6 failure before changing the constant.
+- [x] Verify both full native suites and package identity; prepare .353 source and installable ZIP.

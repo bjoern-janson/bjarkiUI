@@ -1,14 +1,14 @@
 # bjarkiUI
 
-**0.2.352-hide-rested-zs-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
+**0.2.353-party-crown-spacing-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
 
 ## Latest test build
 
-**.352:** Removes the player-frame rested Z animation at the user's request. Hide the original Z texture and keep it hidden after native visibility refreshes. The previous Z placement experiments are retired. [Changes](CHANGELOG.md) · [Verification](docs/VERIFICATION_0.2.352.md)
+**.353:** Gives classic party leader crowns more clearance from the secondary portrait: two additional UI units right, for a total native X+4 offset, at the existing height. Includes the .352 removal of rested Zs. [Changes](CHANGELOG.md) · [Verification](docs/VERIFICATION_0.2.353.md)
 
 ## Install
 
-1. Open a successful [Package addon run](https://github.com/bjoern-janson/bjarkiUI/actions/workflows/package-addon.yml?query=branch%3Afix%2Fhide-rested-zs-0.2.352) and download the `bjarkiUI` artifact.
+1. Open a successful [Package addon run](https://github.com/bjoern-janson/bjarkiUI/actions/workflows/package-addon.yml?query=branch%3Afix%2Fparty-crown-spacing-0.2.353) and download the `bjarkiUI` artifact.
 2. Extract its `bjarkiUI` folder into the Forever client's `Interface/AddOns/` directory. Check that `Interface/AddOns/bjarkiUI/bjarkiUI.toc` exists.
 3. Enable the addon and reload the interface. Use `/bui help` for the main commands and `/bdark` for Soft Dark controls.
 
