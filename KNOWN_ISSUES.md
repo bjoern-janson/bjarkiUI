@@ -1,10 +1,14 @@
 # Known issues and bugs
 
-Current test branch is **0.2.353-party-crown-spacing-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+Current test branch is **0.2.354-hide-party-faction-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
 
-## 0.2.353 classic-party crown clearance — visual follow-up
+## 0.2.354 classic-party faction badges — client follow-up
 
-The current live screenshot shows the classic-party crown crowded against its smaller secondary circle. The previous native X+2 nudge was insufficient. The new X+4 profile shifts the crown two more UI units right at its existing height. Existing pool and permission guards remain the placement owner; final optical spacing still needs an in-client look.
+The user requested removal of the Alliance/Horde shield beside classic-party portraits. The current build hides the original PVPIcon texture and its native visibility refreshes; the same physical region also supplies the FFA badge. Initial hook preparation waits for positive out-of-combat permission. Installed callbacks can reassert guarded cosmetic Hide during combat and check current pool/path ownership and non-raid mode. Failed native calls remain retryable. Offline fixtures cover native faction redraws, combat refreshes and frame reuse; no local client was available to validate the resulting display.
+
+## 0.2.353 classic-party crown clearance — visually approved
+
+The current live screenshot shows the classic-party crown crowded against its smaller secondary circle. The previous native X+2 nudge was insufficient. The new X+4 profile shifts the crown two more UI units right at its existing height. The user's subsequent screenshot and 'nice' response approved this spacing. The native X+4 profile is the current baseline.
 
 ## 0.2.352 rested Z removal
 

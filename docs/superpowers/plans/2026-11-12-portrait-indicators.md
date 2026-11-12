@@ -49,3 +49,10 @@ Mixed effective scales must keep symmetric screen-space crown gaps; native reanc
 - [x] Inspect the screenshot and confirm the existing classic-party profile; apply two additional rightward UI units with no new layout mechanism.
 - [x] Update existing crown expectations and observe the expected -8 versus -6 failure before changing the constant.
 - [x] Verify both full native suites and package identity; prepare .353 source and installable ZIP.
+
+## .354 remove classic-party faction badges
+
+- [x] Identify native PartyMemberOverlay.PVPIcon and its UpdatePvPStatus/UNIT_FACTION writers.
+- [x] Extend the existing party fixture; observe failure before suppression and cover refreshes, combat, pool/path reuse, permission and refusal recovery.
+- [x] Implement narrow suppression in ClassicPartyPresentation and resolve independent review's combat re-show finding; 17 focused cases pass on both native interpreters.
+- [x] Verify both full native suites and package identity, then prepare .354 source and regular installable ZIP.

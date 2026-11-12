@@ -1,14 +1,14 @@
 # bjarkiUI
 
-**0.2.353-party-crown-spacing-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
+**0.2.354-hide-party-faction-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
 
 ## Latest test build
 
-**.353:** Gives classic party leader crowns more clearance from the secondary portrait: two additional UI units right, for a total native X+4 offset, at the existing height. Includes the .352 removal of rested Zs. [Changes](CHANGELOG.md) · [Verification](docs/VERIFICATION_0.2.353.md)
+**.354:** Removes the faction/PvP badges from classic party frames. Their original badge texture stays hidden through native faction and visibility refreshes, including combat refreshes once the hooks are prepared. Builds on the approved .353 crown spacing and .352 rested-Z removal. [Changes](CHANGELOG.md) · [Verification](docs/VERIFICATION_0.2.354.md)
 
 ## Install
 
-1. Open a successful [Package addon run](https://github.com/bjoern-janson/bjarkiUI/actions/workflows/package-addon.yml?query=branch%3Afix%2Fparty-crown-spacing-0.2.353) and download the `bjarkiUI` artifact.
+1. Open a successful [Package addon run](https://github.com/bjoern-janson/bjarkiUI/actions/workflows/package-addon.yml?query=branch%3Afix%2Fhide-party-faction-0.2.354) and download the `bjarkiUI` artifact.
 2. Extract its `bjarkiUI` folder into the Forever client's `Interface/AddOns/` directory. Check that `Interface/AddOns/bjarkiUI/bjarkiUI.toc` exists.
 3. Enable the addon and reload the interface. Use `/bui help` for the main commands and `/bdark` for Soft Dark controls.
 

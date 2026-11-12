@@ -2,11 +2,14 @@
 -- Reuse bjarkiUI's class colors, LoL-like numeric shadows and Soft Dark.
 -- No custom frame, font, options, OnUpdate or status values. Only the native
 -- leader crown receives the small, guarded FrameLabelTweaks geometry shift.
+-- The original faction/PvP badge is hidden on current classic party members.
 local _, uiPrivate = ...
 local members = setmetatable({}, { __mode = "k" })
 local activeMembers = setmetatable({}, { __mode = "k" })
 local groups = setmetatable({}, { __mode = "k" })
 local nativeHooks = {}
+local factionIcons = setmetatable({}, { __mode = "k" })
+local postHook
 
 local function public(value)
     if value == nil then return false end
@@ -149,6 +152,55 @@ local function styleThreatFlashes(frame)
     local petFlash = field(pet, "Flash")
     if safe(petFlash) then pcall(install, petFlash) end
 end
+local function factionHideAllowed(frame)
+    if not memberUnit(frame) then return false end
+    local probe = method(_G, "IsInRaid")
+    if not probe then return false end
+    local ok, value = pcall(probe)
+    return ok and public(value) and value == false
+end
+local function suppressFactionIcon(icon, state)
+    local frame = state.owner
+    if state.applying or not factionHideAllowed(frame) or not safe(icon)
+        or not rawequal(icon, field(field(frame, "PartyMemberOverlay"), "PVPIcon")) then return end
+    local getShown, hide = method(icon, "IsShown"), method(icon, "Hide")
+    if not hide then return end
+    local ok, shown
+    if getShown then ok, shown = pcall(getShown, icon) end
+    if ok and public(shown) and shown == false then return end
+    -- Like native level-ring suppression, this is a guarded cosmetic Texture
+    -- Hide, not protected frame geometry. Installed callbacks also cover a
+    -- native UNIT_FACTION -> UpdatePvPStatus -> Show during combat.
+    state.applying = true
+    pcall(hide, icon)
+    state.applying = nil
+end
+local function hideFactionIcon(frame)
+    -- Prepare hooks outside combat; the native Hide call in an installed
+    -- callback remains guarded by current ownership and native permission.
+    local combatProbe = method(_G, "InCombatLockdown")
+    if not combatProbe then return end
+    local permitted, combat = pcall(combatProbe)
+    if not permitted or not public(combat) or combat ~= false then return end
+    if not factionHideAllowed(frame) then return end
+    local icon = field(field(frame, "PartyMemberOverlay"), "PVPIcon")
+    if not safe(icon) then return end
+    local kind = method(icon, "GetObjectType")
+    if not kind then return end
+    local ok, objectType = pcall(kind, icon)
+    if not ok or not public(objectType) or objectType ~= "Texture" then return end
+    local state = factionIcons[icon]
+    if not state then state = {}; factionIcons[icon] = state end
+    state.owner = frame
+    -- UpdatePvPStatus sets Alliance/Horde/FFA artwork, then calls Show.
+    -- Keep its native state/atlas calculation and suppress only this badge.
+    for _, name in ipairs({ "Show", "SetShown" }) do
+        if not state[name] then
+            postHook(icon, name, function(self) suppressFactionIcon(self, state) end, state)
+        end
+    end
+    suppressFactionIcon(icon, state)
+end
 local function refresh(frame)
     if not memberUnit(frame) then return end
     repaint(frame)
@@ -156,12 +208,13 @@ local function refresh(frame)
     styleNumeric(frame)
     styleThreatFlashes(frame)
     darkChrome(frame)
+    hideFactionIcon(frame)
     -- The crown helper loads later in the TOC. Existing login/pool lifecycle
     -- refreshes discover it without another event frame or polling loop.
     local crown = field(uiPrivate, "InstallClassicPartyLeaderCrown")
     if type(crown) == "function" then pcall(crown, frame, memberUnit) end
 end
-local function postHook(object, name, callback, state)
+postHook = function(object, name, callback, state)
     if state[name] or type(hooksecurefunc) ~= "function" or not method(object, name) then return end
     local ok, result = pcall(hooksecurefunc, object, name, callback)
     if ok and (not public(result) or result ~= false) then state[name] = true end
