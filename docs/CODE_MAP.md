@@ -1,6 +1,6 @@
 # bjarkiUI code map
 
-Current test branch: **0.2.351-portrait-spacing-test**. Start with the physical region that displays the symptom, then follow its native writer, addon observer, ownership record and cleanup. [Timer lifecycle detail](TIMER_LIFECYCLE.md) · [Verification commands and suite map](TESTING.md)
+Current test branch: **0.2.352-hide-rested-zs-test**. Start with the physical region that displays the symptom, then follow its native writer, addon observer, ownership record and cleanup. [Timer lifecycle detail](TIMER_LIFECYCLE.md) · [Verification commands and suite map](TESTING.md)
 
 ## Runtime load order
 
@@ -23,7 +23,7 @@ The [default manifest](../bjarkiUI.toc) and [Camelot manifest](../bjarkiUI_Camel
 | 13 | [UnitAuraStyling.lua](../UnitAuraStyling.lua) | Inert compatibility stub reporting retirement of the custom target/focus aura route. |
 | 14 | [BuffPresentation.lua](../BuffPresentation.lua) | Accessible aura/cast/icon discovery; player duration post-hooks; `/buitimers` and `/buiicons`. |
 | 15 | [FrameLabelTweaks.lua](../FrameLabelTweaks.lua) | Level offsets, combat-icon mirror, portrait-relative leader crowns with per-side optical spacing, guarded classic-party crown X+2, bag/ammunition count fonts and `/buicombat`. |
-| 16 | [RestIndicatorPlacement.lua](../RestIndicatorPlacement.lua) | Attach Blizzard's original resting-ZZZ flipbook beside the player crown with a two-portrait-unit edge gap and aligned centers; retain native animation and guard geometry ownership. |
+| 16 | [RestIndicatorPlacement.lua](../RestIndicatorPlacement.lua) | Hide only the original player rested-Z texture; observe native Show/SetShown and retry safe lifecycle discovery. Historical filename retained; no placement writes. |
 
 ## Find a symptom
 

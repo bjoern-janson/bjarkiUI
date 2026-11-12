@@ -24,3 +24,7 @@ Change only indicator geometry. Apply writes only when permissions positively al
 The .350 optical result was rejected: target/focus crowns crowd their secondary circles and the left-side Zs look detached. Keep the player crown at (5, 11); use (-7, 11) for target/focus as a small screenshot-based optical correction. Equal mirrored anchors are not evidence of equal visible clearance. The inspected .248 and .252 bjarkiPortraits sources share geometry, and no exact live renderer cause was established.
 
 Use the user's already-authorized right-of-crown fallback: original RestTexture CENTER to native player LeaderIcon RIGHT, X = actual Z width / 2 + 2 portrait units converted to Z scale, Y = 0. The native crown supplies the attachment even while hidden. Preserve the original animation/artwork and recalibrate an owned anchor on existing safe scale/layout events. No cross-addon secondary-frame enumeration or new geometry API is needed. The former positional mirror was possible but visually unsuitable; it is superseded.
+
+## .352 user decision: remove Zs completely
+
+The user rejected the animated Z appearance after .351 and explicitly requested removal. Retire placement calculations and hide only the original RestTexture, observing Show/SetShown so native refreshes cannot restore it. Keep native resting state and the parent animation owner separate. Apply only with positive safe, out-of-combat permission and current physical-region identity. Existing crown placements remain the .351 profiles. No new options, polling, assets or cross-addon dependency.

@@ -1,14 +1,14 @@
 # bjarkiUI
 
-**0.2.351-portrait-spacing-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
+**0.2.352-hide-rested-zs-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
 
 ## Latest test build
 
-**.351:** Responds to the .350 in-game screenshots: target/focus crowns move two more UI units toward the bars while the player crown keeps its position. Rested Zs use the user's fallback placement just to the right of the player crown, centered vertically, with a two-portrait-unit gap between native texture bounds. The original artwork and animation remain native. Classic-party crown placement stays at native X+2. [Changes](CHANGELOG.md) · [Verification](docs/VERIFICATION_0.2.351.md)
+**.352:** Removes the player-frame rested Z animation at the user's request. Hide the original Z texture and keep it hidden after native visibility refreshes. The previous Z placement experiments are retired. [Changes](CHANGELOG.md) · [Verification](docs/VERIFICATION_0.2.352.md)
 
 ## Install
 
-1. Open a successful [Package addon run](https://github.com/bjoern-janson/bjarkiUI/actions/workflows/package-addon.yml?query=branch%3Afix%2Fportrait-spacing-0.2.351) and download the `bjarkiUI` artifact.
+1. Open a successful [Package addon run](https://github.com/bjoern-janson/bjarkiUI/actions/workflows/package-addon.yml?query=branch%3Afix%2Fhide-rested-zs-0.2.352) and download the `bjarkiUI` artifact.
 2. Extract its `bjarkiUI` folder into the Forever client's `Interface/AddOns/` directory. Check that `Interface/AddOns/bjarkiUI/bjarkiUI.toc` exists.
 3. Enable the addon and reload the interface. Use `/bui help` for the main commands and `/bdark` for Soft Dark controls.
 
@@ -39,7 +39,7 @@ Historical **0.2.340-leader-crown-nudge-test** nudged the native crowns horizont
 | Unit frames and party | Unit names, status typography, readable class colors, cosmetic labels and vertical compact-party ordering use guarded native presentation hooks. Compact party names/health fills are class colored and their native numeric text gets the same LoL-style outline-free shadow. Camelot level badge artwork stays hidden through native Show, SetShown and SetAlpha writes; the separate level number remains intact. Layout repairs touch displaced anchors and retain rollback state after partial failure. |
 | Soft Dark and icon borders | Eligible native artwork receives reversible tinting or nameplate-style icon decoration. Restoration checks current ownership before replacing a later writer's work. |
 
-Historical **0.2.339-zzz-right-of-secondary-test** placed the original resting animation beyond the upper-right secondary portrait. The .350 upper-left experiment was rejected after the live screenshot; .351 uses the user's right-of-crown fallback.
+Historical **0.2.339-zzz-right-of-secondary-test** placed the original resting animation beyond the upper-right secondary portrait. The .350 upper-left and .351 right-of-crown experiments were subsequently rejected; .352 hides the Z texture completely.
 
 **0.2.338-zzz-inward-test** moves the mirrored player resting Zs 8 UI units to the right (toward the portrait rim), retaining their original vertical position and Blizzard animation. The cast-timer and level-ring fixes are unchanged. A verified ZIP is saved to Library → Addon Versions.
 

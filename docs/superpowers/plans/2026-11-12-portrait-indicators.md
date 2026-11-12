@@ -36,3 +36,10 @@ Mixed effective scales must keep symmetric screen-space crown gaps; native reanc
 - [x] Preserve player/classic-party positions and apply a two-unit target/focus optical correction.
 - [x] Replace left-side Zs with the approved right-of-crown fallback; exercise physical adjacency and safe lifecycle recovery.
 - [x] Run both native Lua verification sets and independently review the correction; prepare the verified regular .351 ZIP and development-source update.
+
+## .352 requested Z removal
+
+- [x] Trace the native resting writer and replace relocation with exact RestTexture suppression.
+- [x] Update the obsolete resting fixture; observe the initial visibility failure against .351 and pass the seven suppression/recovery cases on native Lua 5.1/5.4.
+- [x] Obtain a scoped independent read-only review; no actionable findings.
+- [x] Verify both full native suites and package identity; prepare the .352 source update and installable ZIP for delivery.
