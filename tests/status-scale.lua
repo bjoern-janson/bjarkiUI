@@ -84,6 +84,9 @@ local function fixture()
     end
     env.raiseFramerateCounter = function() end
     env.anchorCombatText = function() env.anchorCalls = env.anchorCalls + 1 end
+    -- The compact level-ring lifecycle was added after this isolated fixture.
+    -- Model it without treating that independent visual repair as a font write.
+    env.applyPlainLevelRings = function() env.ringCalls = (env.ringCalls or 0) + 1 end
     env.primaryClassColorRepair = {Install = unrelated, Queue = unrelated}
     local code = "local isSecret=_G.isSecret\nlocal readableBool=_G.readableBool\n" ..
         "local unitFrame=_G.unitFrame\nlocal healthBar=_G.healthBar\n" .. shadow .. "\n" ..

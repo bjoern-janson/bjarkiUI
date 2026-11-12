@@ -544,6 +544,30 @@ local function tintTexture(texture, relativeBrightness, warmBagChrome)
     return false
 end
 
+-- Classic (non-raid-style) party frames use pooled, portrait-on native art.
+-- Apply the SAME reversible 60% tint to those chrome textures only. Never
+-- touch portraits, bars, debuff/PvP icons, overlays or status text.
+local function tintClassicPartyArt(frame)
+    if not readable(frame) then return 0 end
+    local count = 0
+    local pet = child(frame, "PetFrame")
+    for _, art in pairs({
+        player = child(frame, "Texture"),
+        vehicle = child(frame, "VehicleTexture"),
+        pet = child(pet, "Texture"),
+    }) do
+        if isTexture(art) and tintTexture(art) then count = count + 1 end
+    end
+    return count
+end
+if type(uiPrivate) == "table" then
+    uiPrivate.TintClassicPartyChrome = function(frame)
+        if settings.softDarkEnabled ~= true or loadedDarkMode() then return false end
+        if inCombat() then pending = true; return false end
+        return tintClassicPartyArt(frame) > 0
+    end
+end
+
 -- Safe, reversible desaturation for BAG CHROME ONLY. Do not use on spell,
 -- item, keyring glyph, portrait, status, or quality-colored textures.
 tintBagChromeTexture = function(texture, relativeBrightness)
@@ -1168,6 +1192,18 @@ local function applyTheme()
     end
     stats.chrome = stats.chrome + tintPRDBorders()
     stats.compactChrome, stats.compactBackdrops, stats.compactLower = tintCompactChrome(tint)
+    -- The native PartyFrame pool is distinct from CompactPartyFrame. Its
+    -- textures may be created after addon load or reacquired after Edit Mode.
+    local party = resolve("PartyFrame")
+    local pool = child(party, "PartyMemberFramePool")
+    local enumerate = child(pool, "EnumerateActive")
+    if type(enumerate) == "function" then
+        pcall(function()
+            for member in enumerate(pool) do
+                stats.chrome = stats.chrome + tintClassicPartyArt(member)
+            end
+        end)
+    end
     lastStats = stats
 end
 
