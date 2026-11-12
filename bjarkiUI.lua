@@ -996,7 +996,7 @@ function nativeHealthStyle.Prepare(bar)
         local found, info = pcall(C_Texture.GetAtlasInfo, material.colorable)
         validAtlas = found and not isSecret(info) and type(info) == "table"
     end
-    if (validAtlas or atlas == material.colorable) and type(texture.SetAtlas) == "function" then
+    if material.colorable and (validAtlas or atlas == material.colorable) and type(texture.SetAtlas) == "function" then
         if not restoreHealthSaturation(texture, material) then return false end
         if atlas ~= material.colorable then
             local observer = nativeHealthStyle.textureHooks[texture]
