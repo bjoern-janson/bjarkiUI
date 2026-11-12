@@ -2,6 +2,14 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.348-classic-party-health-material-test — class color requires the health material too
+
+- In-game screenshot shows **green non-raid party health bars** despite v0.2.347's attempts to set class RGB. The underlying `UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health` atlas is precolored green; simple vertex/status-bar tinting is insufficient (the same issue previously fixed on Player/Target/Focus).
+- Extend the existing native `nativeHealthStyle` reversible colorable-material mapping to Blizzard's *original* `UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health-Status` asset (available in Blizzard's PartyFrameTemplates.xml), with the matching party-pet atlas. Vehicle fills retain their native atlas and use the already guarded desaturation route.
+- Export one tightly scoped `ApplyClassicPartyHealthColor` helper to call the same ownership observer/material setup and class RGB path; classic party presentation no longer does standalone SetStatusBarColor. It positively checks the current physical bar's unit, and never recolors unrelated raid/party5 bars.
+- Add four source-backed health-material cases (native party atlas, pet atlas, vehicle desaturation, and unrelated-frame refusal), plus a classic-party test that requires a colorable material instead of checking RGB alone. Total 123 native-health ownership cases and 12 classic-party cases pass on Lua 5.1/5.4.
+- All other v0.2.347 visual surfaces and timings are untouched. **Live visual confirmation remains required.**
+
 ## 0.2.347-classic-party-presentation-test — native party frame visual parity
 
 - Extend styling to **non-raid-style party frames**. These are dynamically pooled `PartyFrame.PartyMemberFramePool` members, not the compact `CompactPartyFrame.memberUnitFrames` used for raid-style party.

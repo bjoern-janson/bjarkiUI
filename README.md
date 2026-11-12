@@ -1,6 +1,6 @@
 # bjarkiUI
 
-**0.2.347-classic-party-presentation-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
+**0.2.348-classic-party-health-material-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
 
 ## Install
 
@@ -19,6 +19,8 @@ Version **0.2.340-leader-crown-nudge-test** nudges only the native party-leader 
 **v0.2.346 action timer numerals:** The six action binding positions were fixed, but four individual numeral tracks (whole/tenths, seconds tens/ones) still printed proportional native digits. This build applies the existing validated font/scale-specific transparent-spacing map to those four **native duration-text binding formatters**. Their physical cell positions, original Blizzard fonts, colors, timer lengths, swipes, GCD filtering, and minute/hour units remain unchanged. A rejected/unsupported markup rule falls back to the original fixed-cell or native formatter; no independent timer is added. [Changelog](CHANGELOG.md)
 
 **v0.2.347 native (non-raid-style) party frames:** Extends the existing bjarkiUI look to Blizzard's classic pooled `PartyFrame` members, separate from the compact raid-style party renderer. Each party member receives class-colored native names, health-bar fills and owner-colored pet health, the same outline-free LoL-style shadow treatment on native health/power status numbers, and Soft Dark's reversible 60% tint on decorative party/vehicle/pet frame art. Portraits, health/power values, icons, power colors, aura frames, UI layout and settings remain native. No in-game options or custom frame implementations.
+
+**v0.2.348 classic party health material fix:** Native non-raid-style health fills use Blizzard's baked-green party atlas, so changing status bar RGB alone did not make them class colored in-game. The classic presenter now delegates to bjarkiUI's existing reversible health-material owner. It uses the stock colorable party health `-Status` atlas where available (including the party pet), and guarded desaturation when a vehicle uses a different stock health mask. Native names, text values, fonts, power colors, portraits, dark art and Edit Mode layout remain unchanged. [Changelog](CHANGELOG.md)
 
 ## Current behavior
 

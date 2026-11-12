@@ -1,6 +1,10 @@
 # Known issues and bugs
 
-Current test branch is **0.2.347-classic-party-presentation-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+Current test branch is **0.2.348-classic-party-health-material-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+
+## 0.2.348 non-raid-style health still green — material-level repair (live check pending)
+
+The first in-game v0.2.347 screenshot showed the classic party art darkened but health bars still green. The bug was in treating `SetStatusBarColor` as sufficient without changing the health fill's baked-green source material. The v0.2.348 patch delegates to the established native health-material ownership and restoration path and chooses the existing Blizzard colorable `-Status` health atlas or safe desaturation when appropriate. An offline RGB assertion alone cannot certify pixels; verify class fills on live players, pets, disconnect/vehicle transitions and party pool reuse.
 
 ## 0.2.347 non-raid-style party presentation (in-game validation pending)
 
