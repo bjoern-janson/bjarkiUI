@@ -217,6 +217,16 @@ rejectRules=true;assert(get(label(20),original)==nil,"setter refused");rejectRul
 local saved={}
 for i=0,9 do local d=tostring(i);saved[d]=widths[d];widths[d]=7.25 end
 assert(get(label(21),original)==original,"native tabular digits need no extra formatter")
+-- Equal numeral advances can still give non-additive measurements when the
+-- native renderer rounds whole lines. An unchanged formatter needs no layout
+-- validation of its output, including its rounded decimal and unit strings.
+outlined=true
+for _,case in ipairs({{7.3,36,original,"action"},{7.32,37,suffix,"suffix"}}) do
+    for i=0,9 do widths[tostring(i)]=case[1] end
+    assert(get(label(case[2]),case[3])==case[3],
+        "pixel-rounded tabular "..case[4].." font must retain its native formatter")
+end
+outlined=false
 for d,w in pairs(saved)do widths[d]=w end
 local function newBase()
     local base=C_StringUtil.CreateNumericRuleFormatter()

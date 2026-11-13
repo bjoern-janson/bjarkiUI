@@ -1,6 +1,16 @@
 # Known issues and bugs
 
-Current test branch is **0.2.356-presentation-performance-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Current verification evidence](docs/VERIFICATION_0.2.356.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+Current test branch is **0.2.357-timer-handoff-recovery-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Current verification evidence](docs/VERIFICATION_0.2.357.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+
+## 0.2.357 timer handoff recovery — live report remains open
+
+The supplied `.356` `/buitimers` capture reports `actions cells=0 stock=2 idle=95`, both sampled buttons as `unavailable`, and zero minimum-read-denied/below-minimum counts. The action reason can be lost after binding succeeds but visibility handoff fails; these counts alone do not identify why the native setter/readback failed. A source reproduction additionally shows that a first refused hide does not retain the fallback required for the next native cooldown update to recover.
+
+The .357 repair retains that prepared fallback, reports hide-write/readback/restoration stages, prevents acquisition inside an open visibility transaction, and yields when binding cleanup invokes a newer visibility writer. Source regressions cover the resulting displayed cells, ordinary native update recovery and nested writes. They do not establish the cause or resolution of the live refusal.
+
+The capture also reports four plain glyph profiles but four unavailable full action formatters at `layout`. Naturally tabular font measurements combined with pixel-rounded line widths reproduce this unnecessary rejection. The exact original formatter now returns after successful glyph preparation. This is an identity operation: it corrects misleading optional preparation failure, but does not by itself activate cells or prove optical numeral stability.
+
+All 48 accessible ordinary aura hooks were installed; `readable-writes=53419` includes both cell and original-label decimal success. No native-duration success was recorded, 12 current states had recorded fallbacks, and the latest reason was `aura ID secret`. That last reason is not proof that all 12 shared it. The existing ordinary FontString exposes no supported below-ten-only formatter for a secret-ID aura. Native custom aura containers provide a separate supported architecture, but create new native-owned buttons and do not automatically preserve the legacy row's saved layout, ordering or inputs. The current rows remain unchanged; missing secret-ID decimals and observed moving buff digits remain open. [Native API evidence and scope](docs/VERIFICATION_0.2.357.md)
 
 ## 0.2.356 performance cleanup — offline evidence, live cost still open
 

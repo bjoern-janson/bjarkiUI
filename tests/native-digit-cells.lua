@@ -553,9 +553,18 @@ ok(not api.InstallAction(button),'failed read and rollback leave recovery pendin
 eq(cooldown.hidden,true,'protected native alpha/visibility still withheld')
 for _,b in ipairs(good) do ok(b.enabled,'rendering retained while stock cannot be restored') end
 cooldown.GetHideCountdownNumbers=getHidden;cooldown.SetHideCountdownNumbers=visibilityWriter
+local resumedVisibility={}
+cooldown.SetHideCountdownNumbers=function(self,hidden)
+ resumedVisibility[#resumedVisibility+1]=hidden
+ return visibilityWriter(self,hidden)
+end
 cooldown:SetCooldown(3)
-eq(cooldown.hidden,false,'next lifecycle restores stock after failed rollback')
-ok(api.InstallAction(button),'subsequent retry retakes verified ownership')
+eq(resumedVisibility[1],false,'next lifecycle completes stock restoration before retrying')
+eq(resumedVisibility[2],true,'same native lifecycle can reclaim its prepared fallback')
+eq(#resumedVisibility,2,'recovery performs one restore and one hide')
+eq(cooldown.hidden,true,'verified cells resume without a separate safe scan')
+cooldown.SetHideCountdownNumbers=visibilityWriter
+ok(api.InstallAction(button),'safe scan reuses the recovered ownership')
 do
  local fetch=C_ActionBar.GetActionCooldownDuration
  for _,order in ipairs({'clear-first','rescan-first','no-denial'}) do
@@ -1331,6 +1340,121 @@ do
   C_ActionBar.GetActionCooldownDuration=get
  end
  C_DurationUtil.CreateDurationTextBinding=create
+ bjarkiUINativeDigitCells=api
+end
+do
+ -- A FIRST visibility refusal must recover on the existing native update,
+ -- without borrowing a stockFallback left by an earlier clock outage.
+ local source=C_ActionBar.GetActionCooldownDuration
+ for _,fault in ipairs({'throw','false','after-write','read-denied','read-unavailable','read-mismatch','restore-refused',
+  'preceding-clock','rollback-update','cleanup-update','read-cleanup-update','external-on','external-off','cleanup-external'}) do
+  mod()
+  local handoff=bjarkiUINativeDigitCells
+  local failing=true
+  local rollbackUpdated=false
+  local clock={IsZero=function()return false end}
+  local current=fault~='preceding-clock' and clock or nil
+  C_ActionBar.GetActionCooldownDuration=function()return current end
+  local owner={action=5,cooldown=container()};local cd=owner.cooldown
+  function owner:GetName()return 'ActionButton11' end
+  function cd:GetCountdownFontString()return nativeLabel end
+  function cd:GetMinimumCountdownDuration()return 0 end
+  function cd:GetHideCountdownNumbers()
+   if failing and self.hidden then
+    if fault=='read-denied' or fault=='restore-refused' then error('readback unavailable') end
+    if fault=='read-unavailable' then return nil end
+    if fault=='read-mismatch' or fault=='read-cleanup-update' then return false end
+   end
+   return self.hidden==true
+  end
+  function cd:SetHideCountdownNumbers(value)
+   if failing then
+    if value and (fault=='throw' or fault=='preceding-clock' or fault=='rollback-update'
+     or fault=='cleanup-update' or fault=='cleanup-external') then error('hide unavailable') end
+    if value and fault=='false' then return false end
+    if not value and fault=='restore-refused' then return false end
+   end
+   self.hidden=value
+   if failing and not value and fault=='rollback-update' and not rollbackUpdated then
+    rollbackUpdated=true
+    self:SetCooldown(0,7.2,1)
+   end
+   if failing and value then
+    if fault=='after-write' then error('hide failed after writing') end
+    if fault=='external-on' or fault=='external-off' then
+     failing=false
+     self:SetHideCountdownNumbers(fault=='external-off')
+    end
+   end
+  end
+  function cd:SetCooldown()end;function cd:Clear()end
+  local first=#allBindings+1
+  local factory=C_DurationUtil.CreateDurationTextBinding
+  if fault=='cleanup-external' or fault=='cleanup-update' or fault=='read-cleanup-update' then
+   local watched=false
+   C_DurationUtil.CreateDurationTextBinding=function()
+    local binding=factory()
+    if not watched then
+     watched=true
+     local setter,armed=binding.SetEnabled,false
+     binding.SetEnabled=function(self,enabled)
+      if enabled then armed=true
+      elseif armed then
+       armed=false;failing=false
+       if fault=='cleanup-external' then cd:SetHideCountdownNumbers(true)
+       else cd:SetCooldown(0,7.2,1) end
+      end
+      return setter(self,enabled)
+     end
+    end
+    return binding
+   end
+  end
+  ok(not handoff.InstallAction(owner),fault..' refuses initial visibility handoff')
+  C_DurationUtil.CreateDurationTextBinding=factory
+  if fault=='preceding-clock' then
+   current=clock
+   ok(not handoff.InstallAction(owner),'later hide refusal replaces preceding clock failure')
+  end
+  local external=fault=='external-on' or fault=='external-off' or fault=='cleanup-external'
+  local report=handoff.GetActionTimerDiagnostics()
+  if not external then
+   ok(report:find('cells=0 stock=1 idle=0',1,true),fault..' retains a prepared stock fallback')
+   local reason=(fault=='read-denied' or fault=='restore-refused') and 'hide-read-denied'
+    or fault=='read-unavailable' and 'hide-read-unavailable'
+    or (fault=='read-mismatch' or fault=='read-cleanup-update') and 'hide-not-applied' or 'hide-write-refused'
+   ok(report:find('ActionButton11:'..reason,1,true),fault..' records its actual visibility stage')
+   if fault=='restore-refused' then
+    ok(report:find('/restore-read-denied',1,true),'failed restoration retains a separate public reason')
+   end
+  end
+  eq(cd.hidden==true,fault=='restore-refused' or fault=='external-off' or fault=='cleanup-external',fault..' preserves the available stock presenter')
+  local objects,bindings,watches=created,#allBindings,hooks
+  failing=false
+  currentCombat=true
+  cd:SetCooldown(0,6.4,1)
+  eq(created,objects,fault..' retries without allocating regions')
+  eq(#allBindings,bindings,fault..' reuses native duration bindings')
+  eq(hooks,watches,fault..' retries without installing hooks')
+  for i=first,#allBindings do
+   local binding=allBindings[i]
+   eq(binding.enabled,not external,fault..' native update respects current visibility ownership')
+   if not external then
+    eq(binding.duration,clock,fault..' binds the current native clock')
+    binding:Tick(6.4)
+   end
+  end
+  if not external then
+   eq(cd.hidden,true,fault..' recovery suppresses the stock number only after binding')
+   ok(handoff.GetActionTimerDiagnostics():find('cells=1 stock=0 idle=0',1,true),fault..' reports recovered cells')
+   eq(allBindings[first].label.text..allBindings[first+1].label.text..allBindings[first+2].label.text,
+    '6.4',fault..' recovered cells display the current tenth')
+  else
+   eq(cd.hidden,fault=='external-off' or fault=='cleanup-external',fault..' ordinary update does not reclaim another visibility writer')
+  end
+  currentCombat=false
+ end
+ C_ActionBar.GetActionCooldownDuration=source
  bjarkiUINativeDigitCells=api
 end
 do
