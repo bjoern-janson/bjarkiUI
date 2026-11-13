@@ -1,6 +1,14 @@
 # Known issues and bugs
 
-Current test branch is **0.2.358-timer-gate-prewarm-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Current verification evidence](docs/VERIFICATION_0.2.358.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+Current test branch is **0.2.359-native-timer-validation-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Current verification evidence](docs/VERIFICATION_0.2.359.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+
+## 0.2.359 alpha validation — latest live failure remains open
+
+The latest capture supplied after .358 delivery shows `cells=0 stock=13 idle=84`, `minimum-read-denied=11`, and `ActionButton3:gate-unsupported/probe-alpha`. ActionButton11 and MultiBarRightButton10 have separate `style-unavailable` receipts. The screenshot does not display the bjarkiUI version line. Aura output reads `native=0 fallback=4 last=aura ID secret readable-writes=2417`, `hooked=48/48`; the short buff visibly reads `6 s`.
+
+The alpha stage checks a synthetic FontString's exact .25 readback and subsequent restoration to one. The actual scalar gate uses only zero/one. .359 removes that unrelated fractional requirement and validates both required endpoints, while preserving all native duration/minimum policy. Fractional quantization is a plausible explanation, not a measured fact from this aggregate receipt. Wrong or inaccessible endpoints still retain stock.
+
+The two style failures do not identify a missing font, secret color, scale or shadow refusal. Those native getters can legitimately return unavailable/restricted data. Fixed public property stages now distinguish the failed read in subsequent existing diagnostics; the addon does not replace unknown current appearance with a default or cached guess. No compatible in-place buff secret-ID duration formatter was found. This build's local tests do not close the live action or buff reports. [Verification](docs/VERIFICATION_0.2.359.md)
 
 ## 0.2.358 idle action minimum-gate preparation — current live follow-up
 
