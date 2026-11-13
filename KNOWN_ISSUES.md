@@ -1,6 +1,16 @@
 # Known issues and bugs
 
-Current test branch is **0.2.357-timer-handoff-recovery-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Current verification evidence](docs/VERIFICATION_0.2.357.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+Current test branch is **0.2.358-timer-gate-prewarm-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Current verification evidence](docs/VERIFICATION_0.2.358.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+
+## 0.2.358 idle action minimum-gate preparation — current live follow-up
+
+The user reports .357 is still not static and buff decimals are not working. The new capture shows short buffs at `2 s` and `0 s`; aura diagnostics are `native=0`, `fallback=11`, `last=aura ID secret`, `readable-writes=21894`, `hooked=48/48`. Action diagnostics show `cells=1 stock=14 idle=82`, 12 minimum-read-denied fallbacks, and named `gate-unsupported/combat-cold` examples for ActionButton3 and ActionButton9. ActionButton6 has a separate `unavailable` receipt. All four glyph and full-formatter profiles now report plain/available.
+
+A source reproduction matches the cold-gate stage: a safe event discards a failed minimum gate, but unchanged prepared idle actions return before preparing a replacement. First restricted use in combat cannot create it. The .358 repair prepares the current native profile during safe scans and native minimum changes, including idle color changes. No minimum/GCD policy or calibration acceptance rule is relaxed. A captured cold profile can also arise from cache eviction or a genuinely new combat-only setting; the single-profile prewarming correction does not claim to cover every possible cause.
+
+Two ordinary fallback sequences can lose their diagnostic reason: rejected shutdown of a publicly zero clock, and a pending style recovery followed by native Clear then SetCooldown. They now retain public stage names, without claiming either unobserved prerequisite occurred on ActionButton6.
+
+The native whole-second buff path remains a separate confirmed limitation. Existing bjarkiUI already disables collapsing and consolidation; those are not replacement compatibility blockers. A [native helpful-buff-row proposal](docs/NATIVE_BUFF_ROW_DESIGN.md) records the supported duration delegate and actual remaining ordering, temporary-enchant, private-aura and Edit Mode considerations. No replacement row is installed in .358. Live digit placement and protected-client behavior remain unverified. [Verification](docs/VERIFICATION_0.2.358.md)
 
 ## 0.2.357 timer handoff recovery — live report remains open
 

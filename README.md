@@ -1,14 +1,14 @@
 # bjarkiUI
 
-**0.2.357-timer-handoff-recovery-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
+**0.2.358-timer-gate-prewarm-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
 
 ## Latest test build
 
-**.357:** Recovers prepared action digits on the next native cooldown update after an initial stock-visibility handoff fails, preserves newer visibility writers during cleanup, and reports precise handoff failure stages. Naturally tabular fonts retain the original formatter without unnecessary padded-layout validation. The reported secret-ID buff fallback remains open. [Changes](CHANGELOG.md) · [Verification and live limits](docs/VERIFICATION_0.2.357.md) · [Prior performance comparison](docs/VERIFICATION_0.2.356.md)
+**.358:** Prepares the native minimum-duration gate for idle action buttons during safe retries, native minimum changes and style refreshes. This repairs a reproduced path that produces the `gate-unsupported/combat-cold` fallback in the latest client capture. Precise diagnostics also distinguish pending style recovery and refused zero-clock shutdown. Secret-ID buff decimals remain open; a [native player-buff-row proposal](docs/NATIVE_BUFF_ROW_DESIGN.md) records the remaining compatibility limits. [Changes](CHANGELOG.md) · [Verification and live limits](docs/VERIFICATION_0.2.358.md) · [Prior performance comparison](docs/VERIFICATION_0.2.356.md)
 
 ## Install
 
-1. Download the supplied `bjarkiUI-0.2.357-Timer-Handoff-Recovery.zip` test package. The stacked development PR does not trigger the workflow restricted to `main`.
+1. Download the supplied `bjarkiUI-0.2.358-Timer-Gate-Prewarm.zip` test package. The stacked development PR does not trigger the workflow restricted to `main`.
 2. Extract its `bjarkiUI` folder into the Forever client's `Interface/AddOns/` directory. Check that `Interface/AddOns/bjarkiUI/bjarkiUI.toc` exists.
 3. Enable the addon and reload the interface. Use `/bui help` for the main commands and `/bdark` for Soft Dark controls.
 
@@ -75,6 +75,6 @@ Start with [AGENTS.md](AGENTS.md), then the [code map](docs/CODE_MAP.md). The tw
 - [Timer sources, native writers, hooks and cleanup](docs/TIMER_LIFECYCLE.md)
 - [Default manifest](bjarkiUI.toc) · [Camelot manifest](bjarkiUI_Camelot.toc)
 - [Package workflow](.github/workflows/package-addon.yml) · [Changelog](CHANGELOG.md)
-- [Current verification and live evidence](docs/VERIFICATION_0.2.357.md)
+- [Current verification and live evidence](docs/VERIFICATION_0.2.358.md)
 
 `ARCHITECTURE.md` records implementation history, including retired experiments. The 0.2.309 audit documents, `tests/snapshot-0.2.309/` and `tools/audit/` are historical reproduction material, not the current test or packaging entry point. Reproduce that audit at its [pinned revision](https://github.com/bjoern-janson/bjarkiUI/tree/d1797e392e0eb466906632e4dc047eb830b2ac78). Current source and top-level tests take precedence over historical descriptions. [Architecture history](ARCHITECTURE.md) · [Audit baseline](docs/AUDIT_BASELINE.md)
