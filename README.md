@@ -1,14 +1,14 @@
 # bjarkiUI
 
-**0.2.359-native-timer-validation-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
+**0.2.360-native-countdown-format-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
 
 ## Latest test build
 
-**.359:** Validates the zero/one alpha endpoints used by the fixed action renderer, replacing an unnecessary exact fractional-alpha requirement exposed by the latest `probe-alpha` fallback. Style failures gain property-specific receipts; their native acceptance rules remain intact. Live fixed positioning and secret-ID buff decimals remain open. [Changes](CHANGELOG.md) · [Verification and live limits](docs/VERIFICATION_0.2.359.md) · [Buff architecture limits](docs/NATIVE_BUFF_ROW_DESIGN.md)
+**.360:** Prefers fixed-spacing formatting on Blizzard's original action countdown after public sample geometry and exact installation checks. For restricted ordinary buffs, a public native seconds-format selector permits forwarding the opaque seconds directly to the original text sink with one decimal, without looking up the secret aura ID. This buff route uses decimals throughout the native seconds band (below 90 seconds), while keeping the longer units and existing rows. Unsupported geometry, selectors or writes retain fallback. Neither change has been verified in the client. [Changes](CHANGELOG.md) · [Verification and live limits](docs/VERIFICATION_0.2.360.md)
 
 ## Install
 
-1. Download the supplied `bjarkiUI-0.2.359-Native-Timer-Validation.zip` test package. The stacked development PR does not trigger the workflow restricted to `main`.
+1. Download the supplied `bjarkiUI-0.2.360-Native-Countdown-Format.zip` test package. The stacked development PR does not trigger the workflow restricted to `main`.
 2. Extract its `bjarkiUI` folder into the Forever client's `Interface/AddOns/` directory. Check that `Interface/AddOns/bjarkiUI/bjarkiUI.toc` exists.
 3. Enable the addon and reload the interface. Use `/bui help` for the main commands and `/bdark` for Soft Dark controls.
 
@@ -32,9 +32,9 @@ Historical **0.2.340-leader-crown-nudge-test** nudged the native crowns horizont
 
 | Surface | Behavior and native fallback |
 | --- | --- |
-| Action and pet-action countdowns | Fixed digit cells retain the current native font. Tenths appear below 10 seconds; whole seconds continue through 90.99 seconds; rounded-up minutes begin at 91 seconds (`2m`), with hours/days at their existing boundaries. Blizzard still owns cooldown timing, swipes, countdown preferences and minimum/GCD policy. Unsupported fixed-cell paths use the guarded native countdown. |
+| Action and pet-action countdowns | Prefer the original native label with verified fixed-spacing formatting and exact current font. Tenths appear below 10 seconds; whole seconds continue through 90.99 seconds; rounded-up minutes begin at 91 seconds (`2m`), with hours/days at their existing boundaries. The original widget owns timing, appearance, countdown preferences and minimum/GCD policy. Unsupported preparation retains the compatibility cells/native fallback. |
 | Player cast/channel timer | Restores the pinned 0.2.309 native duration-bound fixed-digit renderer for casts/channels; Blizzard's original `CastTimeText` is never cleared. The original timer remains visible whenever binding setup or native alpha handoff fails. Native font, settings and Edit Mode remain authoritative. |
-| Player buff/debuff timer | Public short durations use prepared fixed cells. Supported public-identity native duration objects can use a prepared fixed-width decimal formatter on the original label, without reading hidden timing or formatted text. Safe lifecycle refreshes retry missing typography and update changed scale profiles. Restricted identity, private anchors and forbidden frames retain their supported native route. |
+| Player buff/debuff timer | Public short durations retain prepared fixed cells. For an ordinary label with a positively public native seconds selector, restricted seconds can pass unchanged to a localized one-decimal native text sink, covering the native below-90-second band. Supported public-identity duration objects retain their existing formatter route. No rows are replaced; private anchors, inaccessible selectors and refused sinks retain native behavior. |
 | Tracked buff icons | Accessible native cooldown widgets receive the ten-second tenths threshold; timing, longer formats and visibility remain native. |
 | Unit frames and party | Unit names, status typography, readable class colors, cosmetic labels and vertical compact-party ordering use guarded native presentation hooks. Compact party names/health fills are class colored and their native numeric text gets the same LoL-style outline-free shadow. Camelot level badge artwork stays hidden through native Show, SetShown and SetAlpha writes; the separate level number remains intact. Layout repairs touch displaced anchors and retain rollback state after partial failure. |
 | Soft Dark and icon borders | Eligible native artwork receives reversible tinting or nameplate-style icon decoration. Restoration checks current ownership before replacing a later writer's work. |
@@ -70,11 +70,11 @@ For action/cast reports, capture while the affected cooldown or cast is active. 
 
 The description **“Ultralight unit-frame presentation”** refers to the addon's narrow presentation role, native clock ownership and event-driven updates. It is not an FPS, startup-time or in-client memory guarantee. The .356 comparison measures real Lua presenter code against fixed native-boundary fixtures; live rendering, native formatter cost and client garbage collection remain separate checks. Soft Dark retains safe lifecycle discovery because it also recovers late-created or replaced native artwork.
 
-Start with [AGENTS.md](AGENTS.md), then the [code map](docs/CODE_MAP.md). The two manifests load **16 runtime modules**. Current verification runs **37 top-level Lua scripts** (36 behavioral suites plus the manifest syntax script) under Lua 5.1 and Lua 5.4; the aura suite contains 226 cases. See [testing and packaging](docs/TESTING.md) for commands and the boundary between offline and live evidence.
+Start with [AGENTS.md](AGENTS.md), then the [code map](docs/CODE_MAP.md). The two manifests load **16 runtime modules**. Current verification runs **37 top-level Lua scripts** (36 behavioral suites plus the manifest syntax script) under Lua 5.1 and Lua 5.4; the aura suite contains 249 cases. See [testing and packaging](docs/TESTING.md) for commands and the boundary between offline and live evidence.
 
 - [Timer sources, native writers, hooks and cleanup](docs/TIMER_LIFECYCLE.md)
 - [Default manifest](bjarkiUI.toc) · [Camelot manifest](bjarkiUI_Camelot.toc)
 - [Package workflow](.github/workflows/package-addon.yml) · [Changelog](CHANGELOG.md)
-- [Current verification and live evidence](docs/VERIFICATION_0.2.359.md)
+- [Current verification and live evidence](docs/VERIFICATION_0.2.360.md)
 
 `ARCHITECTURE.md` records implementation history, including retired experiments. The 0.2.309 audit documents, `tests/snapshot-0.2.309/` and `tools/audit/` are historical reproduction material, not the current test or packaging entry point. Reproduce that audit at its [pinned revision](https://github.com/bjoern-janson/bjarkiUI/tree/d1797e392e0eb466906632e4dc047eb830b2ac78). Current source and top-level tests take precedence over historical descriptions. [Architecture history](ARCHITECTURE.md) · [Audit baseline](docs/AUDIT_BASELINE.md)

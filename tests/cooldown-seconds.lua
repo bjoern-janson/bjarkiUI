@@ -352,4 +352,58 @@ do
     spy.emit("PLAYER_LOGIN");spy.emit("PLAYER_ENTERING_WORLD");spy.emit("PLAYER_REGEN_ENABLED")
     eq(invalidations,3,"login, world entry and combat exit each admit one bounded calibration retry")
 end
+do
+    -- A fixed native formatter must be confirmed before it can retire the
+    -- competing cell renderer. Accepted void setters may silently do nothing.
+    for _,failure in ipairs({'none','ignored','refused-after-apply','no-getter'}) do
+        local env,spy=makeEnv()
+        local cd=makeCooldown()
+        local fixed,label,base={},{},nil
+        local styleAvailable=true
+        local preference,confirmed,cleared=nil,0,0
+        cd.GetCountdownFontString=function() if styleAvailable then return label end end
+        function cd:SetCountdownFormatter(wanted)
+            self.setterCalls=self.setterCalls+1
+            if wanted==fixed and failure=='ignored' then return end
+            self.formatter=wanted
+            if wanted==fixed and failure=='refused-after-apply' then return false end
+        end
+        if failure=='no-getter' then cd.GetCountdownFormatter=nil end
+        env.ActionButton1={cooldown=cd}
+        env.bjarkiUINativeDigitCells={
+            UseNativeActionFormatter=function(widget,wanted)
+                eq(widget,cd,'native preference belongs to the physical cooldown')
+                if wanted then
+                    eq(wanted,widget.formatter,'native preference follows exact installed formatter readback')
+                    confirmed=confirmed+1
+                else cleared=cleared+1 end
+                preference=wanted
+            end,
+            InstallAction=function()
+                if failure=='none' and styleAvailable then
+                    eq(preference,fixed,'confirmed native preference precedes competing cell discovery')
+                else eq(preference,nil,'unconfirmed or unavailable formatting cannot retire fallback cells') end
+            end,
+        }
+        local helper={
+            GetFixedActionFormatter=function(_,fallback)
+                base=fallback
+                return styleAvailable and fixed or nil
+            end,
+            IsFixedActionFormatter=function(value)return value==fixed end,
+        }
+        loadWith(env,helper)
+        if failure=='none' then
+            eq(confirmed,1,'accepted and read-back native formatter earns preference')
+            styleAvailable=false
+            spy.emit('UI_SCALE_CHANGED')
+            eq(cd.formatter,base,'unavailable current label restores numeric base rather than stale geometry')
+            eq(preference,nil,'changed or inaccessible style retires prior native preference')
+        else
+            eq(confirmed,0,failure..' cannot claim native formatting')
+            eq(cd.formatter,base,failure..' retains standard native numeric rules')
+            check(cleared>0,failure..' clears any prior native preference')
+        end
+    end
+end
 print("bjarkiUI cooldown seconds: "..assertions.." source-backed assertions passed")

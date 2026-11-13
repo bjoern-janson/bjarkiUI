@@ -1,8 +1,20 @@
 # Known issues and bugs
 
-Current test branch is **0.2.359-native-timer-validation-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Current verification evidence](docs/VERIFICATION_0.2.359.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+Current test branch is **0.2.360-native-countdown-format-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Current verification evidence](docs/VERIFICATION_0.2.360.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
 
-## 0.2.359 alpha validation — latest live failure remains open
+## 0.2.360 native action formatter — action movement and buff decimals remain open
+
+The capture supplied after .359 delivery reports `cells=0 stock=13 idle=84`, `minimum-read-denied=11`, two named `gate-unsupported/scalar-threshold` samples, and `MultiBarRightButton10:style-unavailable/text-color`. The four action formatter profiles remain plain. Aura output reads `native=0 fallback=3 last=aura ID secret readable-writes=0`, with `hooked=48/48`, three fallback buttons and six private anchors. A short ordinary buff visibly reads `6 s`. The screenshot does not display the bjarkiUI version line; the separate bjarkiCC startup version is not a bjarkiUI version receipt.
+
+These are two more failures in the replacement action presenter's minimum/appearance reconstruction. The curve contract does not guarantee the exact adjacent-breakpoint behavior assumed by the synthetic fixture; the sampled text-color read is unavailable. Neither receipt supplies permission to guess hidden data or bypass native eligibility.
+
+.360 instead prefers a fixed-spacing formatter on the original native cooldown, after public complete-string geometry checks and exact formatter installation readback. The former plain classification did not validate standalone numeral positions. Native configuration receipts and mocked geometry checks still do not establish the rendered result. Character-selection rectangles are not a documented optical-ink measurement, and unsupported native geometry retains fallback. Keep the live movement report open. [Design](docs/NATIVE_COUNTDOWN_0.2.360_PLAN.md) · [Verification](docs/VERIFICATION_0.2.360.md)
+
+No compatible in-place native delegate was found that conditionally selects decimals only below ten seconds for an opaque legacy buff duration. A narrower route does exist: `SecondsToTimeAbbrev` returns the original seconds unchanged throughout its below-90-second branch, and the ordinary label's `SetFormattedText` accepts opaque arguments. When that call's format selector is positively public, .360 can forward the seconds unchanged to a one-decimal localized sink. This avoids the secret-ID lookup, with decimals throughout that entire native seconds band. Source does not establish selector readability or accepted rendering on every live aura, so the missing-decimal report remains open pending client evidence.
+
+The [larger replacement-row proposal](docs/NATIVE_BUFF_ROW_REPLACEMENT_PROPOSAL.md) would change private grouping, aura order and enchant placement. It is not implemented or required by the narrower seconds-sink route; the current rows and saved layout remain.
+
+## 0.2.359 alpha validation — historical repair and later live failure
 
 The latest capture supplied after .358 delivery shows `cells=0 stock=13 idle=84`, `minimum-read-denied=11`, and `ActionButton3:gate-unsupported/probe-alpha`. ActionButton11 and MultiBarRightButton10 have separate `style-unavailable` receipts. The screenshot does not display the bjarkiUI version line. Aura output reads `native=0 fallback=4 last=aura ID secret readable-writes=2417`, `hooked=48/48`; the short buff visibly reads `6 s`.
 

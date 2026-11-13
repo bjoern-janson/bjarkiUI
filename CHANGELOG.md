@@ -2,6 +2,16 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.360-native-countdown-format-test — keep the native action countdown owner
+
+- The latest capture still shows zero active action cell presenters, with `scalar-threshold` and `text-color` failures. Stop making another calibration adjustment the primary action repair.
+- Prefer fixed-spacing formatting on the original native cooldown widget. Validate public complete sample strings and numeral/decimal character positions, including fonts previously classified as naturally tabular. Keep the existing individual buff/cell glyph maps separate.
+- Require an accepted formatter setter and exact public getter identity before recording native preference. Retire only owned replacement cells and hidden-number state; preserve later writers and explicit recovery after refusal. Existing hooks and preference transitions cannot reacquire cells while that native receipt remains current.
+- The accepted native route retains native clocks, color, minimum/GCD policy and visibility without copying protected source appearance or constructing a separate eligibility gate. Unsupported geometry or installation retains compatibility fallback.
+- Add cached native-configuration/handoff counts with explicit limits: they are not active timer counts or proof of stable live pixels. No new per-button widgets, polling, event frame, dependency, setting or runtime module.
+- Add an in-place ordinary-buff route when the native `SetFormattedText` selector is positively public and exactly the localized seconds format. Forward its original opaque seconds unchanged to a prepared one-decimal sink; no aura identity lookup or time arithmetic is required. The precision tradeoff is decimals throughout the native seconds band (below 90 seconds), rather than conditional below-ten formatting. Longer units and the existing public short-cell path remain.
+- Preserve native rows, icons, fonts, ordering, private anchors, weapon enchants and saved layout. Unsupported/secret selectors or refused sinks keep native behavior. The larger HELPFUL/HARMFUL-row proposal remains an unimplemented alternative, not a prerequisite for this narrower route. Live buff decimal coverage remains unverified.
+
 ## 0.2.359-native-timer-validation-test — validate the alpha values actually used
 
 - The latest capture still shows zero active action cell presenters. Its named `probe-alpha` fallback identifies a synthetic validation stage that required an exact quarter-alpha round trip, although the renderer only uses zero/one scalar alpha.

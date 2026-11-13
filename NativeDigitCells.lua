@@ -1,8 +1,9 @@
 -- Fixed-character countdown cells, with single-owner presentation.
 -- Buff geometry follows native font changes; glyph metrics are cached per font.
--- Action bar: Blizzard's own duration object + native fixed-position digit bindings.
--- The STOCK countdown is hidden through its explicit visibility API ONLY after
--- every binding has passed validation. We never mask it via a formatter.
+-- Action bars prefer a verified formatter on Blizzard's existing countdown.
+-- Compatibility cells use Blizzard's own duration object and digit bindings.
+-- Only that fallback hides STOCK through its visibility API, after validation.
+-- A confirmed native formatter retires the fallback's own visibility/bindings.
 -- Action timers use separate decimal, two-digit and unit-suffixed text tracks.
 -- No font replacement, OnUpdate, polling, text interception, slash commands,
 -- protected time arithmetic, or layout work during combat.
@@ -10,6 +11,8 @@ local _,private=...
 local api = {}
 bjarkiUINativeDigitCells = api
 local installed = setmetatable({}, {__mode='k'})
+local nativeActions = setmetatable({}, {__mode='k'})
+local nativeFormatterHooks = setmetatable({}, {__mode='k'})
 local petButtons = setmetatable({}, {__mode='k'})
 local buffCells = setmetatable({}, {__mode='k'})
 local buffLayoutHookNames = {'SetPoint','ClearAllPoints','SetAllPoints','SetScale','SetTextScale'}
@@ -687,7 +690,7 @@ local function minimumGate(state,minimum)
     return ok and gate or nil
 end
 local function prepareActionMinimumGate(state)
-    if not outOfCombat() then return end
+    if nativeActions[state.cooldown] or not outOfCombat() then return end
     local minimum=publicMilliseconds(state.cooldown,'GetMinimumCountdownDuration')
     if minimum and minimum>0 then minimumGate(state,minimum) end
 end
@@ -867,8 +870,126 @@ local function restoreFailedHandoff(state,reason,stopBindings)
     state.handoffCleanup=nil
     return false
 end
+local function matchesNativeFormatter(cooldown,formatter)
+    local get=m(cooldown,'GetCountdownFormatter')
+    local read,actual=pcall(get,cooldown)
+    return read and public(actual) and rawequal(actual,formatter)
+end
+local function releaseNativeFormatter(cooldown)
+    if not nativeActions[cooldown] then return end
+    nativeActions[cooldown]=nil
+    local state=installed[cooldown]
+    if state then state.nativeClockInvalid=nil end
+    if state and state.prepared and not state.active then
+        state.stockFallback=true
+        state.fallbackReason='native-format-unavailable'
+    end
+end
+local function nativeBindingsStopped(state)
+    local complete=true
+    for i,binding in ipairs(state.bindings) do
+        local read,enabled=pcall(m(binding,'IsEnabled'),binding)
+        if not read or not public(enabled) or enabled~=false then
+            complete=false
+            local label=state.cells[i]
+            if accepted(pcall(m(label,'Hide'),label)) then state.muted[i]=true end
+        end
+    end
+    if not complete then state.rendering=nil end -- retry a silently ignored shutdown
+    return complete
+end
+local function retireNativeAction(state,receipt)
+    if receipt.configured then return true end
+    if state.visibilityWrites~=nil or state.handoffCleanup or state.nativeRetiring then return false end
+    state.nativeRetiring=true
+    state.epoch=state.epoch+1
+    state.pendingSet=false
+    if state.cleared or currentCooldown(state.button)~=state.cooldown
+        or state.button~=receipt.button
+        or (receipt.action~=nil and not rawequal(field(state.button,'action'),receipt.action)) then
+        state.nativeClockInvalid=true
+    end
+    if state.nativeClockInvalid then
+        -- A refused restoration preserves only a still-current presenter.
+        -- Clear, a newer clock, or a changed owner/slot invalidates its digits.
+        state.active=false
+        setRendering(state,false)
+    end
+    local restored
+    if state.ownsHidden and not wantsNativeNumbers() then
+        -- A disabled/unknown native preference cannot authorize unhiding our
+        -- former label. A native visibility write or later enable completes it.
+        state.nativeClockInvalid=true
+        setRendering(state,false)
+        restored=false
+    else
+        restored=restoreStock(state)
+    end
+    -- A nested native set may invalidate the clock during the visibility
+    -- write itself, after the initial invalidation check above.
+    local stopped
+    if state.nativeClockInvalid then
+        state.active=false
+        setRendering(state,false)
+        -- Restoration may still refuse. A disabled old clock nevertheless
+        -- needs a readback/Hide fallback before it can repaint old digits.
+        stopped=nativeBindingsStopped(state)
+    elseif restored then stopped=nativeBindingsStopped(state) end
+    local complete=restored and stopped
+        and matchesNativeFormatter(state.cooldown,receipt.formatter)
+    state.nativeRetiring=nil
+    -- A nested formatter/visibility writer may have superseded the request.
+    -- Do not publish a completed handoff from the older transaction.
+    if nativeActions[state.cooldown]~=receipt then return false end
+    if complete then
+        receipt.configured=true
+        state.stockFallback=nil
+        state.fallbackReason=nil
+        return true
+    end
+    return false
+end
+function api.UseNativeActionFormatter(cooldown,formatter)
+    if not safe(cooldown) then return false end
+    if type(formatter)=='nil' then releaseNativeFormatter(cooldown);return false end
+    if not public(formatter) or not outOfCombat() then return false end
+    local verify=field(private,'IsFixedActionFormatter')
+    local checked,verified=pcall(verify,formatter)
+    if not checked or not public(verified) or verified~=true
+        or not matchesNativeFormatter(cooldown,formatter) then return false end
+    if not nativeFormatterHooks[cooldown] then
+        if type(hooksecurefunc)~='function' or not m(cooldown,'SetCountdownFormatter') then return false end
+        local hooked,result=pcall(hooksecurefunc,cooldown,'SetCountdownFormatter',function(widget)
+            local receipt=nativeActions[widget]
+            if receipt then
+                receipt.observation=receipt.observation+1
+                local observation=receipt.observation
+                local matches=matchesNativeFormatter(widget,receipt.formatter)
+                if not matches and nativeActions[widget]==receipt
+                    and receipt.observation==observation then releaseNativeFormatter(widget) end
+            end
+        end)
+        if not accepted(hooked,result) then return false end
+        nativeFormatterHooks[cooldown]=true
+        if not matchesNativeFormatter(cooldown,formatter) then return false end
+    end
+    local state=installed[cooldown]
+    local receipt=nativeActions[cooldown]
+    if not receipt or not rawequal(receipt.formatter,formatter) then
+        receipt={formatter=formatter,configured=false,observation=0,button=state and state.button,
+            action=state and field(state.button,'action')}
+        nativeActions[cooldown]=receipt
+        if state then state.epoch=state.epoch+1;state.pendingSet=false end
+    end
+    receipt.observation=receipt.observation+1
+    if state then return retireNativeAction(state,receipt) end
+    receipt.configured=true
+    return true
+end
 local installAction
 local function refreshCurrentClock(state)
+    local native=nativeActions[state.cooldown]
+    if native then retireNativeAction(state,native);return end
     if currentCooldown(state.button)~=state.cooldown then
         -- A retained native hook can run before the new button is discovered.
         -- Its former action slot cannot supply the clock for this widget.
@@ -933,6 +1054,13 @@ local function refreshAction(state,nativeSet)
     if nativeSet then
         state.epoch=state.epoch+1
         state.cleared=false
+    end
+    local native=nativeActions[state.cooldown]
+    if native then
+        if nativeSet or state.cleared then state.nativeClockInvalid=true end
+        state.pendingSet=false
+        retireNativeAction(state,native)
+        return
     end
     if state.refreshing then
         if nativeSet then state.pendingSet=true end
@@ -1133,11 +1261,18 @@ function api.StopActionNumbers()
         state.pendingSet=false
         state.restorePending=false
         setRendering(state,false)
+        local native=nativeActions[state.cooldown]
+        if native then retireNativeAction(state,native) end
     end
 end
 function api.StockCountdownVisibilityChanged(button)
     local cooldown=currentCooldown(button)
     local state=cooldown and installed[cooldown]
+    local native=cooldown and nativeActions[cooldown]
+    if native then
+        if state then retireNativeAction(state,native) end
+        return
+    end
     if not state or state.button~=button or not state.prepared or not state.hideSerial then return end
     local serial=state.hideSerial
     local ok,hidden=pcall(m(cooldown,'GetHideCountdownNumbers'),cooldown)
@@ -1161,7 +1296,10 @@ function api.ResumeOwnedActionNumbers()
         -- Stance/pet widgets may receive no native CVar visibility write.
         -- Reuse only a prepared presenter: either our suppressed stock label
         -- or a known stock fallback whose visibility can be checked again.
-        if state.prepared and state.ownsHidden and not state.active then
+        local native=nativeActions[state.cooldown]
+        if native then
+            retireNativeAction(state,native)
+        elseif state.prepared and state.ownsHidden and not state.active then
             local getHide=m(state.cooldown,'GetHideCountdownNumbers')
             local ok,hidden=pcall(getHide,state.cooldown)
             if ok and public(hidden) and hidden==true then
@@ -1193,9 +1331,17 @@ installAction=function(button,prepared,petIndex)
     local cooldown=currentCooldown(button)
     if not safe(cooldown) then return false end
     local state=installed[cooldown]
+    local native=nativeActions[cooldown]
+    if native then
+        if state then
+            if state.button~=button then state.nativeClockInvalid=true end
+            retireNativeAction(state,native)
+        end
+        return false
+    end
     -- A native update inside our hide/restore setter or binding cleanup
     -- cannot start a second acquisition before that handoff has completed.
-    if state and (state.visibilityWrites~=nil or state.handoffCleanup) then return false end
+    if state and (state.visibilityWrites~=nil or state.handoffCleanup or state.nativeRetiring) then return false end
     -- A legitimate later SetCooldown/minimum change may reclaim only this
     -- already-prepared stock fallback. No new resources or hooks in combat.
     if prepared and (state~=prepared or state.button~=button or not state.prepared or not state.stockFallback) then return false end
@@ -1299,6 +1445,7 @@ installAction=function(button,prepared,petIndex)
         return restoreFailedHandoff(state,not confirmed and 'hide-read-denied'
             or not known and 'hide-read-unavailable' or 'hide-not-applied')
     end
+    if nativeActions[cooldown] then retireNativeAction(state,nativeActions[cooldown]);return false end
     state.active=true
     if state.epoch~=claimEpoch then
         -- A new clock or clear arrived after A was bound, while inactive
@@ -1322,9 +1469,13 @@ function api.GetActionTimerDiagnostics()
     -- Summarize existing receipts only. Never inspect a live clock or ask the
     -- renderer to refresh; restricted values stay in their native sinks.
     local cells,stock,idle,denied,below=0,0,0,0,0
+    local configured,pending=0,0
+    for _,receipt in pairs(nativeActions) do
+        if receipt.configured then configured=configured+1 else pending=pending+1 end
+    end
     local names={}
     for _,state in pairs(installed) do
-        if state.prepared then
+        if state.prepared and not (nativeActions[state.cooldown] and nativeActions[state.cooldown].configured) then
             if state.active and state.rendering==true then
                 cells=cells+1
             elseif not state.cleared and (state.stockFallback or state.restorePending) then
@@ -1343,6 +1494,7 @@ function api.GetActionTimerDiagnostics()
     table.sort(names)
     return string.format('actions cells=%d stock=%d idle=%d minimum-read-denied=%d below/equal-minimum=%d',
         cells,stock,idle,denied,below)..(#names>0 and ' ['..table.concat(names,', ')..']' or '')
+        ..string.format(' native-format-configured=%d native-handoff-pending=%d',configured,pending)
 end
 -- Player aura durations are already refreshed by Blizzard's UpdateDuration;
 -- reuse the EXISTING post-hook, never register an additional OnUpdate.

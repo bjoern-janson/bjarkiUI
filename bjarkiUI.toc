@@ -2,7 +2,7 @@
 ## Title: bjarkiUI
 ## Notes: Ultralight unit-frame presentation for WoW: Forever
 ## Author: Bjarki / OpenAI
-## Version: 0.2.359-native-timer-validation-test
+## Version: 0.2.360-native-countdown-format-test
 ## SavedVariablesPerCharacter: bjarkiUISettings
 
 NativePrecision.lua
