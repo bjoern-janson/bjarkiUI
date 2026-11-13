@@ -543,6 +543,204 @@ function private.GetFixedTimerGlyphs(label)
     return entry.glyphs
 end
 
+-- The seconds-only buff sink receives one opaque number, so it cannot insert
+-- different markup around individual digits. Constant outside guards help
+-- only fonts whose complete decimal strings also have stable inner columns.
+-- Reuse the public action probe; no live text or timer value enters this path.
+local buffSecondsProfiles,buffSecondsKeys,buffSecondsSlot={},{},1
+local lastBuffSecondsStage="none"
+local buffSinkTokenReady,buffSinkTokenEpoch
+-- A public unused vararg identifies our exact native write without examining
+-- its opaque argument. Qualify that call contract independently of geometry:
+-- proportional fonts still need the plain and genuine-duration text sinks.
+function private.PrepareBuffSecondsSink(label)
+    if buffSinkTokenReady then return true end
+    if buffSinkTokenEpoch==retryEpoch then return false end
+    local attempt={}
+    local key,file,size,flags,scale,textScale=readableStyle(label,attempt)
+    if not key then return false end
+    buffSinkTokenEpoch=retryEpoch
+    local ok=pcall(function()
+        prepareProbe(file,size,flags,scale,textScale,attempt)
+        accepted(probe:SetFormattedText("%.1f",1.7))
+        local plain=accessible(probe:GetText())
+        assert(type(plain)=="string" and plain:match("^1[.,]7$"),"unsupported decimal sink")
+        accepted(probe:SetFormattedText("%.1f",1.7,1))
+        assert(accessible(probe:GetText())==plain,"unused native vararg changed numeric output")
+        accepted(probe:SetFormattedText("%s","bjarkiUI",1))
+        assert(accessible(probe:GetText())=="bjarkiUI","unused native vararg changed text output")
+    end)
+    local cleaned=pcall(function()
+        if probe then accepted(probe:Hide());accepted(probe:SetText("")) end
+    end)
+    buffSinkTokenReady=ok and cleaned or nil
+    return buffSinkTokenReady==true
+end
+local function buildBuffSeconds(file,size,flags,scale,textScale,smooth,attempt)
+    local probeWidth,probeHeight=prepareActionProbe(file,size,flags,scale,textScale,smooth,attempt)
+    local tolerance=.01/scale
+    local guard,larger=string.format(actionSpacer,1),string.format(actionSpacer,2)
+    local format=guard.."%.1f"..guard
+    local function sample(text)
+        attempt.stage="sample-text"
+        accepted(actionProbe:SetText(text))
+        assert(accessible(actionProbe:GetText())==text,"different public sample")
+    end
+    local function printf(template,value)
+        attempt.stage="sample-format"
+        accepted(actionProbe:SetFormattedText(template,value,1))
+        local text=accessible(actionProbe:GetText())
+        assert(type(text)=="string","unreadable public formatted sample")
+        return text
+    end
+    local function width(text,unbounded)
+        attempt.stage="measure"
+        local value
+        if actionProbe.GetUnboundedStringWidthForText then value=actionProbe:GetUnboundedStringWidthForText(text)
+        else
+            sample(text)
+            if unbounded then value=actionProbe:GetUnboundedStringWidth()
+            else value=actionProbe:GetStringWidth() end
+        end
+        assert(positive(value) and (unbounded or value<=probeWidth),"unmeasurable or clipped public line")
+        return value
+    end
+    local function character(index)
+        attempt.stage="character-areas"
+        local areas=accessible(actionProbe:CalculateScreenAreaFromCharacterSpan(index,index+1))
+        assert(type(areas)=="table" and #areas==1 and accessible(areas[2])==nil,"missing character area")
+        local area=accessible(areas[1])
+        assert(type(area)=="table","invalid character area")
+        local left,bottom,w,h=area.left,area.bottom,area.width,area.height
+        assert(canRead(left) and type(left)=="number" and left>=0 and left<math.huge
+            and canRead(bottom) and type(bottom)=="number" and bottom>=0 and bottom<math.huge
+            and positive(w) and positive(h) and left+w<=probeWidth+tolerance and bottom+h<=probeHeight+tolerance,
+            "unreadable or clipped character area")
+        return left+w/2-probeWidth/2,w
+    end
+    sample(guard.."0"..guard)
+    local haveAreas=pcall(character,#guard+1)
+    local contexts={}
+    local function context(text)
+        local cached=contexts[text]
+        if not cached then
+            local packed=guard..text..guard
+            assert(#packed*8<=8192,"public sample too long")
+            cached={width(packed),width(string.rep(packed,8),true)}
+            contexts[text]=cached
+        end
+        return cached
+    end
+    -- Independent guard growth rejects ignored/zero-width texture markup.
+    local reference,unit
+    local advances={}
+    for digit=0,9 do
+        local d=tostring(digit)
+        local measured=context(d)
+        local left=width(larger..d..guard)-measured[1]
+        local right=width(guard..d..larger)-measured[1]
+        local both=width(larger..d..larger)-measured[1]
+        attempt.stage="width-digits"
+        assert(positive(left) and math.abs(left-right)<=tolerance and math.abs(both-2*left)<=tolerance,
+            "outside guards have inconsistent advance")
+        if reference then
+            assert(math.abs(measured[1]-reference[1])<=tolerance
+                and math.abs(measured[2]-reference[2])<=tolerance and math.abs(left-unit)<=tolerance,
+                "native buff numerals are not tabular")
+        else reference,unit=measured,left end
+        if haveAreas then
+            sample(guard..d..guard)
+            local _,advance=character(#guard+1)
+            advances[d]=advance
+        end
+    end
+    local families,required={},0
+    for tenth=0,900 do
+        local raw=printf("%.1f",tenth/10)
+        assert(raw:match("^%d%d?[.,]%d$"),"unsupported native decimal format")
+        attempt.stage="height"
+        local height=actionProbe:GetStringHeight()
+        assert(positive(height) and height<=probeHeight+tolerance,"unreadable or clipped native height")
+        local packed=printf(format,tenth/10)
+        assert(packed==guard..raw..guard,"native printf changed literal guards")
+        attempt.stage="height"
+        local paddedHeight=actionProbe:GetStringHeight()
+        assert(positive(paddedHeight) and paddedHeight<=probeHeight+tolerance
+            and math.abs(paddedHeight-height)<=tolerance,"guards change or clip line height")
+        local fullWidth=width(packed)
+        required=math.max(required,fullWidth)
+        local positions={}
+        if haveAreas then
+            -- Width fallback is unavailable after any valid first rectangle.
+            sample(packed)
+            for i=1,#raw do
+                local center,advance=character(#guard+i)
+                local expected=advances[raw:sub(i,i)]
+                assert(not expected or math.abs(advance-expected)<=tolerance,"decimal context changes numeral advance")
+                positions[#positions+1]=center;positions[#positions+1]=advance
+            end
+        else
+            for i=1,#raw do
+                local prefix,suffix=context(raw:sub(1,i)),context(raw:sub(i))
+                positions[#positions+1]=prefix[1];positions[#positions+1]=prefix[2]
+                positions[#positions+1]=suffix[1];positions[#positions+1]=suffix[2]
+            end
+        end
+        local family=raw:gsub("%d","#")
+        local previous=families[family]
+        attempt.stage="columns"
+        if previous then
+            assert(math.abs(fullWidth-previous.width)<=tolerance,"complete buff width moved")
+            for i,value in ipairs(positions) do
+                assert(math.abs(value-previous.positions[i])<=tolerance,"native buff column moved")
+            end
+        else families[family]={width=fullWidth,positions=positions} end
+    end
+    return format,required,not haveAreas
+end
+
+function private.GetFixedBuffSecondsFormat(label)
+    local attempt={}
+    local key,file,size,flags,scale,textScale=readableStyle(label,attempt)
+    if not key then lastBuffSecondsStage=attempt.stage;return nil end
+    attempt.stage="smooth-scaling"
+    local got,smooth=pcall(function()return accessible(label:GetSmoothScaling())end)
+    if not got or type(smooth)~="boolean" then lastBuffSecondsStage=attempt.stage;return nil end
+    key=key.."\031"..(smooth and "1" or "0")
+    local entry=buffSecondsProfiles[key]
+    if not entry then
+        if buffSecondsKeys[buffSecondsSlot] then buffSecondsProfiles[buffSecondsKeys[buffSecondsSlot]]=nil end
+        buffSecondsKeys[buffSecondsSlot]=key;buffSecondsSlot=buffSecondsSlot%16+1
+        entry={};buffSecondsProfiles[key]=entry
+    end
+    if not entry.format and entry.epoch~=retryEpoch then
+        entry.epoch=retryEpoch
+        local built,format,required,widthOnly=pcall(buildBuffSeconds,file,size,flags,scale,textScale,smooth,attempt)
+        local cleaned=pcall(function()
+            if actionProbe then
+                accepted(actionProbe:Hide())
+                assert(accessible(actionProbe:IsShown())==false,"buff probe remains shown")
+                accepted(actionProbe:SetText(""))
+            end
+        end)
+        if not cleaned then built=false;attempt.stage="probe-cleanup" end
+        entry.stage=built and (widthOnly and "fixed-widths" or "fixed") or attempt.stage
+        entry.format,entry.required=built and format or nil,required
+    end
+    lastBuffSecondsStage=entry.stage
+    if not entry.format then return end
+    local fits=pcall(function()
+        local explicit=accessible(label:GetWidth(true))
+        if explicit~=0 then assert(positive(explicit) and explicit>=entry.required,"narrow buff label")
+        elseif accessible(label:GetNumPoints())>1 then
+            local width=label:GetWidth()
+            assert(positive(width) and width>=entry.required,"constrained buff label")
+        end
+    end)
+    if not fits then lastBuffSecondsStage="label-fit";return end
+    return entry.format,smooth,entry.required
+end
+
 local function fitsWidget(widget,label,scale,required)
     local widgetWidth,widgetScale=widget:GetWidth(),widget:GetEffectiveScale()
     if not positive(widgetWidth) or not positive(widgetScale) or widgetWidth*widgetScale/scale<required then return false end
@@ -619,7 +817,12 @@ function private.GetTimerTypographyDiagnostics()
     for _,source in pairs(sources) do
         for _,key in pairs(source.keys) do count(formats,source[key]) end
     end
-    return string.format("typography profiles glyphs=fixed:%d/plain:%d/unavailable:%d last=%s | formats=fixed:%d/plain:%d/unavailable:%d last=%s",
+    local buffFixed,buffUnavailable=0,0
+    for _,entry in pairs(buffSecondsProfiles) do
+        if entry.format then buffFixed=buffFixed+1 else buffUnavailable=buffUnavailable+1 end
+    end
+    return string.format("buff-seconds=fixed:%d/unavailable:%d last=%s | typography profiles glyphs=fixed:%d/plain:%d/unavailable:%d last=%s | formats=fixed:%d/plain:%d/unavailable:%d last=%s",
+        buffFixed,buffUnavailable,lastBuffSecondsStage,
         glyphs.fixed,glyphs.plain,glyphs.unavailable,lastGlyphStage,
         formats.fixed,formats.plain,formats.unavailable,lastFormatterStage)
 end

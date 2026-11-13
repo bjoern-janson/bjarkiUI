@@ -52,7 +52,8 @@ local widths={["0"]=7.25,["1"]=3.25,["2"]=6.25,["3"]=6.75,["4"]=7.25,["5"]=6.25,
     ["6"]=6.75,["7"]=5.25,["8"]=7.25,["9"]=7.25,["."]=2.5,[","]=2.5,m=6,h=5,d=5.5}
 local invalidMarkup,ignoreFont,tallMarkup,outlined=false,false,false,false
 local modernBounds,quantizeSpacers,spanFailure=false,false,nil
-local widthFailure
+local widthFailure,oversizedHeight
+local rejectUnusedArgument,formattedSamples=false,0
 local rejectAlpha,rejectShow,unreadableAlpha,rejectSmooth=false,false,false,false
 local quantizeBounds=false
 local sideBearings={["1"]={2,.5},["7"]={.75,.25}}
@@ -117,6 +118,12 @@ function UIParent:CreateFontString()
     function f:SetSmoothScaling(value)if rejectSmooth then return false end;self.smoothScaling=value end
     function f:GetSmoothScaling()return self.smoothScaling end
     function f:SetText(text)assert(self.hidden or self.alpha==0);self.text=text end
+    function f:SetFormattedText(format,value,writeToken)
+        formattedSamples=formattedSamples+1
+        if writeToken and rejectUnusedArgument then return false end
+        assert(not issecretvalue(value),"public calibration received opaque time")
+        self:SetText((string.format(format,value):gsub("%.",localePoint)))
+    end
     function f:GetText()return self.text end
     function f:SetSize(w,h)
         self.width,self.height=quantizeBounds and math.floor(w+.5) or w,quantizeBounds and math.floor(h+.5) or h
@@ -164,13 +171,17 @@ function UIParent:CreateFontString()
         return outlined and math.floor(w+.5)+2 or w
     end
     function f:GetStringWidth()return self:GetUnboundedStringWidthForText(self.text) end
-    function f:GetStringHeight()return self.size+(tallMarkup and self.text:find("|T",1,true) and 4 or 0) end
+    function f:GetStringHeight()
+        if oversizedHeight then return self.height+1 end
+        return self.size+(tallMarkup and self.text:find("|T",1,true) and 4 or 0)
+    end
     return f
 end
 local function label(size,scale)
     return {GetFont=function()return "fixture.ttf",size,"OUTLINE" end,
         GetEffectiveScale=function()return scale or 1 end, GetTextScale=function()return 1 end,
         GetSmoothScaling=function()return false end,
+        GetWidth=function()return 0 end,GetNumPoints=function()return 1 end,
         GetText=function()error("attempted to read the current countdown")end,
         SetText=function()error("attempted to modify the current countdown")end}
 end
@@ -516,6 +527,64 @@ do
     local plain=diagnose()
     assert(plain:find("last=plain |",1,true) and plain:find("/plain:1/",1,true),
         "naturally tabular profile was not reported as plain")
+    for d,w in pairs(savedWidths)do widths[d]=w end
+end
+-- A whole printf sink cannot insert spacing between opaque digits. Outer
+-- guards only qualify when complete decimals also have stable interior columns.
+do
+    local prepare=assert(private.PrepareBuffSecondsSink,"missing native sink token preparation")
+    local font=label(93)
+    rejectUnusedArgument=true;assert(not prepare(font),'refused token call cannot earn a sink')
+    local samples=formattedSamples;rejectUnusedArgument=false
+    assert(not prepare(font) and formattedSamples==samples,'failed contract retried before safe epoch')
+    private.RetryFixedActionFormatters();assert(prepare(font),'exact native call shapes did not recover')
+    samples=formattedSamples;assert(prepare(font) and formattedSamples==samples,'sink capability is not cached')
+    assert(private.GetFixedBuffSecondsFormat(font)==nil,'proportional geometry should still fail independently')
+    local buff=assert(private.GetFixedBuffSecondsFormat,"missing native buff seconds format")
+    local savedWidths,savedKern={},kern
+    for i=0,9 do local d=tostring(i);savedWidths[d]=widths[d];widths[d]=7.25 end
+    modernBounds,quantizeSpacers,kern=true,true,{};localePoint="."
+    local function check(format)
+        assert(format:find("%.1f",1,true) and not format:find(" s",1,true))
+        for _,value in ipairs({0,0.1,1.1,1.8,7.1,8.1,8.8,9.9})do
+            local _,raw,positions=layout(string.format(format,value))
+            assert(raw==string.format("%.1f",value),"buff spelling changed")
+            for i,want in ipairs({-4.875,0,4.875})do
+                assert(math.abs(positions[i]-want)<.001,"guarded buff column moved")
+            end
+        end
+        for _,value in ipairs({10,11.1,17.8,71.1,81.8,88.8,89.9,90})do
+            local _,_,positions=layout(string.format(format,value))
+            for i,want in ipairs({-8.5,-1.25,3.625,8.5})do
+                assert(math.abs(positions[i]-want)<.001,"two-digit buff column moved")
+            end
+        end
+    end
+    local beforeProbes,beforeFormatters=probeCount,formatterCount
+    spanFailure=nil;check(assert(buff(label(80))))
+    spanFailure="nil";local f=label(81);local fixed=assert(buff(f));check(fixed)
+    local before=measures
+    for _=1,50 do assert(buff(f)==fixed)end
+    assert(measures==before and probeCount==beforeProbes and formatterCount==beforeFormatters,
+        "buff profile cache allocated probes/rules or repeated measurement")
+    kern=savedKern
+    assert(buff(label(82))==nil,"outer guards cannot repair variable internal kerning")
+    kern={["1."]=-.5,[".8"]=.5}
+    -- 1.8 and 8.1 have equal complete widths but different decimal positions.
+    assert(buff(label(83))==nil,"equal whole widths hid moving internal columns")
+    kern={};outlined=true;widths["1"]=7.4
+    assert(buff(label(84))==nil,"rounded widths concealed unequal repeated advances")
+    widths["1"]=7.25;outlined=false
+    widthFailure="secret";assert(buff(label(85))==nil);widthFailure=nil
+    invalidMarkup=true;assert(buff(label(86))==nil);invalidMarkup=false
+    tallMarkup=true;local retry=label(87);assert(buff(retry)==nil);tallMarkup=false
+    before=measures;assert(buff(retry)==nil and measures==before,"failed buff profile retried on use")
+    private.RetryFixedActionFormatters();check(assert(buff(retry)))
+    oversizedHeight=true;assert(buff(label(91))==nil,"equal oversized heights hid a clipped public sample");oversizedHeight=false
+    spanFailure="metrics";assert(buff(label(88))==nil,"contradictory character data selected width fallback")
+    spanFailure=nil;localePoint=",";assert(buff(label(89)));localePoint="."
+    combat=true;before=measures;assert(buff(label(90))==nil and measures==before);combat=false
+    kern=savedKern;modernBounds,quantizeSpacers,spanFailure=false,false,nil
     for d,w in pairs(savedWidths)do widths[d]=w end
 end
 for _,probe in ipairs(probes)do assert(probe.hidden,"calibration leaked a shown sample region")end

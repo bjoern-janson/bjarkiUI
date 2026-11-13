@@ -2,6 +2,16 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.362-buff-format-consistency-test — reconcile native buff routes
+
+- The user reports that buffs are still intermittently moving and displaying a seconds suffix. This supersedes treating the earlier pictured success as general coverage.
+- Reproduce the same-label public/opaque mismatch and the seconds sink's interception of a supported genuine duration object. Prefer genuine object formatting inside the fresh current-owner transaction, without guessing an opaque aura identity or clock.
+- Forward the opaque native formatted result through an exact `%s` sink. Keep ordinary `SetText` as a later writer; preserve newest output when an older setter completes last. Guard native-object cache and retry mutations against nested assignments, including unchanged aura IDs.
+- Remove the seconds suffix from the seconds-only fallback. Its original opaque argument remains unchanged; this route still displays tenths throughout the native seconds band below 90 seconds. Public and genuine-object routes retain the below-ten policy and native larger-unit formats.
+- Prepare a separate whole-number spacing format using constant outside guards. Validate every native public decimal output from 0.0 through 90.0, complete height/width and character columns, or guarded/repeated prefix/suffix widths when the first character sample is unusable. Reject unequal advances, variable interior kerning, ineffective guards, clipping and stale font/scale/smooth/label-fit profiles.
+- Reuse the existing shared probe and retry epochs; cache at most 16 buff font profiles. A current supported profile keeps readable and opaque short updates on the same native label. No additional timer, runtime module, asset, dependency, setting or per-button widget.
+- Preserve .361 action formatting. Accepted metrics and native writes are preparation/configuration evidence, not a live visual verdict; a plain fallback may still move. Keep the buff and action observations open.
+
 ## 0.2.361-action-width-validation-test — recover tabular action formatting
 
 - The user reports that buff decimals now look good; the supplied capture shows `0.9 s` and `3.7 s`, with accepted seconds-sink writes. Preserve .360's buff code.

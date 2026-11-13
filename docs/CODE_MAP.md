@@ -1,6 +1,6 @@
 # bjarkiUI code map
 
-Current test branch: **0.2.361-action-width-validation-test**. Start with the physical region that displays the symptom, then follow its native writer, addon observer, ownership record and cleanup. [Timer lifecycle detail](TIMER_LIFECYCLE.md) · [Verification commands and suite map](TESTING.md)
+Current test branch: **0.2.362-buff-format-consistency-test**. Start with the physical region that displays the symptom, then follow its native writer, addon observer, ownership record and cleanup. [Timer lifecycle detail](TIMER_LIFECYCLE.md) · [Verification commands and suite map](TESTING.md)
 
 ## Runtime load order
 
@@ -15,7 +15,7 @@ The [default manifest](../bjarkiUI.toc) and [Camelot manifest](../bjarkiUI_Camel
 | 5 | [SoftDark.lua](../SoftDark.lua) | Native artwork tinting, ownership-aware restoration and `/bdark`. |
 | 6 | [ClassicPartyPresentation.lua](../ClassicPartyPresentation.lua) | Native non-raid party member class names/health via `nativeHealthStyle` colorable fills, owner-colored pet health, shared 25%-alpha native threat flashes, LoL status text, Soft Dark chrome and scoped native faction/PvP-badge suppression, excluding compact/raid frames. |
 | 7 | [TrackedBuffSeconds.lua](../TrackedBuffSeconds.lua) | Native ten-second decimal threshold for active tracked-buff cooldown widgets. |
-| 8 | [ActionTimerSpacing.lua](../ActionTimerSpacing.lua) | Validates complete public action sample geometry, prepares native fixed-spacing formatters, and separately maintains bounded individual glyph profiles, safe retry epochs and public preparation stages. |
+| 8 | [ActionTimerSpacing.lua](../ActionTimerSpacing.lua) | Validates complete public action sample geometry, prepares native fixed-spacing formatters, and separately prepares whole buff seconds formats, native sink capability and bounded individual glyph profiles through safe retry epochs. |
 | 9 | [CooldownSeconds.lua](../CooldownSeconds.lua) | Installs native action countdown formatting with exact identity readback; coordinates native preference, settings and safe bar lifecycle events. |
 | 10 | [NativeDigitCells.lua](../NativeDigitCells.lua) | Ownership-safe native action handoff and compatibility duration bindings; safe buff typography/profile preparation, longer readable stock text digit mapping, and physical-label ownership. |
 | 11 | [CastBarDigits.lua](../CastBarDigits.lua) | Native `UnitCastingDuration`/`UnitChannelDuration` objects drive fixed glyph bindings; retains Blizzard's original cast text as fallback and never clears it. |
