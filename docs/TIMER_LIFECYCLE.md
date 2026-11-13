@@ -1,8 +1,16 @@
 # Timer lifecycle and diagnostics
 
-This guide describes the **0.2.361-action-width-validation-test** branch. It traces the displayed timer through its native writer, addon hook, typography preparation, ownership and cleanup. The former cast text-mirror mode is historical. Source/fixture checks are separate from live-client correctness. [Module map](CODE_MAP.md) · [Tests](TESTING.md) · [Open live reports](../KNOWN_ISSUES.md)
+This guide describes the **0.2.362-buff-format-consistency-test** branch. It traces the displayed timer through its native writer, addon hook, typography preparation, ownership and cleanup. The former cast text-mirror mode is historical. Source/fixture checks are separate from live-client correctness. [Module map](CODE_MAP.md) · [Tests](TESTING.md) · [Open live reports](../KNOWN_ISSUES.md)
 
 The .356 allocation cleanup keeps every existing permission and current-owner check. `NativeDigitCells` shares protected member-reader functions and a constant buff layout-hook list. Safe buff setup may reuse an unchanged typography record, but still resolves current glyphs and calls the formatter preparation path so failed preparation and changed profiles can recover at the same epochs. Timer ticks still perform no new font measurement or formatter construction.
+
+## .362 current buff reconciliation
+
+A fresh native source receipt now enters one ownership-checked transaction. A legitimate public aura identity can supply a genuine duration object; its opaque formatted string is forwarded through an exact owned `%s` sink. Unsupported object acquisition keeps its existing backoff while the public seconds-selector fallback uses the original opaque seconds with bare `%.1f`. Secret/unreadable unit selectors cannot authorize this fallback. Larger units retain native labels, and public/object precision remains below ten; the seconds-only fallback retains the wider below-90-second band.
+
+`GetFixedBuffSecondsFormat` prepares a separate whole-number outside-guard profile from native public printf samples, using the existing shared probe and safe epochs. Complete columns and height/fit are validated independently from the action glyph formatter. Supported short public/object/opaque updates can share the original label. The cached profile includes native font, effective/text scale and smooth mode; use checks also verify the current physical label's available width. No font substitution, timer-tick calibration or new clock is added.
+
+Native-object cache/retry mutations and the final setter yield to newer assignments and source writes. The exact `%s`/decimal call and its prepared public context token mark the owned sink; generic `SetText` remains a later writer, with only bounded in-flight formatted-output replay. Original opaque seconds are never retained. Diagnostics distinguish `duration-object`, `accepted-fixed` and `accepted-plain`, and the new `buff-seconds` profile summary describes preparation, not live stability.
 
 ## Four distinct timer paths
 
