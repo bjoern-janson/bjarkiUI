@@ -2,6 +2,15 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.357-timer-handoff-recovery-test — recover refused action visibility handoffs
+
+- Retain a prepared stock fallback after the first refused hide/readback, allowing the existing native cooldown update to recover fixed action cells. Reuse the existing regions, bindings and hooks, including during combat.
+- Reject a nested acquisition while an own visibility transaction is open. Mark and recheck tentative visibility ownership around binding shutdown so cleanup yields to a newer external writer.
+- Record fixed public hide-write, hide-readback and restoration failure stages in `/buitimers`; no error payload or hidden timing is read or logged.
+- For naturally tabular native fonts, return the unchanged native formatter immediately after font/scale/glyph validation. Pixel-rounded whole-line measurements no longer reject an operation that changes no text. Keep full validation for padded output.
+- Preserve current buff rows and their native permission boundary. The live `aura ID secret` fallback is identified, but no supported in-place conditional-decimal bridge was found. Native custom aura containers require separate row/ownership work and are not installed here.
+- Add focused fresh-owner, refused-write/readback, rollback-reentry, newer-writer and rounded-font regressions. This is a source-level recovery repair; live fixed positioning and secret-ID decimals remain unverified/open. No polling loop, font change, settings change or new runtime module.
+
 ## 0.2.356-presentation-performance-test — reduce temporary timer allocations and NPC discovery
 
 - Replace per-read timer member-lookup closures with a shared protected reader, and reuse the constant buff layout-hook list. Retain every public-value, type, permission and ownership check.

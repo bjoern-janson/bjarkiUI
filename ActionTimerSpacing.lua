@@ -224,6 +224,9 @@ end
 
 local function build(base,source,file,size,flags,scale,textScale,attempt)
     local glyphs,broad,tolerance,natural,width,lineWidth=measureGlyphs(file,size,flags,scale,textScale,attempt)
+    -- No transformed text is installed for tabular numerals. Native line
+    -- rounding or kerning cannot invalidate this exact formatter identity.
+    if natural then return base end
     attempt.stage="samples"
     if not source.samples then source.samples=readSamples(base) end
     local samples=source.samples
@@ -263,7 +266,6 @@ local function build(base,source,file,size,flags,scale,textScale,attempt)
             previous=packed
         end
     end
-    if natural then return base end
     -- Day counts have no finite upper bound. Keep the original native numeric
     -- formatting beyond the measured two-digit vocabulary.
     rules[#rules+1]={threshold=dynamicDays,step=day,rounding=Enum.NumericRuleFormatRounding.Up,

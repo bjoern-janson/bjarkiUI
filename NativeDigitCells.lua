@@ -799,6 +799,7 @@ local function releaseVisibility(state,preserveSerial)
     state.epoch=state.epoch+1
     state.pendingSet=false
     state.restorePending=false
+    state.restoreReason=nil
     state.active=false
     state.stockFallback=nil
     setRendering(state,false)
@@ -827,16 +828,31 @@ local function restoreStock(state)
         if not state.ownsHidden then return false end -- a writer ran during readback
         -- A wrapper may reject after applying the write. The public native
         -- flag confirms stock ownership in that case as well.
-        if not read or not public(hidden) or hidden~=false then
+        local known=read and public(hidden)
+        if not known or hidden~=false then
             -- Preserve the last presenter while the original cannot be restored.
             state.restorePending=true
+            state.restoreReason=not read and 'restore-read-denied'
+                or not known and 'restore-read-unavailable' or 'restore-hidden'
             return false
         end
         state.ownsHidden=false
     end
     state.restorePending=false
+    state.restoreReason=nil
     state.active=false
     return setRendering(state,false)
+end
+local function restoreFailedHandoff(state,reason,stopBindings)
+    state.stockFallback=true
+    state.fallbackReason=reason
+    -- Binding shutdown can invoke another native cooldown update after the
+    -- visibility setter has returned. Keep the whole rollback serialized.
+    state.handoffCleanup=true
+    if stopBindings then setRendering(state,false) end
+    if state.ownsHidden then restoreStock(state) end
+    state.handoffCleanup=nil
+    return false
 end
 local installAction
 local function refreshCurrentClock(state)
@@ -1161,6 +1177,9 @@ installAction=function(button,prepared,petIndex)
     local cooldown=currentCooldown(button)
     if not safe(cooldown) then return false end
     local state=installed[cooldown]
+    -- A native update inside our hide/restore setter or binding cleanup
+    -- cannot start a second acquisition before that handoff has completed.
+    if state and (state.visibilityWrites~=nil or state.handoffCleanup) then return false end
     -- A legitimate later SetCooldown/minimum change may reclaim only this
     -- already-prepared stock fallback. No new resources or hooks in combat.
     if prepared and (state~=prepared or state.button~=button or not state.prepared or not state.stockFallback) then return false end
@@ -1244,20 +1263,21 @@ installAction=function(button,prepared,petIndex)
         if suppressed==nil then return false end
         if not suppressed then
             -- A wrapper can throw after the original hidden write landed.
-            -- The native label was known visible on entry.
-            setRendering(state,false)
+            -- The native label was known visible on entry. Retain this
+            -- prepared fallback so the next native cooldown update retries
+            -- even when this was the first attempt to acquire the display.
             state.ownsHidden=true
-            restoreStock(state)
-            return false
+            return restoreFailedHandoff(state,'hide-write-refused',true)
         end
         state.ownsHidden=true
     end
     local confirmed,value=pcall(getHide,cooldown)
-    if not confirmed or not public(value) or value~=true then
-        restoreStock(state)
-        return false
+    if not state.ownsHidden then return false end -- a newer visibility writer won
+    local known=confirmed and public(value)
+    if not known or value~=true then
+        return restoreFailedHandoff(state,not confirmed and 'hide-read-denied'
+            or not known and 'hide-read-unavailable' or 'hide-not-applied')
     end
-    if not state.ownsHidden then return false end
     state.active=true
     if state.epoch~=claimEpoch then
         -- A new clock or clear arrived after A was bound, while inactive
@@ -1293,6 +1313,7 @@ function api.GetActionTimerDiagnostics()
                 elseif reason=='below/equal-minimum' then below=below+1 end
                 if state.buttonName and #names<3 then
                     if reason=='gate-unsupported' and state.minimumGateFailure then reason=reason..'/'..state.minimumGateFailure end
+                    if state.restorePending and state.restoreReason then reason=reason..'/'..state.restoreReason end
                     names[#names+1]=state.buttonName..':'..reason
                 end
             else idle=idle+1 end
