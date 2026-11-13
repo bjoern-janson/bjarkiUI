@@ -289,7 +289,12 @@ local function prepareDurationTypography(button,duration)
     local state=states[button]
     if not state then return end
     local glyphs=preparedBuffGlyphs(duration,button)
-    state.durationTypography=glyphs and {label=duration,glyphs=glyphs,formatter=getDurationFormatter(glyphs)} or nil
+    if not glyphs then state.durationTypography=nil;return end
+    local formatter=getDurationFormatter(glyphs)
+    local profile=state.durationTypography
+    if not profile or profile.label~=duration or profile.glyphs~=glyphs or profile.formatter~=formatter then
+        state.durationTypography={label=duration,glyphs=glyphs,formatter=formatter}
+    end
 end
 local function preparedDurationFormatter(button,duration)
     local state=states[button]

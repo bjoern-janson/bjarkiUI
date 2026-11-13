@@ -1,6 +1,6 @@
 # bjarkiUI code map
 
-Current test branch: **0.2.355-timer-spacing-recovery-test**. Start with the physical region that displays the symptom, then follow its native writer, addon observer, ownership record and cleanup. [Timer lifecycle detail](TIMER_LIFECYCLE.md) · [Verification commands and suite map](TESTING.md)
+Current test branch: **0.2.356-presentation-performance-test**. Start with the physical region that displays the symptom, then follow its native writer, addon observer, ownership record and cleanup. [Timer lifecycle detail](TIMER_LIFECYCLE.md) · [Verification commands and suite map](TESTING.md)
 
 ## Runtime load order
 
@@ -29,7 +29,7 @@ The [default manifest](../bjarkiUI.toc) and [Camelot manifest](../bjarkiUI_Camel
 
 | Symptom | Writer, ownership and recovery route | Focused tests |
 | --- | --- | --- |
-| Health colors or stale class tint | `applyUnit` → `applyHealthColor` → `nativeHealthStyle.Prepare/ObserveColor/Restore`. Separate unit identity from class availability and native color writes. Restore only the current recipient and owned color/material state. | [health-color-observer.lua](../tests/health-color-observer.lua), [lifecycle.lua](../tests/lifecycle.lua) |
+| Health colors or stale class tint | `applyUnit` → `applyHealthColor` → `nativeHealthStyle.Prepare/ObserveColor/Restore`. Separate unit identity from class availability and native color writes. Restore only the current recipient and owned color/material state. | [health-color-observer.lua](../tests/health-color-observer.lua), [nameplate-color-discovery.lua](../tests/nameplate-color-discovery.lua), [lifecycle.lua](../tests/lifecycle.lua) |
 | Name color after target/focus replacement | `applyClassNameColor`, `prepareNameColor`, `restoreNativeNameColor`; check alias/owner identity and native setter order. The combat-exit route performs one name-color reconciliation pass. | [name-color-ownership.lua](../tests/name-color-ownership.lua) |
 | Native non-raid party art, colors, numbers | `PartyFrame.PartyMemberFramePool` → `ClassicPartyPresentation` guarded native setters; `SoftDark.TintClassicPartyChrome` tints only original decorative art. The exact `PartyMemberOverlay.PVPIcon` receives guarded Hide observers on Show/SetShown, retaining current physical ownership across pool reuse. Only the leader crown delegates geometry to `InstallClassicPartyLeaderCrown` with the current member validator; protected status values stay native. | [classic-party-presentation.lua](../tests/classic-party-presentation.lua), [classic-party-softdark.lua](../tests/classic-party-softdark.lua) |
 | Status text/shadow or pet text | `installUnitStatusFonts` → `installStatusFont` → `styleStatusFont`; the native font/style writes and effective scale determine the next application. | [status-style.lua](../tests/status-style.lua), [status-scale.lua](../tests/status-scale.lua), [status-combat.lua](../tests/status-combat.lua), [pet-status-text.lua](../tests/pet-status-text.lua) |
@@ -52,8 +52,10 @@ A duration object's existence is not permission to read its remaining time. The 
 
 Many modules intentionally repeat safe discovery at login, world entry, combat exit or addon load. Timer progression comes from existing native writers and bindings, not an addon-created polling loop. Recovery callbacks and bounded retries are still work: offline tests do not measure their live cost.
 
+NPC color discovery preserves the first readable native witness. `CompactUnitFrame_UpdateHealthColor` can pass its current frame/token to `applyHealthColor`; the shortcut requires matching public GUIDs and current physical wrapper, origin and receiving bar with positive access checks. It rechecks after reading RGB and abandons a superseded callback revision. An invalid hint returns to fresh discovery. Ordinary health callbacks keep the existing search route, and no identity or RGB is retained between callbacks.
+
 For protected-frame changes, inspect the permission check immediately before the writer. Keep native ownership, successful write receipts and later external writes distinct. The shared float helper accounts for native storage precision; it is not a broad tolerance for overwriting changed state.
 
 ## Current versus historical material
 
-`tests/*.lua` is the current 36-script verification set. `tests/snapshot-0.2.309/`, `tools/audit/`, the `CODEX_*` audit prompts and [AUDIT_BASELINE.md](AUDIT_BASELINE.md) describe the pinned .309 audit. [ARCHITECTURE.md](../ARCHITECTURE.md) preserves historical design notes, some of which describe superseded cast/timer implementations. Use current source and this map when changing main.
+`tests/*.lua` is the current 37-script verification set. `tests/snapshot-0.2.309/`, `tools/audit/`, the `CODEX_*` audit prompts and [AUDIT_BASELINE.md](AUDIT_BASELINE.md) describe the pinned .309 audit. [ARCHITECTURE.md](../ARCHITECTURE.md) preserves historical design notes, some of which describe superseded cast/timer implementations. Use current source and this map when changing main.

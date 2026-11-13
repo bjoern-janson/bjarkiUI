@@ -1,6 +1,8 @@
 # Timer lifecycle and diagnostics
 
-This guide describes the **0.2.355-timer-spacing-recovery-test** branch. It traces the displayed timer through its native writer, addon hook, typography preparation, ownership and cleanup. The former cast text-mirror mode is historical. Source/fixture checks are separate from live-client correctness. [Module map](CODE_MAP.md) · [Tests](TESTING.md) · [Open live reports](../KNOWN_ISSUES.md)
+This guide describes the **0.2.356-presentation-performance-test** branch. It traces the displayed timer through its native writer, addon hook, typography preparation, ownership and cleanup. The former cast text-mirror mode is historical. Source/fixture checks are separate from live-client correctness. [Module map](CODE_MAP.md) · [Tests](TESTING.md) · [Open live reports](../KNOWN_ISSUES.md)
+
+The .356 allocation cleanup keeps every existing permission and current-owner check. `NativeDigitCells` shares protected member-reader functions and a constant buff layout-hook list. Safe buff setup may reuse an unchanged typography record, but still resolves current glyphs and calls the formatter preparation path so failed preparation and changed profiles can recover at the same epochs. Timer ticks still perform no new font measurement or formatter construction.
 
 ## Four distinct timer paths
 

@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.355-timer-spacing-recovery-test"
+local BJARKI_UI_VERSION = "0.2.356-presentation-performance-test"
 -- Standalone PRD treatment is retained. Unit-frame resource bars stay native.
 local PRD_MANA_R, PRD_MANA_G, PRD_MANA_B = 0.10, 0.25, 1.00
 local WORLD_TEXT_SCREEN_Y = "0.0430"
@@ -604,7 +604,6 @@ end
 local function namePlateHealthColor(plate, unitFrame)
     if not plate then return nil end
     local candidates = {}
-    local nativeColor
     if unitFrame then candidates[#candidates + 1] = { unitFrame, "unitFrame" } end
 
     -- Some clients return the NamePlate wrapper from GetNamePlates, while
@@ -652,11 +651,11 @@ local function namePlateHealthColor(plate, unitFrame)
         end)
         if barOK and bar then
             local r, g, b = readNativeHealthBarColor(bar)
-            if r and not nativeColor then
+            if r then
                 -- Native bar RGB is presentation data, not class identity.
                 -- Copy it exactly; ordinary white text and palette matches
                 -- cannot establish a player's class.
-                nativeColor = { r, g, b, 1, path .. ":native" }
+                return r, g, b, 1, path .. ":native"
             end
         end
 
@@ -682,11 +681,9 @@ local function namePlateHealthColor(plate, unitFrame)
                         and regionName:find("bar", 1, true)
                     then
                         local r, g, b = readNativeHealthBarColor(region)
-                        if r and not nativeColor then
-                            nativeColor = {
-                                r, g, b, 1,
-                                label .. ".region" .. tostring(index) .. ":native",
-                            }
+                        if r then
+                            return r, g, b, 1,
+                                label .. ".region" .. tostring(index) .. ":native"
                         end
                     end
                 end
@@ -694,7 +691,6 @@ local function namePlateHealthColor(plate, unitFrame)
         end
     end
 
-    if nativeColor then return unpack(nativeColor) end
     return nil, nil, nil, nil, "native-color-unavailable"
 end
 
@@ -1091,9 +1087,60 @@ local function validNPCColorComponent(value)
         and value == value and value >= 0 and value <= 1
 end
 
+-- Only a revision is retained, never a unit/frame/RGB cache. Nested native
+-- callbacks invalidate an older hint even when the same binding survives.
+local nativeNameplateColorRevision = 0
+
+-- The native hook's hint is call-local. Require a current physical binding,
+-- readable identity and positive access; a failed check uses normal discovery.
+local function hintedNamePlateHealthColor(bar, unit, origin, token)
+    local revision = nativeNameplateColorRevision
+    local ok, accepted, r, g, b = pcall(function()
+        token = readableUnitToken(token)
+        if not token or not token:match("^nameplate%d+$") then return false end
+        local function accessible(object)
+            if isSecret(object) or not object then return false end
+            local forbidden = object.IsForbidden
+            return not isSecret(forbidden) and type(forbidden) == "function"
+                and readableBool(forbidden, object) == false
+        end
+        if not accessible(origin) or not accessible(bar) then return false end
+        local unitGUID, plateGUID = readableUnitGUID(unit), readableUnitGUID(token)
+        -- GUIDs are optional in ordinary discovery, but this shortcut needs a
+        -- stable public identity witness across potentially reentrant getters.
+        if not unitGUID or not plateGUID or unitGUID ~= plateGUID then return false end
+        local api = C_NamePlate
+        if isSecret(api) or not api then return false end
+        local lookup = api.GetNamePlateForUnit
+        if isSecret(lookup) or type(lookup) ~= "function" then return false end
+        local plate = lookup(token)
+        local function current()
+            if not accessible(plate) or not accessible(origin) or not accessible(bar)
+                or sameUnit(unit, token) ~= true
+                or readableUnitGUID(unit) ~= unitGUID or readableUnitGUID(token) ~= plateGUID
+            then return false end
+            -- Check physical fields last: permission/identity getters above
+            -- may synchronously run a newer native update or recycle a frame.
+            local frame = plate.UnitFrame
+            if isSecret(frame) then return false end
+            if not frame then frame = plate.unitFrame end
+            return not isSecret(frame) and frame == origin
+                and readableUnitToken(origin.unit) == token
+                and healthBar(unit) == bar and readableUnitToken(bar.unit) == unit
+                and revision == nativeNameplateColorRevision
+        end
+        if not current() then return false end
+        local red, green, blue = namePlateHealthColor(plate, origin)
+        if not current() or red == nil then return false end
+        return true, red, green, blue
+    end)
+    if ok and accepted then return true, r, g, b end
+    return false
+end
+
 -- Copy native nameplate RGB only for a positively established non-player,
 -- non-pet NPC. This is presentation transport, not inferred class identity.
-local function npcHealthColor(unit)
+local function npcHealthColor(unit, bar, origin, plateToken)
     local player, playerReadable = playerUnitState(unit)
     local pet, petReadable = petUnitState(unit)
     if not playerReadable or player or not petReadable or pet
@@ -1101,12 +1148,16 @@ local function npcHealthColor(unit)
     local guid = readableUnitGUID(unit)
     if guid and guid:match("^Pet%-") then return nil end
 
-    local plate, frame = matchingNamePlate(unit)
-    if plate then
-        local r, g, b = namePlateHealthColor(plate, frame)
-        if validNPCColorComponent(r) and validNPCColorComponent(g) and validNPCColorComponent(b) then
-            return r, g, b, 1
-        end
+    local hinted, r, g, b
+    if type(plateToken) == "string" and not isSecret(plateToken) then
+        hinted, r, g, b = hintedNamePlateHealthColor(bar, unit, origin, plateToken)
+    end
+    if not hinted then
+        local plate, frame = matchingNamePlate(unit)
+        if plate then r, g, b = namePlateHealthColor(plate, frame) end
+    end
+    if validNPCColorComponent(r) and validNPCColorComponent(g) and validNPCColorComponent(b) then
+        return r, g, b, 1
     end
 
     -- No cached plate color: after despawn/camera turns, use CURRENT NPC state.
@@ -1128,7 +1179,7 @@ local function npcHealthColor(unit)
     end
 end
 
-local function applyHealthColor(bar, unit)
+local function applyHealthColor(bar, unit, origin, plateToken)
     if isSecret(unit) or type(unit) ~= "string" or not CLASS_HEALTH_UNITS[unit]
         or isSecret(bar) or not bar or type(bar.SetStatusBarColor) ~= "function"
         or bar ~= healthBar(unit) or readableUnitToken(bar.unit) ~= unit
@@ -1138,11 +1189,32 @@ local function applyHealthColor(bar, unit)
         return false
     end
     if not isPlayerUnit(unit) then
-        local r, g, b, a = npcHealthColor(unit)
-        if r then return setHealthColor(bar, r, g, b, a) end
-        -- Pets and unavailable/contradictory identity remain native.
-        nativeHealthStyle.Restore(bar)
-        return false
+        local r, g, b, a = npcHealthColor(unit, bar, origin, plateToken)
+        local revision = nativeNameplateColorRevision
+        -- Discovery may reenter and replace the actor without replacing its
+        -- bar. Reclassify before transporting NPC RGB or restoring ownership.
+        local player, playerReadable = playerUnitState(unit)
+        local npc = playerReadable and not player
+        if npc then
+            local pet, petReadable = petUnitState(unit)
+            local guid = readableUnitGUID(unit)
+            npc = petReadable and not pet
+                and readableBool(UnitPlayerControlled, unit) == false
+                and not (guid and guid:match("^Pet%-"))
+        end
+        local exists = readableBool(UnitExists, unit) == true
+        -- Check the recipient after all identity getters, which can reenter.
+        if bar ~= healthBar(unit) or readableUnitToken(bar.unit) ~= unit then return false end
+        -- A newer callback owns the result even if actor and bar are unchanged.
+        if revision ~= nativeNameplateColorRevision then return false end
+        if not exists or not (playerReadable and player) then
+            if exists and npc and r then return setHealthColor(bar, r, g, b, a) end
+            -- Pets and unavailable/contradictory identity remain native.
+            nativeHealthStyle.Restore(bar)
+            return false
+        end
+        -- A newly readable player uses the same current class/native route
+        -- below as a player observed at callback entry.
     end
     local r, g, b, a = fallbackPlayerHealthColor(unit)
     if r then
@@ -2052,6 +2124,7 @@ local function installNativeUpdateHooks()
         and type(CompactUnitFrame_UpdateHealthColor) == "function" then
         nativeNameplateHealthHookInstalled = pcall(hooksecurefunc, "CompactUnitFrame_UpdateHealthColor",
             function(frame)
+                nativeNameplateColorRevision = nativeNameplateColorRevision + 1
                 local ok, plateUnit = pcall(function()
                     if isSecret(frame) or not frame
                         or (frame.IsForbidden and readableBool(frame.IsForbidden, frame) ~= false)
@@ -2061,7 +2134,7 @@ local function installNativeUpdateHooks()
                 if not ok or not plateUnit or not plateUnit:match("^nameplate%d+$") then return end
                 for _, unit in ipairs({ "target", "focus", "targettarget", "focustarget" }) do
                     if sameUnit(unit, plateUnit) then
-                        applyHealthColor(healthBar(unit), unit)
+                        applyHealthColor(healthBar(unit), unit, frame, plateUnit)
                     end
                 end
             end)

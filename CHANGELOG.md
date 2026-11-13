@@ -2,6 +2,15 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.356-presentation-performance-test — reduce temporary timer allocations and NPC discovery
+
+- Replace per-read timer member-lookup closures with a shared protected reader, and reuse the constant buff layout-hook list. Retain every public-value, type, permission and ownership check.
+- Reuse an unchanged buff typography record after the existing glyph lookup and formatter preparation/retry path runs. Failed calibration, inherited-scale changes and physical-label replacement keep their existing recovery behavior.
+- Stop NPC native-color discovery at the first readable witness, preserving its original priority and downstream RGB validation. Avoid later candidate/region reads once that witness is known.
+- Let the native nameplate-color hook supply call-local context. Use direct lookup only with a current physical wrapper/frame/recipient, matching public GUIDs and positive access checks, revalidated after the color read. Revision receipts make older color work yield to a newer callback, including during post-discovery identity checks. Missing or changed context uses fresh normal discovery; no plate, identity or RGB is cached between callbacks.
+- Keep full safe lifecycle discovery for Soft Dark: it also catches late-created or replaced native artwork. Add no polling, dependencies, options or runtime modules. Keep the exact “Ultralight unit-frame presentation for WoW: Forever” description.
+- Add a full-module native-color discovery regression suite and compare .355/.356 with identical timer workloads. Offline Lua timings, heap growth and call counts are distinct from live FPS, rendering, native costs and client memory. Existing .355 visual follow-up remains open.
+
 ## 0.2.355-timer-spacing-recovery-test — cover native buff decimals and repair typography recovery
 
 - The live report shows a short buff changing from whole seconds on one application to decimals on the next, with moving digits; action-bar digits also remain unstable. Source inspection reproduced an uncalibrated native buff decimal route, missed optional calibration retries and stale inherited-scale profiles.
