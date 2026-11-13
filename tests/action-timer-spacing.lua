@@ -52,6 +52,7 @@ local widths={["0"]=7.25,["1"]=3.25,["2"]=6.25,["3"]=6.75,["4"]=7.25,["5"]=6.25,
     ["6"]=6.75,["7"]=5.25,["8"]=7.25,["9"]=7.25,["."]=2.5,[","]=2.5,m=6,h=5,d=5.5}
 local invalidMarkup,ignoreFont,tallMarkup,outlined=false,false,false,false
 local modernBounds,quantizeSpacers,spanFailure=false,false,nil
+local widthFailure
 local rejectAlpha,rejectShow,unreadableAlpha,rejectSmooth=false,false,false,false
 local quantizeBounds=false
 local sideBearings={["1"]={2,.5},["7"]={.75,.25}}
@@ -142,19 +143,23 @@ function UIParent:CreateFontString()
         assert(self.justify=="CENTER" and self.maxLines==1 and self.wordWrap==false and self.nonSpaceWrap==false)
         if spanFailure=="nil" then return nil end
         if spanFailure=="secret-table" then return secret end
-        local _,_,_,regions=layout(self.text)
+        if spanFailure=="throw" then error("unsupported public sample character query") end
+        local _,plain,_,regions=layout(self.text)
         local region=regions[left]
         assert(right==left+1 and region,"character spans use original string byte positions")
         local area={left=self.width/2+region.left,bottom=(self.height-self.size)/2,width=region.width,height=self.size}
         if spanFailure=="secret-field" then area.left=secret end
         if spanFailure=="negative" then area.width=-1 end
         if spanFailure=="missing" then area.bottom=nil end
+        if spanFailure=="metrics" and plain:find("[.,]") then area.width=area.width+1 end
         if spanFailure=="multiple" then return {area,area}end
         return {area}
     end
     function f:GetUnboundedStringWidthForText(text)
         measures=measures+1
         lineMeasures=lineMeasures+1
+        if widthFailure=="secret" then return secret end
+        if widthFailure=="nil" then return nil end
         local w=layout(text)
         return outlined and math.floor(w+.5)+2 or w
     end
@@ -376,7 +381,7 @@ singleInput,singleThreshold=false,false
 for index,failure in ipairs({"nil","secret-table","secret-field","negative","missing","multiple"})do
     spanFailure=failure
     assert(get(label(40+index),original)==nil,"unverified character geometry accepted: "..failure)
-    assert(private.GetTimerTypographyDiagnostics():match("formats=.*last=character%-areas$"),"wrong character geometry failure stage")
+    assert(private.GetTimerTypographyDiagnostics():match("formats=.*last=width%-digits$"),"wrong unsupported font fallback stage")
     assert(probes[1].hidden and probes[1].alpha==0,"failed geometry left the public-sample probe visible")
 end
 spanFailure=nil
@@ -390,6 +395,79 @@ quantizeSpacers=false
 private.RetryFixedActionFormatters()
 local recovered=assert(get(label(48),original))
 assert(private.IsFixedActionFormatter(recovered),"native geometry did not recover on the existing safe retry")
+do
+    -- The native character-area result is nullable. Its absence must not
+    -- prevent an independently width-validated tabular font from using the
+    -- original countdown. Optical bearings and kerning are deliberately on:
+    -- returning the old plain formatter would move these modeled columns.
+    local originalWidths={}
+    for i=0,9 do local d=tostring(i);originalWidths[d]=widths[d];widths[d]=7.25 end
+    modernBounds,spanFailure,quantizeSpacers=true,"nil",true
+    local font=label(60)
+    local base=newBase()
+    local initialLines,initialSpans,initialFormatters=lineMeasures,spanMeasures,formatterCount
+    local fixed=assert(get(font,base),"nullable character areas block valid tabular native countdowns")
+    assert(private.IsFixedActionFormatter(fixed) and fixed~=base,"width fallback did not earn native ownership")
+    for _,family in ipairs({
+        {values={.1,1.1,1.8,7.1,8.1,8.8,9.9},positions={-5.875,0,5.875}},
+        {values={11,17,18,71,78,81,88},positions={-4.625,4.625}},
+        {values={120,180,240,480},positions={-3,4.625}},
+    })do
+        for _,value in ipairs(family.values)do
+            local _,raw,positions=layout(fixed:FormatNumber(value))
+            assert(raw==base:FormatNumber(value),"width fallback changed native spelling")
+            for i,want in ipairs(family.positions)do
+                assert(math.abs(positions[i]-want)<.001,"width-validated column moved at "..value)
+            end
+        end
+    end
+    assert(private.GetTimerTypographyDiagnostics():match("formats=.*last=fixed%-widths$"),
+        "width route does not identify its independent validation")
+    local measured,allocated=measures,formatterCount
+    for _=1,50 do assert(get(font,base)==fixed)end
+    assert(measures==measured and formatterCount==allocated,"cached width route remeasures or reallocates")
+    print(string.format("PASS nullable-area native formatter; first width profile: %d character queries, %d line widths, %d formatter; stable calls cached",
+        spanMeasures-initialSpans,lineMeasures-initialLines,formatterCount-initialFormatters))
+    -- The alternate route is independent of an unusable first rectangle; it
+    -- cannot reclassify contradictory geometry after accepting a first one.
+    for i,failure in ipairs({"secret-table","secret-field","negative","missing","multiple","throw"})do
+        spanFailure=failure
+        assert(get(label(60+i),base),"unusable first character area blocks independent widths: "..failure)
+    end
+    spanFailure="metrics"
+    assert(get(label(67),base)==nil,"changing accepted character metrics incorrectly selected width fallback")
+    spanFailure="nil"
+    outlined=true
+    local rounded=assert(get(label(68),base),"rounded native widths reject equal tabular columns")
+    for _,value in ipairs({.1,1.1,1.8,7.1,8.1,8.8})do
+        local _,_,positions=layout(rounded:FormatNumber(value))
+        assert(math.abs(positions[2])<.001,"rounded scalar measurements accepted a moving decimal")
+    end
+    -- A whole single-digit width rounds to the same integer here. Repeating
+    -- its guarded sample must expose the different underlying advance.
+    widths["1"]=7.4
+    assert(get(label(69),base)==nil,"rounded individual widths hid unequal repeated advances")
+    widths["1"]=7.25;outlined=false
+    for i,failure in ipairs({"secret","nil"})do
+        widthFailure=failure
+        assert(get(label(70+i),base)==nil,"unreadable widths earned native ownership")
+    end
+    widthFailure=nil
+    invalidMarkup=true
+    assert(get(label(73),base)==nil,"ineffective constant guards earned native ownership")
+    invalidMarkup=false
+    tallMarkup=true
+    assert(get(label(74),base)==nil,"width fallback ignored a changed line height")
+    tallMarkup=false
+    private.RetryFixedActionFormatters()
+    assert(get(label(74),base),"safe typography retry did not recover a valid width profile")
+    local narrow=label(60)
+    narrow.GetWidth=function()return 0 end
+    local widget={GetWidth=function()return 10 end,GetEffectiveScale=function()return 1 end}
+    assert(get(narrow,base,widget)==base,"width fallback clipped the native cooldown widget")
+    modernBounds,spanFailure,quantizeSpacers=false,nil,false
+    for d,w in pairs(originalWidths)do widths[d]=w end
+end
 -- Diagnostics observe only cached style preparation, never the live timer.
 do
     local epoch=assert(private.GetTimerTypographyRetryEpoch,"missing typography retry epoch")

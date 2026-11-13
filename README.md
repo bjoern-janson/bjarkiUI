@@ -1,14 +1,14 @@
 # bjarkiUI
 
-**0.2.360-native-countdown-format-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
+**0.2.361-action-width-validation-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
 
 ## Latest test build
 
-**.360:** Prefers fixed-spacing formatting on Blizzard's original action countdown after public sample geometry and exact installation checks. For restricted ordinary buffs, a public native seconds-format selector permits forwarding the opaque seconds directly to the original text sink with one decimal, without looking up the secret aura ID. This buff route uses decimals throughout the native seconds band (below 90 seconds), while keeping the longer units and existing rows. Unsupported geometry, selectors or writes retain fallback. Neither change has been verified in the client. [Changes](CHANGELOG.md) · [Verification and live limits](docs/VERIFICATION_0.2.360.md)
+**.361:** Repairs an unavailable action formatter preparation route. If the initial public character-area sample is unusable, tabular fonts can now use constant integer spacing after complete native width, prefix/suffix and repeated-sample checks. The original native countdown retains its clock, font, color, visibility and minimum/GCD rules. Width validation operates at the native metric resolution; live action stability remains unverified. The user reports that .360 buffs now look good, with visible `0.9 s` and `3.7 s` timers. That buff implementation is retained byte for byte, including its below-90-second native seconds-band precision. [Changes](CHANGELOG.md) · [Verification and live limits](docs/VERIFICATION_0.2.361.md)
 
 ## Install
 
-1. Download the supplied `bjarkiUI-0.2.360-Native-Countdown-Format.zip` test package. The stacked development PR does not trigger the workflow restricted to `main`.
+1. Download the supplied `bjarkiUI-0.2.361-Action-Width-Validation.zip` test package. The stacked development PR does not trigger the workflow restricted to `main`.
 2. Extract its `bjarkiUI` folder into the Forever client's `Interface/AddOns/` directory. Check that `Interface/AddOns/bjarkiUI/bjarkiUI.toc` exists.
 3. Enable the addon and reload the interface. Use `/bui help` for the main commands and `/bdark` for Soft Dark controls.
 
@@ -75,6 +75,6 @@ Start with [AGENTS.md](AGENTS.md), then the [code map](docs/CODE_MAP.md). The tw
 - [Timer sources, native writers, hooks and cleanup](docs/TIMER_LIFECYCLE.md)
 - [Default manifest](bjarkiUI.toc) · [Camelot manifest](bjarkiUI_Camelot.toc)
 - [Package workflow](.github/workflows/package-addon.yml) · [Changelog](CHANGELOG.md)
-- [Current verification and live evidence](docs/VERIFICATION_0.2.360.md)
+- [Current verification and live evidence](docs/VERIFICATION_0.2.361.md)
 
 `ARCHITECTURE.md` records implementation history, including retired experiments. The 0.2.309 audit documents, `tests/snapshot-0.2.309/` and `tools/audit/` are historical reproduction material, not the current test or packaging entry point. Reproduce that audit at its [pinned revision](https://github.com/bjoern-janson/bjarkiUI/tree/d1797e392e0eb466906632e4dc047eb830b2ac78). Current source and top-level tests take precedence over historical descriptions. [Architecture history](ARCHITECTURE.md) · [Audit baseline](docs/AUDIT_BASELINE.md)
