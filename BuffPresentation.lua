@@ -1,6 +1,7 @@
 -- Native aura presentation. Blizzard keeps discovery, duration calculation,
 -- layout, tooltips, cancellation, dispel colours and target/focus cooldowns.
--- Player rows: native mask/frame skin, no expiry pulse, tenths <10s.
+-- Player rows: native mask/frame skin, no expiry pulse; public tenths <10s,
+-- restricted native seconds-band tenths when its public unit selector permits.
 -- Public ToT/ToF and cast icons share the skin. Already-native tracked icons stay native.
 -- Recovery: native target/focus rows are left alone. UnitAuraStyling.lua is
 -- a status-only compatibility stub, loaded first to prevent native scanning.
@@ -10,6 +11,8 @@ local states = setmetatable({}, { __mode = "k" })
 local targetHooks = setmetatable({}, { __mode = "k" })
 local settingCVars = false
 local nativeTimerHooks = setmetatable({}, { __mode = "k" })
+local secondsLabels = setmetatable({}, { __mode = "k" })
+local secondsUnitFormat, secondsDecimalFormat
 local diagnostics = {}
 local requestRefresh -- one deferred discovery pass after native event/layout work
 
@@ -85,7 +88,8 @@ local durationFormatter
 local fixedDurationFormatters=setmetatable({}, {__mode="k"})
 local buffDecimalSamples
 local timerStats = { native = 0, fallback = 0, readable = 0,
-    visibilityRestricted = 0, retries = 0, lastReason = "none" }
+    visibilityRestricted = 0, retries = 0, lastReason = "none",
+    secondsSinkAccepted = 0, secondsSinkLast = "unprepared" }
 local DURATION_RETRY_DELAY = 0.25
 local MAX_DURATION_RETRY_DELAY = 2
 
@@ -132,6 +136,8 @@ local function afterAuraType(button)
     local state = states[button]
     if state and member(button, "isExample") == true then
         state.assignment=(state.assignment or 0)+1
+        local receipt=state.secondsLabel and secondsLabels[state.secondsLabel]
+        if receipt and receipt.owner==button then receipt.serial=receipt.serial+1;receipt.kind="assignment" end
         state.pendingForeignReplay=nil
         if state.splitDuration then releaseDigits(button,state) end
     end
@@ -148,6 +154,8 @@ local function invalidateDurationObject(button)
     -- inherit a backoff window from an older, temporarily inaccessible read.
     state.durationObject = nil
     state.assignment=(state.assignment or 0)+1
+    local receipt=state.secondsLabel and secondsLabels[state.secondsLabel]
+    if receipt and receipt.owner==button then receipt.serial=receipt.serial+1;receipt.kind="assignment" end
     state.sharedTime,state.sharedSecret,state.sharedNativeTime=nil,nil,nil
     resetStockReceipt(state)
     state.capturingStock,state.pendingForeignReplay=nil,nil
@@ -498,6 +506,174 @@ local function canFormatDuration(button, duration)
     return true
 end
 
+local function prepareSecondsFormat()
+    local source=member(_G,"SECOND_ONELETTER_ABBR")
+    if type(source)~="string" then return false end
+    if source==secondsUnitFormat then return secondsDecimalFormat~=nil end
+    secondsUnitFormat,secondsDecimalFormat=source,nil
+    local count,valid=0,true
+    local result=source:gsub("%%(.)",function(code)
+        if code=="%" then return "%%" end
+        if code=="d" then count=count+1;return "%.1f" end
+        valid=false;return "%"..code
+    end)
+    -- Accept one native integer conversion and literal escaped percent signs.
+    -- Positional/width/multiple conversions require a separately proven locale.
+    if valid and count==1 and not source:gsub("%%%%",""):match("%%$") then secondsDecimalFormat=result end
+    return secondsDecimalFormat~=nil
+end
+
+local function recordSecondsWrite(label,format,isText)
+    local receipt=secondsLabels[label]
+    if not receipt then return end
+    receipt.serial=receipt.serial+1
+    local serial=receipt.serial
+    receipt.kind,receipt.writer="later-writer",nil
+    if isText then
+        if isText=="parent" then receipt.owner,receipt.assignment=nil,nil end
+        return
+    end
+    local publicFormat=readable(format)
+    local knownFormat=publicFormat and type(format)=="string" and
+        (format==secondsUnitFormat or format==secondsDecimalFormat
+            or format==member(_G,"MINUTE_ONELETTER_ABBR") or format==member(_G,"HOUR_ONELETTER_ABBR")
+            or format==member(_G,"DAY_ONELETTER_ABBR"))
+    if publicFormat and not knownFormat then return end
+    receipt.owner,receipt.assignment=nil,nil
+    if not accessible(label) then receipt.kind="owner-unavailable";return end
+    local getParent=member(label,"GetParent")
+    local got,owner=pcall(getParent,label)
+    local state=got and accessible(owner) and states[owner]
+    if not state or state.secondsLabel~=label or durationLabel(owner)~=label or receipt.serial~=serial then return end
+    receipt.owner,receipt.assignment=owner,state.assignment
+    if not publicFormat then
+        receipt.seenSource=true;receipt.kind="format-unreadable"
+    elseif type(format)~="string" then return
+    elseif format==secondsUnitFormat then
+        receipt.seenSource=true;receipt.kind="seconds"
+    elseif state.secondsWriting and format==secondsDecimalFormat then
+        receipt.kind="sink";receipt.writer=state.secondsWriting
+    elseif format==member(_G,"MINUTE_ONELETTER_ABBR") or format==member(_G,"HOUR_ONELETTER_ABBR")
+        or format==member(_G,"DAY_ONELETTER_ABBR") then
+        receipt.seenSource=true;receipt.kind="native-unit"
+    end
+    if receipt.kind=="seconds" or receipt.kind=="native-unit" or receipt.kind=="format-unreadable" then
+        receipt.sourceWrites=(receipt.sourceWrites or 0)+1
+    end
+end
+
+local function setupSecondsSink(button,state)
+    if not outOfCombat() or type(hooksecurefunc)~="function" then return end
+    local label=durationLabel(button)
+    if not accessible(label) or type(member(label,"GetParent"))~="function"
+        or type(member(label,"SetFormattedText"))~="function" or type(member(label,"SetText"))~="function" then return end
+    prepareSecondsFormat()
+    state.secondsLabel=label
+    state.secondsContexts=state.secondsContexts or {{},{}}
+    local receipt=secondsLabels[label]
+    if not receipt then receipt={serial=0,consumed=0};secondsLabels[label]=receipt end
+    if not receipt.formattedHook then
+        receipt.formattedHook=pcall(hooksecurefunc,label,"SetFormattedText",function(region,format)
+            recordSecondsWrite(region,format,false)
+        end)
+    end
+    if not receipt.textHook then
+        receipt.textHook=pcall(hooksecurefunc,label,"SetText",function(region)recordSecondsWrite(region,nil,true)end)
+    end
+    if not receipt.parentHook and type(member(label,"SetParent"))=="function" then
+        receipt.parentHook=pcall(hooksecurefunc,label,"SetParent",function(region)recordSecondsWrite(region,nil,"parent")end)
+    end
+end
+
+local function consumeSecondsReceipt(button)
+    local label=durationLabel(button)
+    local receipt=label and secondsLabels[label]
+    if not receipt or not receipt.formattedHook or not receipt.textHook or not receipt.seenSource then return end
+    local serial=receipt.serial
+    if serial==receipt.consumed then return receipt,serial,false end
+    receipt.consumed=serial
+    if (receipt.sourceWrites or 0)>1 then receipt.kind="ambiguous-source" end
+    receipt.sourceWrites=0
+    return receipt,serial,true
+end
+
+local function currentSecondsOwner(button,state,label,receipt,serial)
+    if not state or receipt.serial~=serial or receipt.owner~=button or receipt.assignment~=state.assignment
+        or state.secondsLabel~=label or not accessible(button) or not accessible(label)
+        or durationLabel(button)~=label or member(button,"isExample")==true then return false end
+    local got,parent=pcall(member(label,"GetParent"),label)
+    return got and readable(parent) and parent==button and receipt.serial==serial
+        and receipt.assignment==state.assignment and durationLabel(button)==label
+end
+
+local function captureSecondsReplay(button,state,context)
+    if not context then return end
+    local label=context.label
+    local receipt=secondsLabels[label]
+    local serial=receipt and receipt.serial
+    if not receipt or not currentSecondsOwner(button,state,label,receipt,serial) then return end
+    local got,text=pcall(member(label,"GetText"),label)
+    if currentSecondsOwner(button,state,label,receipt,serial) then
+        -- Transient formatted output only: never retain the original seconds.
+        context.replay,context.text,context.replaySerial=got,text,serial
+        context.replayAssignment=state.assignment
+    end
+end
+
+local function finishSecondsFallback(button,state,receipt,serial,stage)
+    timerStats.secondsSinkLast=stage
+    -- Do not clean a newer writer's acquired cells from an older callback.
+    if receipt.serial==serial then releaseDigits(button,state) end
+    return true
+end
+
+local function showNativeSeconds(button,state,label,timeLeft,receipt,serial,fresh)
+    if not receipt or readable(timeLeft) then return false end
+    local checked,restricted=pcall(issecretvalue,timeLeft)
+    if not checked or restricted~=true then return false end
+    if not fresh or receipt.serial~=serial then return finishSecondsFallback(button,state,receipt,serial,"stale-writer") end
+    if receipt.kind~="seconds" then return finishSecondsFallback(button,state,receipt,serial,receipt.kind) end
+    if not secondsDecimalFormat then return finishSecondsFallback(button,state,receipt,serial,"format-unavailable") end
+    if not currentSecondsOwner(button,state,label,receipt,serial) then return finishSecondsFallback(button,state,receipt,serial,"owner-unavailable") end
+    local enabledGet=member(C_CVar,"GetCVarBool") or member(_G,"GetCVarBool")
+    local known,enabled=pcall(enabledGet,"buffDurations")
+    local visible=known and readable(enabled) and enabled==true and canFormatDuration(button,label)
+    if not currentSecondsOwner(button,state,label,receipt,serial) then timerStats.secondsSinkLast="stale-writer";return true end
+    if not visible then return finishSecondsFallback(button,state,receipt,serial,"preference-hidden") end
+    if not releaseDigits(button,state,label) then timerStats.secondsSinkLast="cell-release-refused";return true end
+    if not currentSecondsOwner(button,state,label,receipt,serial) then timerStats.secondsSinkLast="stale-writer";return true end
+    state.durationObject,state.durationRetryAt,state.durationRetryDelay=nil,nil,nil
+    state.sharedTime,state.sharedSecret,state.sharedNativeTime=nil,nil,nil
+    state.capturingStock,state.pendingForeignReplay=nil,nil
+    resetStockReceipt(state)
+    local outer=state.secondsWriting
+    if outer and outer.parent then timerStats.secondsSinkLast="nested-writer";return true end
+    local context=state.secondsContexts[outer and 2 or 1]
+    context.label,context.parent=label,outer
+    context.replay,context.text,context.replaySerial,context.replayAssignment=nil,nil,nil,nil
+    state.secondsWriting=context
+    local wrote,result=pcall(member(label,"SetFormattedText"),label,secondsDecimalFormat,timeLeft)
+    state.secondsWriting=outer
+    local current=receipt.serial
+    if context.replay and receipt.writer==context and receipt.kind=="sink"
+        and current==context.replaySerial+1 and state.assignment==context.replayAssignment
+        and currentSecondsOwner(button,state,label,receipt,current) then
+        -- An older native setter completed after a newer update. Replay only
+        -- that newer native text, then release this bounded transient receipt.
+        pcall(member(label,"SetText"),label,context.text)
+    end
+    local acceptedWrite=wrote and (type(result)=="nil" or (readable(result) and result~=false))
+    if acceptedWrite
+        and receipt.serial==serial+1 and receipt.writer==context
+        and currentSecondsOwner(button,state,label,receipt,receipt.serial) then
+        timerStats.secondsSinkAccepted=timerStats.secondsSinkAccepted+1
+        timerStats.secondsSinkLast="accepted"
+        state.durationReported=nil
+    else timerStats.secondsSinkLast=not acceptedWrite and "write-refused" or "superseded" end
+    context.label,context.parent,context.replay,context.text,context.replaySerial,context.replayAssignment=nil,nil,nil,nil,nil,nil
+    return true
+end
+
 local function restoreOwnerStockReceipt(owner, ownerState, label, ownerGeneration)
     -- The failed native call could have transferred the physical label.
     local cells = bjarkiUINativeDigitCells
@@ -524,7 +700,9 @@ local function recoverForeignTimer(reader, readerState, label, owner, ownerGener
     ownerState.replaying = true
     if ownerState.splitDuration and ownerState.splitDuration ~= label then releaseDigits(owner, ownerState) end
     local currentSample = ownerState.sharedLabel == label and ownerState.sharedGeneration == ownerGeneration
-    if currentSample and ownerState.sharedTime then
+    if currentSample and ownerState.sharedSecondsSink then
+        restoreOwnerStockReceipt(owner,ownerState,label,ownerGeneration)
+    elseif currentSample and ownerState.sharedTime then
         pcall(member(owner, "UpdateDuration"), owner, ownerState.sharedTime)
     elseif currentSample and ownerState.sharedSecret and (ownerState.sharedVisible or canFormatDuration(owner, label)) then
         -- Ask stock to format its original opaque sample even when the aura ID is restricted.
@@ -562,7 +740,7 @@ local function enchantRemaining(button)
     return (expiration-now)/(rate and rate>0 and rate or 1)
 end
 
-local function showTenths(button, timeLeft)
+local function showTenths(button, timeLeft, secondsReceipt, secondsSerial, secondsFresh)
     if not readable(button) then return end
     local state = states[button]
     local assignment=state and state.assignment
@@ -605,8 +783,32 @@ local function showTenths(button, timeLeft)
             state.sharedLabel,state.sharedGeneration=duration,ownerGeneration
             state.sharedTime=type(sample)=="number" and sample or nil
             state.sharedSecret,state.sharedVisible,state.capturingStock=secretTime,visible,nil
-            if secretTime then state.sharedNativeTime=timeLeft else state.sharedNativeTime=nil end
+            state.sharedSecondsSink=secondsReceipt and secretTime and not enchantTime or nil
+            if secretTime and not state.sharedSecondsSink then state.sharedNativeTime=timeLeft else state.sharedNativeTime=nil end
         end
+    end
+    -- A readable enchant expiry already has the public fixed-cell path.
+    if not enchantTime and showNativeSeconds(button,state,duration,timeLeft,secondsReceipt,secondsSerial,secondsFresh) then
+        if binding then
+            -- The native setter can transfer this label and complete after
+            -- its new owner's update. Reconcile that lease before capturing
+            -- any receipt from the old caller's completed write.
+            local ours,_,_,currentOwner,currentFlush,currentOwnerGeneration=binding(duration,button)
+            if ours==false then
+                recoverForeignTimer(button,state,duration,currentOwner,currentOwnerGeneration)
+                return
+            end
+            if currentOwner~=physicalOwner or currentOwnerGeneration~=ownerGeneration then return end
+            stockFlush=currentFlush
+        end
+        if state and physicalOwner==button and state.assignment==assignment and durationLabel(button)==duration
+            and state.sharedLabel==duration and state.sharedGeneration==ownerGeneration then
+            state.capturingStock=true
+            rememberStockReceipt(state,duration)
+            state.capturingStock=nil
+        end
+        if stockFlush then digitCells.RememberBuffStock(duration,button) end
+        return
     end
     if not visible then
         releaseDigits(button, state, duration)
@@ -753,14 +955,16 @@ local function afterDuration(button, timeLeft)
     -- the OnUpdate script. HookScript(OnUpdate) did not: it was lost whenever
     -- a permanent/empty slot became timed, leaving .268 flashing again.
     -- Restore opacity even if duration text is hidden, restricted, or >=10s.
-    keepOpaque(button)
     local state=states[button]
+    local secondsReceipt,secondsSerial,secondsFresh=consumeSecondsReceipt(button)
+    local secondsWriting=state and state.secondsWriting
+    keepOpaque(button)
     if state then state.pendingForeignReplay=nil end
     local clearing=state and state.clearingLabel
     if clearing then
         local serial=state.clearSerial+1
         state.clearSerial=serial
-        showTenths(button,timeLeft)
+        showTenths(button,timeLeft,secondsReceipt,secondsSerial,secondsFresh)
         if state.clearSerial==serial then
             local target,assignment,generation=durationLabel(button),state.assignment,state.sharedGeneration
             local received,text
@@ -771,9 +975,11 @@ local function afterDuration(button, timeLeft)
                 state.clearReceived,state.clearText=received,text
             end
         end
+        captureSecondsReplay(button,state,secondsWriting)
         return
     end
-    showTenths(button, timeLeft)
+    showTenths(button, timeLeft,secondsReceipt,secondsSerial,secondsFresh)
+    captureSecondsReplay(button,state,secondsWriting)
 end
 
 local function getIcon(button)
@@ -834,6 +1040,7 @@ local function setupButton(button)
         state = { scripts = {}, auraStyle = true }
         states[button] = state
     end
+    setupSecondsSink(button,state)
     local hookScript = member(button, "HookScript")
     if type(hookScript) == "function" then
         for _, script in ipairs({ "OnShow" }) do
@@ -1239,6 +1446,8 @@ if type(SlashCmdList) == "table" then
             .. " | readable-writes=" .. timerStats.readable
             .. ", visibility-restricted=" .. timerStats.visibilityRestricted
             .. ", retries=" .. timerStats.retries
+            .. " | seconds-sink-accepted=" .. timerStats.secondsSinkAccepted
+            .. ", seconds-sink-last=" .. timerStats.secondsSinkLast
             .. " | hooked=" .. hooked .. "/" .. buttons
             .. ", retry-pending=" .. pending .. ", fallback-buttons=" .. fallbacks
             .. ", private=" .. private .. ", inaccessible=" .. blocked

@@ -94,6 +94,7 @@ C_DurationUtil={CreateDurationTextBinding=function()
  function b:SetZeroDurationText(v)self.zero=v end
  function b:SetExpiredText(v)self.expired=v end
  function b:SetEnabled(v)self.enabled=v end
+ function b:IsEnabled()return self.enabled end
  function b:Tick(value)
   if not self.enabled then return end
   if value==0 then self.label:SetText(self.zero)
@@ -1970,6 +1971,197 @@ do
  ActionButton5=oldButton
  CreateFrame,C_DurationUtil.CreateDuration,C_CurveUtil,CreateColor,GetTime=oldCreate,oldDuration,oldCurves,oldColor,oldTime
  C_DurationUtil.CreateDurationTextBinding,C_ActionBar.GetActionCooldownDuration,issecretvalue=oldFactory,oldSource,oldSecret
+ bjarkiUINativeDigitCells=api
+end
+do
+ -- The in-place native formatter owns its existing label. A prepared fallback
+ -- must retire only its own visibility/bindings and cannot retake it later.
+ local oldCreate,oldButton,oldCVar=CreateFrame,ActionButton1,C_CVar
+ local fixed=C_StringUtil.CreateNumericRuleFormatter()
+ fixed:SetBreakpoints({{threshold=0,format='%.1f'}})
+ local helper={GetFixedActionFormatter=function()return fixed end,
+  IsFixedActionFormatter=function(f)return rawequal(f,fixed)end}
+ local enabled=true
+ C_CVar={GetCVarBool=function()return enabled end}
+ local event
+ CreateFrame=function()
+  event={RegisterEvent=function()end,SetScript=function(self,kind,fn)self[kind]=fn end}
+  return event
+ end
+ local function owner()
+  local cd=container();local sourceLabel=label(cd)
+  local button={action=5,cooldown=cd}
+  function button:GetName()return 'ActionButton1'end
+  function cd:GetCountdownFontString()return sourceLabel end
+  function cd:GetCountdownFormatter()return self.formatter end
+  function cd:SetCountdownFormatter(f)self.formatter=f;if self.refuseFormatter then return false end end
+  function cd:GetHideCountdownNumbers()return self.hidden==true end
+  function cd:SetHideCountdownNumbers(v)
+   if v==false and self.refuseRestore then return false end
+   self.hidden=v
+   if v==false and self.reenter then local fn=self.reenter;self.reenter=nil;fn()end
+  end
+  function cd:GetMinimumCountdownDuration()self.minimumReads=(self.minimumReads or 0)+1;return self.minimum or 0 end
+  function cd:SetMinimumCountdownDuration(v)self.minimum=v end
+  function cd:SetCooldown(v)self.value=v end
+  function cd:Clear()self.value=0 end
+  function cd:NativeText()return self.hidden and '' or self.formatter:FormatNumber(self.value or 8.7)end
+  return button,cd,sourceLabel
+ end
+ local function fresh()
+  assert(loadfile(addon..'/NativeDigitCells.lua'))('bjarkiUI',helper)
+  return bjarkiUINativeDigitCells
+ end
+ local function enabledBindings(cd)
+  local count=0
+  for _,b in ipairs(allBindings)do if b.label and b.label.parent==cd and b.enabled then count=count+1 end end
+  return count
+ end
+ local primary=fresh()
+ local b,cd,sourceLabel=owner();ActionButton1=b
+ local colors=0
+ sourceLabel.GetTextColor=function()colors=colors+1;error('secret native timer color')end
+ local beforeCreated,beforeBindings,beforeRequests=created,#allBindings,requests
+ assert(loadfile(addon..'/CooldownSeconds.lua'))('bjarkiUI',helper)
+ eq(cd.formatter,fixed,'actual native module installs the verified formatter')
+ eq(colors,0,'native preferred countdown never queries its protected color')
+ eq(cd.minimumReads,nil,'native preferred countdown delegates minimum policy without reading it')
+ eq(created,beforeCreated,'native preferred countdown creates no replacement cells')
+ eq(#allBindings,beforeBindings,'native preferred countdown creates no digit bindings')
+ eq(requests,beforeRequests,'native preferred countdown performs no action clock query')
+ eq(cd:NativeText(),'8.7','native preferred countdown keeps its existing label visible')
+ ok(primary.GetActionTimerDiagnostics():find('native-format-configured=1',1,true),'diagnostic identifies configured native formatter')
+ cd:SetCooldown(6.3);cd:Clear();cd:SetMinimumCountdownDuration(5000)
+ primary.StopActionNumbers();primary.ResumeOwnedActionNumbers();primary.StockCountdownVisibilityChanged(b)
+ eq(requests,beforeRequests,'native lifecycle remains entirely on the native clock')
+ eq(colors,0,'native lifecycle never invokes cell style reads')
+ cd:SetHideCountdownNumbers(true);event:OnEvent('EDIT_MODE_LAYOUTS_UPDATED')
+ eq(cd:GetHideCountdownNumbers(),true,'external hidden-number writer remains native authority')
+ eq(created,beforeCreated,'external hidden-number writer cannot trigger cell takeover')
+
+ for _,case in ipairs({'clean','restore-refused','invalid-clock-shutdown-ignored','binding-refused','binding-ignored','owner-changed','action-changed','reentrant','external-writer'})do
+  local route=fresh();local oldOwner,oldCD=owner()
+  ok(route.InstallAction(oldOwner),case..' starts with the real prepared fallback')
+  eq(oldCD:GetHideCountdownNumbers(),true,case..' fallback owns the native hidden state')
+  eq(enabledBindings(oldCD),6,case..' fallback has six native bindings')
+  oldCD:SetCountdownFormatter(fixed)
+  local allocations,queries=created,requests
+  local blockedBinding,originalDisable,originalHide
+  if case=='restore-refused' or case=='invalid-clock-shutdown-ignored' or case=='owner-changed' or case=='action-changed' then oldCD.refuseRestore=true end
+  if case=='binding-refused' or case=='binding-ignored' then
+   for _,binding in ipairs(allBindings)do if binding.label and binding.label.parent==oldCD then blockedBinding=binding;break end end
+   originalDisable=blockedBinding.SetEnabled;originalHide=blockedBinding.label.Hide
+   blockedBinding.SetEnabled=function(self,on)if on==false then if case=='binding-refused' then return false end;return end;return originalDisable(self,on)end
+   blockedBinding.label.Hide=function()return false end
+  end
+  if case=='reentrant' then oldCD.reenter=function()
+   ok(not route.InstallAction(oldOwner),'native retirement blocks nested fallback acquisition')
+   oldCD:SetCooldown(4.2)
+  end end
+  if case=='external-writer' then oldCD.reenter=function()oldCD:SetHideCountdownNumbers(true)end end
+  local retired=route.UseNativeActionFormatter(oldCD,fixed)
+  if case=='restore-refused' or case=='invalid-clock-shutdown-ignored' or case=='owner-changed' or case=='action-changed' then
+   ok(not retired,'refused source restoration is a pending handoff')
+   eq(enabledBindings(oldCD),6,'refused restoration preserves the valid previous presenter')
+   eq(oldCD:GetHideCountdownNumbers(),true,'refused restoration keeps its ownership receipt')
+  elseif case=='binding-refused' or case=='binding-ignored' then
+   ok(not retired,'refused binding shutdown cannot claim completed handoff')
+   eq(oldCD:GetHideCountdownNumbers(),false,'binding refusal retains the restored native presenter')
+  elseif case=='external-writer' then
+   ok(not retired,'newer external visibility writer supersedes in-progress restoration')
+   eq(oldCD:GetHideCountdownNumbers(),true,'newer external hidden flag is never overwritten')
+  else
+   ok(retired,case..' finishes source restoration and binding shutdown')
+   eq(oldCD:GetHideCountdownNumbers(),false,case..' restores only the addon-owned hidden flag')
+   eq(enabledBindings(oldCD),0,case..' disables all superseded native bindings')
+  end
+  local pending=case~='clean' and case~='reentrant'
+  ok(route.GetActionTimerDiagnostics():find('native-handoff-pending='..(pending and 1 or 0),1,true),case..' reports actual cached handoff completion')
+  if case=='invalid-clock-shutdown-ignored' then
+   for _,binding in ipairs(allBindings)do if binding.label and binding.label.parent==oldCD then blockedBinding=binding;break end end
+   originalDisable=blockedBinding.SetEnabled;originalHide=blockedBinding.label.Hide
+   blockedBinding.SetEnabled=function(self,on)if on==false then return end;return originalDisable(self,on)end
+   oldCD:Clear()
+   blockedBinding:Tick(8.7)
+   ok(blockedBinding.label.hidden,'invalidated old binding cannot repaint stale digits while restoration and shutdown refuse')
+  elseif case=='restore-refused' then
+   oldCD:Clear()
+   eq(enabledBindings(oldCD),0,'pending restoration cannot keep digits from a cleared normal cooldown')
+   oldCD:SetCooldown(2.4)
+   eq(enabledBindings(oldCD),0,'a new native clock cannot reuse the old clock while restoration still refuses')
+  elseif case=='owner-changed' then
+   route.InstallAction({action=5,cooldown=oldCD})
+   eq(enabledBindings(oldCD),0,'pending restoration invalidates bindings when another physical owner takes the widget')
+  elseif case=='action-changed' then
+   oldOwner.action=6
+   route.InstallAction(oldOwner)
+   eq(enabledBindings(oldCD),0,'pending restoration invalidates bindings after the public action slot changes')
+  end
+  oldCD.refuseRestore=false
+  if blockedBinding then blockedBinding.SetEnabled=originalDisable;blockedBinding.label.Hide=originalHide end
+  oldCD:SetCooldown(3.1)
+  eq(enabledBindings(oldCD),0,case..' existing native update completes retirement')
+  ok(route.GetActionTimerDiagnostics():find('native-format-configured=1',1,true),case..' native configuration becomes complete')
+  eq(oldCD:GetHideCountdownNumbers(),case=='external-writer',case..' recovery respects latest visibility authority')
+  oldCD:Clear();oldCD:SetMinimumCountdownDuration(4000)
+  route.ResumeOwnedActionNumbers();route.StopActionNumbers();route.ResumeOwnedActionNumbers()
+  ok(not route.InstallAction(oldOwner),case..' later safe discovery cannot reacquire native preferred widget')
+  eq(created,allocations,case..' handoff lifecycle allocates no cells')
+  eq(requests,queries,case..' handoff lifecycle makes no old action clock query')
+  eq(enabledBindings(oldCD),0,case..' Clear, minimum and preference updates leave old bindings stopped')
+  enabled=false;oldCD:SetHideCountdownNumbers(true)
+  route.StopActionNumbers();route.ResumeOwnedActionNumbers();route.StockCountdownVisibilityChanged(oldOwner)
+  eq(oldCD:GetHideCountdownNumbers(),true,case..' native CVar disable retains its hidden flag')
+  eq(enabledBindings(oldCD),0,case..' native CVar disable cannot reactivate cells')
+  enabled=true;oldCD:SetHideCountdownNumbers(false)
+  route.StockCountdownVisibilityChanged(oldOwner);route.ResumeOwnedActionNumbers()
+  eq(oldCD:GetHideCountdownNumbers(),false,case..' native CVar enable keeps the original countdown visible')
+  eq(enabledBindings(oldCD),0,case..' native CVar enable cannot reacquire cells')
+  -- The cached report itself may not read native properties or clocks.
+  oldCD.GetCountdownFormatter=function()error('diagnostic formatter read')end
+  oldCD.GetHideCountdownNumbers=function()error('diagnostic visibility read')end
+  route.GetActionTimerDiagnostics()
+  eq(requests,queries,case..' diagnostics add no clock reads')
+ end
+ -- An external setter can return false after actually replacing the formatter.
+ -- The post-hook must inspect actual native identity rather than its argument
+ -- or the calling wrapper's return value.
+ local replacementAPI=fresh();local replacementOwner,replacementCD=owner()
+ replacementCD:SetCountdownFormatter(fixed)
+ ok(replacementAPI.UseNativeActionFormatter(replacementCD,fixed),'fresh physical widget accepts verified native formatting')
+ replacementCD.refuseFormatter=true
+ local foreign=C_StringUtil.CreateNumericRuleFormatter();foreign:SetBreakpoints({{threshold=0,format='%.0f'}})
+ eq(replacementCD:SetCountdownFormatter(foreign),false,'external wrapper refuses after applying its own formatter')
+ ok(replacementAPI.GetActionTimerDiagnostics():find('native-format-configured=0',1,true),'actual external formatter replacement revokes the native receipt')
+ ok(replacementAPI.InstallAction(replacementOwner),'an invalidated native preference no longer blocks compatible cells')
+ eq(replacementCD:GetHideCountdownNumbers(),true,'fallback renderer may acquire after real native formatter replacement')
+ -- A formatter change re-entering the old visibility restoration cannot be
+ -- followed by the superseded transaction claiming native completion.
+ replacementCD.refuseFormatter=false;replacementCD:SetCountdownFormatter(fixed)
+ replacementCD.reenter=function()replacementCD:SetCountdownFormatter(foreign)end
+ ok(not replacementAPI.UseNativeActionFormatter(replacementCD,fixed),'nested formatter replacement supersedes native retirement')
+ ok(replacementAPI.GetActionTimerDiagnostics():find('native-format-configured=0',1,true),'superseded retirement cannot publish a stale configured receipt')
+ eq(replacementCD:GetHideCountdownNumbers(),false,'superseded retirement leaves native source restored')
+ eq(enabledBindings(replacementCD),0,'superseded retirement keeps old bindings shut down')
+ -- Getter reentrancy must not let an older observer revoke a newly confirmed
+ -- receipt. The old read returns a stale formatter after installing fixed.
+ replacementCD:SetCountdownFormatter(fixed)
+ ok(replacementAPI.UseNativeActionFormatter(replacementCD,fixed),'native route recovers before reentrant getter case')
+ local getFormatter=replacementCD.GetCountdownFormatter
+ local getterReentry=true
+ replacementCD.GetCountdownFormatter=function(self)
+  if getterReentry then
+   getterReentry=false
+   local stale=self.formatter
+   self:SetCountdownFormatter(fixed)
+   ok(replacementAPI.UseNativeActionFormatter(self,fixed),'nested getter installs a new verified receipt')
+   return stale
+  end
+  return getFormatter(self)
+ end
+ replacementCD:SetCountdownFormatter(foreign)
+ ok(replacementAPI.GetActionTimerDiagnostics():find('native-format-configured=1',1,true),'older formatter observer cannot revoke the nested current receipt')
+ ActionButton1,CreateFrame,C_CVar=oldButton,oldCreate,oldCVar
  bjarkiUINativeDigitCells=api
 end
 local owned=created

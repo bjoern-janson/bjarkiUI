@@ -70,13 +70,32 @@ local function getFormatter()
     return cooldownFormatter
 end
 
-local function installFormatter(cooldown, setter, current, wanted)
+local function preferNativeFormatter(cooldown, formatter)
+    local cells = bjarkiUINativeDigitCells
+    if cells and type(cells.UseNativeActionFormatter) == "function" then
+        cells.UseNativeActionFormatter(cooldown, formatter)
+    end
+end
+
+local function installFormatter(cooldown, setter, getter, current, wanted, requireReceipt)
     if not rawequal(current, wanted) then
         local ok, result = pcall(setter, cooldown, wanted)
         if not ok or isSecret(result) or result == false then
             applied[cooldown] = nil
             return false
         end
+    end
+    -- A void native setter can be accepted without changing the widget.
+    -- Only exact public readback can authorize retiring a separate presenter.
+    if type(getter) == "function" then
+        local read, actual = pcall(getter, cooldown)
+        if not read or isSecret(actual) or not rawequal(actual, wanted) then
+            applied[cooldown] = nil
+            return false
+        end
+    elseif requireReceipt then
+        applied[cooldown] = nil
+        return false
     end
     applied[cooldown] = wanted
     return true
@@ -98,8 +117,7 @@ local function styleCooldown(cooldown, formatter, seen)
     local current = applied[cooldown]
     if type(getter) == "function" then
         local read, value = pcall(getter, cooldown)
-        if not read or isSecret(value) then return end
-        current = value
+        if read and not isSecret(value) then current = value else current = nil end
     end
 
     if private and private.GetFixedActionFormatter and type(getLabel) == "function" then
@@ -107,14 +125,24 @@ local function styleCooldown(cooldown, formatter, seen)
         if read and not isSecret(label) and label then
             local built, fixed = pcall(private.GetFixedActionFormatter, label, formatter, cooldown)
             if built and not isSecret(fixed) and fixed and not rawequal(fixed, formatter) then
-                if installFormatter(cooldown, setter, current, fixed) then return end
+                local verified = false
+                if type(private.IsFixedActionFormatter) == "function" then
+                    local checked, value = pcall(private.IsFixedActionFormatter, fixed)
+                    verified = checked and not isSecret(value) and value == true
+                end
+                if (not verified or type(getter) == "function")
+                    and installFormatter(cooldown, setter, getter, current, fixed, verified) then
+                    preferNativeFormatter(cooldown, verified and fixed or nil)
+                    return
+                end
                 current = nil -- A refused setter may already have changed the widget.
             end
-        elseif current and rawequal(current, applied[cooldown]) then
-            return -- Keep an installed formatter while the label is temporarily inaccessible.
         end
     end
-    installFormatter(cooldown, setter, current, formatter)
+    -- The current label/style must still validate. An earlier accepted
+    -- formatter is not evidence for a changed font or unavailable geometry.
+    preferNativeFormatter(cooldown, nil)
+    installFormatter(cooldown, setter, getter, current, formatter)
 end
 
 local function styleButton(button, formatter, petIndex, seen)
