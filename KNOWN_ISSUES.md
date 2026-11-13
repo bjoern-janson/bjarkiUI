@@ -1,8 +1,18 @@
 # Known issues and bugs
 
-Current test branch is **0.2.360-native-countdown-format-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Current verification evidence](docs/VERIFICATION_0.2.360.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+Current test branch is **0.2.361-action-width-validation-test**, based on main 0.2.335-cast-recovery-test. The evidence below distinguishes source inspection, offline fixtures and the user's live observations. [Current verification evidence](docs/VERIFICATION_0.2.361.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
 
-## 0.2.360 native action formatter — action movement and buff decimals remain open
+## 0.2.361 action width validation — buffs observed working, actions still open
+
+The user's follow-up after .360 delivery says "buffs seem good, action bar not yet." Its ordinary buff labels visibly show `0.9 s` and `3.7 s`; diagnostics report `seconds-sink-accepted=2040`, `seconds-sink-last=accepted`, and zero current fallback buttons. This is positive live evidence for the pictured buffs, not a claim about every aura, locale or combat situation. The exact .360 buff implementation is retained.
+
+Action output shows `native-format-configured=0`, `native-handoff-pending=0`, four unavailable full formatter profiles with `last=character-areas`, and four plain individual-glyph profiles. No accepted fixed native formatter is recorded. The reported action movement remains open. The screenshot does not display the bjarkiUI version line, and this aggregate preparation stage cannot distinguish nil results, restrictions, unusable rectangles or later metric inconsistencies.
+
+The native character-area API is nullable, and its documentation does not guarantee immediate usable selection rectangles for transparent texture-marked samples. .361 adds independent scalar width validation for tabular fonts when the first character sample is unusable. It checks actual integer guard growth, repeated digit widths, complete emitted strings and every corresponding prefix/suffix, line height and widget fit. A successful initial character sample keeps the original route, including rejection of later contradictory metrics.
+
+Scalar validation is limited by native width resolution. It is not proof of exact optical ink or in-game stability. Source and modeled tests cannot establish the native cause of the failed sample or close this action report. The next build reports the width route as `last=fixed-widths`; configured formatter counts remain separate from active cooldown counts. [Verification](docs/VERIFICATION_0.2.361.md)
+
+## 0.2.360 native action formatter — initial architecture and earlier evidence
 
 The capture supplied after .359 delivery reports `cells=0 stock=13 idle=84`, `minimum-read-denied=11`, two named `gate-unsupported/scalar-threshold` samples, and `MultiBarRightButton10:style-unavailable/text-color`. The four action formatter profiles remain plain. Aura output reads `native=0 fallback=3 last=aura ID secret readable-writes=0`, with `hooked=48/48`, three fallback buttons and six private anchors. A short ordinary buff visibly reads `6 s`. The screenshot does not display the bjarkiUI version line; the separate bjarkiCC startup version is not a bjarkiUI version receipt.
 

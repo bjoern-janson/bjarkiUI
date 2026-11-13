@@ -271,12 +271,17 @@ local function build(base,source,file,size,flags,scale,textScale,smoothScaling,a
         accepted(actionProbe:SetText(text))
         assert(accessible(actionProbe:GetText())==text,"different public sample text")
     end
-    local function width(text)
+    local function width(text,unbounded)
         attempt.stage="measure"
         local value
         if actionProbe.GetUnboundedStringWidthForText then value=actionProbe:GetUnboundedStringWidthForText(text)
-        else value=actionProbe:GetStringWidth() end
-        assert(positive(value) and value<=probeWidth,"unmeasurable or clipped sample line")
+        else
+            sample(text)
+            attempt.stage="measure"
+            if unbounded then value=actionProbe:GetUnboundedStringWidth()
+            else value=actionProbe:GetStringWidth() end
+        end
+        assert(positive(value) and (unbounded or value<=probeWidth),"unmeasurable or clipped sample line")
         return value
     end
     local function character(index)
@@ -296,33 +301,79 @@ local function build(base,source,file,size,flags,scale,textScale,smoothScaling,a
         return left+w/2-probeWidth/2,w
     end
     local guard=string.format(actionSpacer,1)
-    local advances,broad={},0
-    for i=0,9 do
-        local digit=tostring(i)
-        sample(guard..digit..guard)
-        local _,advance=character(#guard+1)
-        advances[digit]=advance
-        broad=math.max(broad,advance)
-    end
-    -- Measure a texture's actual native advance from two public character
-    -- spans. End bearings, outlines and centered-line rounding cancel here.
-    sample(guard.."8"..guard.."8"..guard)
-    local first,firstWidth=character(#guard+1)
-    local second,secondWidth=character(2*#guard+2)
-    local unit=second-first-(firstWidth+secondWidth)/2
-    attempt.stage="spacing"
-    assert(positive(unit) and math.abs(firstWidth-advances["8"])<=tolerance
-        and math.abs(secondWidth-firstWidth)<=tolerance,"inline guard has no stable advance")
-    local glyphs,guards={},{}
-    for i=0,9 do
-        local digit=tostring(i)
-        local padding=1+(broad-advances[digit])/(2*unit)
-        assert(positive(padding) and padding<=64,"unsupported guard range")
-        local tag=string.format(actionSpacer,padding)
-        -- Fractional widths are candidates, not an assumed texture contract.
-        -- Every completed native string must prove its actual columns below.
-        glyphs[digit]=tag..digit..tag
-        guards[digit]=#tag
+    -- Selection rectangles are optional native output. Test that capability
+    -- once, before any accepted geometry. A later contradictory rectangle
+    -- must not silently fall back to weaker scalar measurements.
+    sample(guard.."0"..guard)
+    local haveAreas,_,firstAdvance=pcall(character,#guard+1)
+    local widthOnly=not haveAreas
+    local glyphs,guards,advances={},{},{}
+    local widthContexts
+    if widthOnly then
+        -- Constant integer guards need no fractional texture-width contract.
+        -- Measure complete public strings, including repeated samples that
+        -- amplify differences concealed by native whole-line rounding.
+        local larger=string.format(actionSpacer,2)
+        local reference,referenceRepeated,unit
+        local copies=8
+        for i=0,9 do
+            local digit=tostring(i)
+            local packed=guard..digit..guard
+            local single=width(packed)
+            local repeated=width(string.rep(packed,copies),true)
+            local left=width(larger..digit..guard)-single
+            local right=width(guard..digit..larger)-single
+            local both=width(larger..digit..larger)-single
+            attempt.stage="width-digits"
+            assert(positive(left) and math.abs(left-right)<=tolerance
+                and math.abs(both-2*left)<=tolerance,"inline guards have inconsistent advance")
+            if reference then
+                assert(math.abs(single-reference)<=tolerance and math.abs(repeated-referenceRepeated)<=tolerance
+                    and math.abs(left-unit)<=tolerance,"guarded numerals are not tabular")
+            else reference,referenceRepeated,unit=single,repeated,left end
+            glyphs[digit],guards[digit]=packed,#guard
+        end
+        local cache={[""]={0,0}}
+        widthContexts=function(text)
+            local measured=cache[text]
+            if not measured then
+                -- Guard the repetition boundaries too, so an exposed unit or
+                -- punctuation cannot kern into the next calibration sample.
+                local repeated=guard..text..guard
+                assert(#repeated*copies<=8192,"calibration sample is too long")
+                measured={width(text),width(string.rep(repeated,copies),true)}
+                cache[text]=measured
+            end
+            return measured
+        end
+    else
+        local broad=0
+        for i=0,9 do
+            local digit=tostring(i)
+            local advance=firstAdvance
+            if i~=0 then sample(guard..digit..guard);_,advance=character(#guard+1) end
+            advances[digit]=advance
+            broad=math.max(broad,advance)
+        end
+        -- Measure a texture's actual native advance from two public character
+        -- spans. End bearings, outlines and centered-line rounding cancel here.
+        sample(guard.."8"..guard.."8"..guard)
+        local first,firstWidth=character(#guard+1)
+        local second,secondWidth=character(2*#guard+2)
+        local unit=second-first-(firstWidth+secondWidth)/2
+        attempt.stage="spacing"
+        assert(positive(unit) and math.abs(firstWidth-advances["8"])<=tolerance
+            and math.abs(secondWidth-firstWidth)<=tolerance,"inline guard has no stable advance")
+        for i=0,9 do
+            local digit=tostring(i)
+            local padding=1+(broad-advances[digit])/(2*unit)
+            assert(positive(padding) and padding<=64,"unsupported guard range")
+            local tag=string.format(actionSpacer,padding)
+            -- Fractional widths are candidates, not an assumed texture contract.
+            -- Every completed native string must prove its actual columns below.
+            glyphs[digit]=tag..digit..tag
+            guards[digit]=#tag
+        end
     end
 
     local encoded,families={[""]=""},{}
@@ -349,11 +400,22 @@ local function build(base,source,file,size,flags,scale,textScale,smoothScaling,a
         local fullWidth=width(packed)
         requiredWidth=math.max(requiredWidth,fullWidth)
         local positions={}
-        for i,index in ipairs(spans) do
-            local x,advance=character(index)
-            local digitWidth=advances[raw:sub(i,i)]
-            assert(not digitWidth or math.abs(advance-digitWidth)<=tolerance,"inline guard changes character metrics")
-            positions[i]=x
+        if widthOnly then
+            for i=1,#pieces do
+                local prefix=widthContexts(table.concat(pieces,"",1,i))
+                local suffix=widthContexts(table.concat(pieces,"",i,#pieces))
+                positions[#positions+1]=prefix[1]
+                positions[#positions+1]=prefix[2]
+                positions[#positions+1]=suffix[1]
+                positions[#positions+1]=suffix[2]
+            end
+        else
+            for i,index in ipairs(spans) do
+                local x,advance=character(index)
+                local digitWidth=advances[raw:sub(i,i)]
+                assert(not digitWidth or math.abs(advance-digitWidth)<=tolerance,"inline guard changes character metrics")
+                positions[i]=x
+            end
         end
         -- A native format keeps stationary numeral and punctuation columns.
         -- Changes in digit count or unit retain the original format transition.
@@ -424,7 +486,7 @@ local function build(base,source,file,size,flags,scale,textScale,smoothScaling,a
     for _,value in ipairs({dynamicDays,dynamicDays+1,365*day,1e10}) do
         assert(accessible(formatter:FormatNumber(value))==accessible(base:FormatNumber(value)),"changed dynamic day rule")
     end
-    return formatter,requiredWidth
+    return formatter,requiredWidth,widthOnly
 end
 
 function private.RetryFixedActionFormatters()
@@ -518,7 +580,7 @@ function private.GetFixedActionFormatter(label,base,widget)
     if not entry.formatter then
         if entry.epoch==retryEpoch then lastFormatterStage=entry.stage;return nil end
         entry.epoch=retryEpoch
-        local built,formatter,required=pcall(build,base,source,file,size,flags,scale,textScale,smoothScaling,attempt)
+        local built,formatter,required,widthOnly=pcall(build,base,source,file,size,flags,scale,textScale,smoothScaling,attempt)
         local cleaned=pcall(function()
             if actionProbe then
                 accepted(actionProbe:Hide())
@@ -528,7 +590,7 @@ function private.GetFixedActionFormatter(label,base,widget)
         end)
         if not cleaned then built=false;attempt.stage="probe-cleanup" end
         entry.outcome=built and formatter and "fixed" or "unavailable"
-        entry.stage=entry.outcome=="unavailable" and attempt.stage or entry.outcome
+        entry.stage=entry.outcome=="unavailable" and attempt.stage or (widthOnly and "fixed-widths" or entry.outcome)
         lastFormatterStage=entry.stage
         if not built or not formatter then return nil end
         fixedActionFormatters[formatter]=true

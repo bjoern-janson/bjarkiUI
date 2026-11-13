@@ -2,6 +2,15 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.361-action-width-validation-test — recover tabular action formatting
+
+- The user reports that buff decimals now look good; the supplied capture shows `0.9 s` and `3.7 s`, with accepted seconds-sink writes. Preserve .360's buff code.
+- The same capture has four unavailable action formatter profiles at `character-areas`, four plain/tabular glyph profiles, and zero configured native formatters. The aggregate stage does not establish the exact native reason.
+- Add a narrow route when the first public sample has no usable character rectangle. Constant positive integer guards receive native all-digit, repeated-sample, one-sided growth, complete-line, prefix/suffix, height and fit checks. No fractional spacer support is assumed by this route.
+- Keep the original character-area path after its first successful sample. Later inconsistent character metrics cannot switch to the width route. Unsupported or inconsistent public widths retain fallback.
+- Report successful width preparation as `last=fixed-widths` in existing typography diagnostics. This is a cached preparation receipt, not exact subpixel/optical proof or a live rendering verdict.
+- Reuse existing probes, bounded caches and safe typography epochs. No new timer, event frame, runtime module, setting, dependency or per-button label; no changed native clocks, colors, fonts, minimum/GCD rules or thresholds.
+
 ## 0.2.360-native-countdown-format-test — keep the native action countdown owner
 
 - The latest capture still shows zero active action cell presenters, with `scalar-threshold` and `text-color` failures. Stop making another calibration adjustment the primary action repair.
