@@ -118,13 +118,13 @@ local function inheritStyle(from,to)
     return true
 end
 local actionStyleParts={
-    {'color','GetTextColor','SetTextColor',4},
-    {'shadowColor','GetShadowColor','SetShadowColor',4},
-    {'shadowOffset','GetShadowOffset','SetShadowOffset',2},
+    {'color','GetTextColor','SetTextColor',4,'text-color'},
+    {'shadowColor','GetShadowColor','SetShadowColor',4,'shadow-color'},
+    {'shadowOffset','GetShadowOffset','SetShadowOffset',2,'shadow-offset'},
 }
 local function readActionStyle(label,center)
     local path,size,flags=getFont(label)
-    if not path then return nil end
+    if not path then return nil,'font' end
     local style={font={path,size,flags or ''}}
     local function positive(object,name,default)
         local getter=m(object,name)
@@ -135,18 +135,20 @@ local function readActionStyle(label,center)
     local sourceScale=positive(label,'GetEffectiveScale',1)
     local parentScale=positive(center,'GetEffectiveScale',1)
     local textScale=positive(label,'GetTextScale',1)
-    if not sourceScale or not parentScale or not textScale then return nil end
+    if not sourceScale then return nil,'source-scale' end
+    if not parentScale then return nil,'parent-scale' end
+    if not textScale then return nil,'text-scale' end
     local relative=sourceScale/parentScale
-    if relative<=0 or relative>=math.huge then return nil end
+    if relative<=0 or relative>=math.huge then return nil,'relative-scale' end
     style.scale={relative,textScale}
     for _,part in ipairs(actionStyleParts)do
         local get=m(label,part[2])
         if get then
             local values={pcall(get,label)}
-            if not values[1] then return nil end
+            if not values[1] then return nil,part[5] end
             table.remove(values,1)
             for i=1,part[4]do
-                if not public(values[i]) or type(values[i])~='number' then return nil end
+                if not public(values[i]) or type(values[i])~='number' then return nil,part[5] end
             end
             style[part[1]]=values
         end
@@ -612,9 +614,14 @@ local function minimumCalibration()
             assert(public(real) and public(base) and public(display) and public(adjusted))
             assert((display==base*1000 and adjusted==real*1000) or (display==real*1000 and adjusted==base*1000))
         end
-        minimumProbeStage='probe-alpha'
-        assert(accepted(pcall(p.label.SetAlpha,p.label,.25)) and p.label:GetAlpha()==.25)
-        assert(accepted(pcall(p.label.SetAlpha,p.label,1)))
+        -- The step gate consumes only 0/1 alpha. Fractional channel storage
+        -- need not round-trip an unrelated calibration value exactly.
+        for _,alpha in ipairs({0,1})do
+            minimumProbeStage=alpha==0 and 'probe-alpha-zero' or 'probe-alpha-one'
+            assert(accepted(pcall(p.label.SetAlpha,p.label,alpha)))
+            local read,value=pcall(p.label.GetAlpha,p.label)
+            assert(read and public(value) and type(value)=='number' and value==alpha)
+        end
         return p
     end)
     if ok then minimumProbe=p;minimumProbeStage=nil end
@@ -1086,7 +1093,9 @@ local function prepareAction(state,label,formatters,createBinding)
 end
 local function resyncActionStyle(state)
     local got,label=pcall(m(state.cooldown,'GetCountdownFontString'),state.cooldown)
-    local style=got and safe(label) and readActionStyle(label,state.cooldown)
+    local style,styleFailure
+    if got and safe(label) then style,styleFailure=readActionStyle(label,state.cooldown)
+    else styleFailure='label' end
     local formatters=nativeFormatters or buildFormatters()
     if not formatters then return false end
     local desired=actionDigitsForFont(label,formatters)
@@ -1097,7 +1106,7 @@ local function resyncActionStyle(state)
     -- invalidates it. A partial style refusal always leaves stock in charge.
     state.stylePending=true
     state.stockFallback=true
-    state.fallbackReason=style and 'style-refused' or 'style-unavailable'
+    state.fallbackReason=style and 'style-refused' or ('style-unavailable/'..(styleFailure or 'unknown'))
     if not restoreStock(state) or not style or not resetMinimumGate(state) then return false end
     if not sameStyle or not state.cellsReady then
         if not makeCells(label,state.cooldown,true,state.cells,false,style) then return false end

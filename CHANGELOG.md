@@ -2,6 +2,14 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.359-native-timer-validation-test — validate the alpha values actually used
+
+- The latest capture still shows zero active action cell presenters. Its named `probe-alpha` fallback identifies a synthetic validation stage that required an exact quarter-alpha round trip, although the renderer only uses zero/one scalar alpha.
+- Validate both required visibility endpoints with protected public readback. Keep refusal, unavailable/secret and incorrect-result fallbacks; retain native clocks, minimum/GCD rules, rate mapping and color gating.
+- Exercise quantized-alpha counterexamples and endpoint failures in the existing actual-module fixture. The models do not claim the client's exact fractional conversion was measured.
+- Add property-specific public style-failure receipts without changing native style acceptance, restoration or retry behavior. Do not substitute guessed colors or fonts.
+- Secret-ID buff decimals remain open; the reviewed native APIs still provide no compatible in-place duration delegate. Keep the original rows and saved layouts.
+
 ## 0.2.358-timer-gate-prewarm-test — prepare idle action gates before combat
 
 - The .357 live capture reports 12 minimum-duration fallbacks, with named `gate-unsupported/combat-cold` samples. Source reproduction finds that a safe retry cleared a failed gate, then an unchanged, already-active zero-clock presenter skipped preparing it again before combat.

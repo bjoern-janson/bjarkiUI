@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.358-timer-gate-prewarm-test"
+local BJARKI_UI_VERSION = "0.2.359-native-timer-validation-test"
 -- Standalone PRD treatment is retained. Unit-frame resource bars stay native.
 local PRD_MANA_R, PRD_MANA_G, PRD_MANA_B = 0.10, 0.25, 1.00
 local WORLD_TEXT_SCREEN_Y = "0.0430"

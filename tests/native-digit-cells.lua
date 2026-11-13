@@ -1524,11 +1524,15 @@ do
 
  -- Native Clear may erase the last cause while a style repair is still
  -- pending. A later normal set must name that pending stage, without styling.
- local font=nativeLabel.GetFont
+ local font=nativeLabel.GetFont;local originalNativeText=nativeLabel.text
  nativeLabel.GetFont=function()return nil end
  ok(not diagnosticAPI.InstallAction(owner),'unavailable native font leaves a pending safe style repair')
+ local missingFont=report()
+ ok(missingFont:find('cells=0 stock=1 idle=0',1,true),'nullable font leaves stock in charge')
+ eq(cd.hidden,false,'nullable font restores native visibility')
+ eq(nativeLabel.text,originalNativeText,'nullable font does not replace native text')
  nativeLabel.GetFont=font;cd:SetCooldown(0,12,1)
- ok(report():find('ActionButton5:style-unavailable',1,true),'ordinary set preserves the precise existing style receipt')
+ ok(report():find('ActionButton5:style-unavailable/font',1,true),'ordinary set preserves the precise font receipt')
  cd:Clear();ok(report():find('cells=0 stock=0 idle=1',1,true),'a cleared pending style remains idle')
  local nativeText=nativeLabel.text;nativeLabel:SetText('12')
  currentCombat=true;cd:SetCooldown(0,12,1);currentCombat=false
@@ -1542,6 +1546,31 @@ do
  local stages='zero='..zeroShutdown..'; style='..pendingStyle
  ok(zeroShutdown:find('ActionButton5:zero-shutdown-refused',1,true),'zero shutdown has a named public stage: '..stages)
  ok(pendingStyle:find('ActionButton5:style-pending',1,true),'post-Clear style repair has a named public stage: '..pendingStyle)
+ -- Native GetTextColor may return nothing or secret components; neither
+ -- outcome authorizes inherited/cached color as a replacement for this label.
+ for _,case in ipairs({
+  {'no-color',nativeLabel,'GetTextColor','text-color',function()end},
+  {'secret-color',nativeLabel,'GetTextColor','text-color',function()return .9,secret,.2,1 end},
+  {'secret-scale',nativeLabel,'GetEffectiveScale','source-scale',function()return secret end},
+ })do
+  local tag,object,getter,stage,unavailable=(table.unpack or unpack)(case)
+  local original=object[getter];local before=nativeLabel.text
+  object[getter]=function(...)reads=reads+1;return unavailable(...)end
+  ok(not diagnosticAPI.InstallAction(owner),tag..' keeps unavailable style on stock')
+  local reason=report()
+  ok(reason:find('ActionButton5:style-unavailable/'..stage,1,true),tag..' names the failed public property')
+  ok(reason:find('cells=0 stock=1 idle=0',1,true),tag..' records zero fixed presenters')
+  eq(cd.hidden,false,tag..' retains the original native number')
+  eq(nativeLabel.text,before,tag..' never changes native text')
+  for i=firstBinding,firstBinding+5 do ok(not allBindings[i].enabled,tag..' stops replacement bindings')end
+  object[getter]=original
+  ok(diagnosticAPI.InstallAction(owner),tag..' safe refresh recovers without a style substitute')
+  for i=firstBinding,firstBinding+5 do allBindings[i]:Tick(6.3)end
+  eq(first.label.text..allBindings[firstBinding+1].label.text..allBindings[firstBinding+2].label.text,
+   '6.3',tag..' recovery displays the current native-bound tenth')
+  eq(first.label.font,nativeLabel.font,tag..' retains the actual native font')
+  ok(report():find('cells=1 stock=0 idle=0',1,true),tag..' recovery reactivates fixed cells')
+ end
  cd:Clear();ok(report():find('cells=0 stock=0 idle=1',1,true),'native Clear is idle')
  local retained={}
  total=secret
@@ -1566,9 +1595,15 @@ do
  local oldCreate,oldDuration,oldCurves,oldColor,oldTime=CreateFrame,C_DurationUtil.CreateDuration,C_CurveUtil,CreateColor,GetTime
  local oldFactory,oldSource,oldSecret=C_DurationUtil.CreateDurationTextBinding,C_ActionBar.GetActionCooldownDuration,issecretvalue
  local secrets=setmetatable({},{__mode='k'})
+ local alphaReadSecret
  local function opaque(v)local x=setmetatable({},{__lt=function()error('secret comparison')end,__le=function()error('secret comparison')end,__mul=function()error('secret arithmetic')end,__tostring=function()error('secret string')end});secrets[x]=v;return x end
  local function unwrap(v)return secrets[v] or v end
- issecretvalue=function(v)return secrets[v]~=nil or oldSecret(v)end
+ issecretvalue=function(v)
+  -- A native secret alpha still has numeric type; consume its receipt only
+  -- when production actually asks permission to inspect that returned value.
+  if alphaReadSecret~=nil and rawequal(v,alphaReadSecret)then alphaReadSecret=nil;return true end
+  return secrets[v]~=nil or oldSecret(v)
+ end
  Enum.DurationTimeModifier={RealTime=0,BaseTime=1};Enum.DurationTextBindingProperty={TotalDuration=4};Enum.LuaCurveType={Step=1}
  local allocations=0
  CreateColor=function(r,g,b,a)return {GetRGBA=function()return r,g,b,a end}end
@@ -1589,16 +1624,36 @@ do
   return d
  end
  C_DurationUtil.CreateDuration=duration;GetTime=function()return 100 end
+ -- Only boolean alpha endpoints are consumed by the native minimum gate.
+ -- Fractional channel storage is modeled separately from endpoint failures.
+ local alphaMode,alphaFault,alphaEndpoint='exact',nil,nil
  local function alphaLabel(f)
-  function f:SetAlpha(v)self.alpha=unwrap(v)end
-  function f:GetAlpha()return self.alpha or 1 end
+  function f:SetAlpha(v)
+   local value=unwrap(v);self.alphaRequested=value
+   if self.alphaProbe and value==alphaEndpoint then
+    if alphaFault=='write-throw' then error('alpha write refused')end
+    if alphaFault=='write-false' then return false end
+   end
+   local offset=alphaMode=='nearest' and .5 or 0
+   self.alpha=alphaMode=='exact' and value or math.floor(value*255+offset)/255
+  end
+  function f:GetAlpha()
+   if self.alphaProbe and self.alphaRequested==alphaEndpoint then
+    if alphaFault=='read-throw' then error('alpha read refused')end
+    if alphaFault=='read-secret' then alphaReadSecret=self.alpha;return self.alpha end
+    if alphaFault=='read-nil' then return nil end
+    if alphaFault=='read-wrong' then return 1-self.alpha end
+    if alphaFault=='read-string' then return tostring(self.alpha)end
+   end
+   return self.alpha or 1
+  end
   return f
  end
  CreateFrame=function(kind)
   eq(kind,'Cooldown','only one harmless calibration cooldown')
   local p=container();local l=alphaLabel(label(p));p.Hide=function()end
   function p:GetCountdownFontString()if self.duration then return l end end
-  function p:CreateFontString()return alphaLabel(label(self))end
+  function p:CreateFontString()local f=alphaLabel(label(self));f.alphaProbe=true;return f end
   function p:SetCooldownFromDurationObject(d)self.duration=d end
   function p:GetCooldownDisplayDuration()return self.duration:GetTotalDuration(1)*1000 end
   function p:GetCooldownDuration()return self.duration:GetTotalDuration(0)*1000 end
@@ -1849,6 +1904,69 @@ do
   eq(shown,'6.3',scenario..' first secret combat update paints the native fixed digits')
   currentCombat=false
  end
+ -- Fractional alpha round trips are unrelated to the required 0/1 gate.
+ -- These actual-module cases fail if calibration requires .25, or stops
+ -- validating either endpoint before suppressing the native countdown.
+ CreateFrame=properCreate
+ C_DurationUtil.CreateDurationTextBinding=configuredFactory
+ local alphaCases={{mode='floor'},{mode='nearest'}}
+ for _,endpoint in ipairs({0,1})do
+  for _,fault in ipairs({'write-throw','write-false','read-throw','read-secret','read-nil','read-wrong','read-string'})do
+   alphaCases[#alphaCases+1]={mode='nearest',endpoint=endpoint,fault=fault}
+  end
+ end
+ for _,case in ipairs(alphaCases)do
+  alphaMode,alphaFault,alphaEndpoint=case.mode,case.fault,case.endpoint
+  local description=case.fault and case.fault..'-'..case.endpoint or case.mode
+  local alphaClock=duration();alphaClock:SetTimeFromStart(100,12,1);alphaClock.sealed=true;alphaClock.seconds=6.3
+  C_ActionBar.GetActionCooldownDuration=function(_,ignore)eq(ignore,true);return alphaClock end
+  local alphaOwner={action=5,cooldown=container()};local alphaCD=alphaOwner.cooldown;local alphaNative=label(alphaCD)
+  alphaNative:SetText('6.3')
+  function alphaOwner:GetName()return 'ActionButton5'end
+  alphaCD.CreateFontString=function(self)return alphaLabel(label(self))end
+  function alphaCD:GetCountdownFontString()return alphaNative end
+  function alphaCD:GetHideCountdownNumbers()return self.hidden==true end
+  function alphaCD:SetHideCountdownNumbers(v)self.hidden=v end
+  function alphaCD:GetMinimumCountdownDuration()return 2000 end
+  function alphaCD:GetCooldownDisplayDuration()return opaque(1)end
+  function alphaCD:GetCooldownDuration()return opaque(1)end
+  function alphaCD:SetCooldown()end;function alphaCD:Clear()end
+  assert(loadfile(addon..'/NativeDigitCells.lua'))()
+  local alphaAPI=bjarkiUINativeDigitCells
+  local active=alphaAPI.InstallAction(alphaOwner)
+  if case.fault then
+   ok(not active,description..' keeps unsupported gate on stock')
+   eq(alphaCD:GetHideCountdownNumbers(),false,description..' leaves native text visible')
+   eq(alphaNative.text,'6.3',description..' preserves native countdown text')
+   for _,binding in ipairs(allBindings)do
+    if binding.label and binding.label.parent==alphaCD then
+     ok(not binding.enabled,description..' cannot display partially prepared cells')
+    end
+   end
+   local reason='probe-alpha-'..(case.endpoint==0 and 'zero' or 'one')
+   ok(alphaAPI.GetActionTimerDiagnostics():find('ActionButton5:gate-unsupported/'..reason,1,true),
+    description..' records the failed endpoint')
+   local labels=#labelList
+   alphaFault=nil
+   alphaAPI.RetryActionMinimumGates()
+   ok(alphaAPI.InstallAction(alphaOwner),description..' recovers after the existing safe retry')
+   eq(#labelList,labels,description..' recovery reuses prepared labels and the alpha probe')
+  else
+   ok(active,description..' alpha storage admits fixed cells: '..alphaAPI.GetActionTimerDiagnostics())
+  end
+  eq(alphaCD:GetHideCountdownNumbers(),true,description..' hides stock after endpoint validation')
+  local shown=''
+  for _,binding in ipairs(allBindings)do
+   if binding.label and binding.label.parent==alphaCD and binding.enabled then
+    eq(binding.duration,alphaClock,description..' retains the native duration object')
+    binding:Tick(alphaClock.seconds)
+    local _,_,_,a=binding:GetFormattedTextColor():GetRGBA()
+    if a*(binding.label.alpha or 1)>0 and not binding.label.hidden then shown=shown..binding.label.text end
+   end
+  end
+  eq(shown,'6.3',description..' displays the current fixed native tenth')
+ end
+ alphaMode,alphaFault,alphaEndpoint='exact',nil,nil
  ActionButton5=oldButton
  CreateFrame,C_DurationUtil.CreateDuration,C_CurveUtil,CreateColor,GetTime=oldCreate,oldDuration,oldCurves,oldColor,oldTime
  C_DurationUtil.CreateDurationTextBinding,C_ActionBar.GetActionCooldownDuration,issecretvalue=oldFactory,oldSource,oldSecret
