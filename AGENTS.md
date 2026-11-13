@@ -1,6 +1,6 @@
 # Working on bjarkiUI
 
-This is the current **0.2.355-timer-spacing-recovery-test** development tree. Read the [code map](docs/CODE_MAP.md) for the affected surface, [timer lifecycle guide](docs/TIMER_LIFECYCLE.md) for countdown work, and [testing guide](docs/TESTING.md) for verification commands. Both TOCs define the same 16-module runtime load order. Current regression scripts live directly under `tests/`.
+This is the current **0.2.356-presentation-performance-test** development tree. Read the [code map](docs/CODE_MAP.md) for the affected surface, [timer lifecycle guide](docs/TIMER_LIFECYCLE.md) for countdown work, and [testing guide](docs/TESTING.md) for verification commands. Both TOCs define the same 16-module runtime load order. Current regression scripts live directly under `tests/`.
 
 ## Trace the displayed result
 
@@ -16,6 +16,7 @@ This is the current **0.2.355-timer-spacing-recovery-test** development tree. Re
 - Action receiving cells must inherit the native label's relative effective scale and text scale, with scale-only changes using the existing stock handoff. Retry rejected mapped formatters only at existing safe typography epochs. Buff native-duration decimal formatters may use already calibrated fixed-width literals; prepare outside combat, recheck current label/owner/profile, and forward opaque results unchanged. Safe buff setup must refresh failed or inherited-scale-changed typography without rebuilding unchanged geometry or measuring on timer ticks.
 - Keep native clock ownership. Forward opaque duration objects or formatted strings only to their supported native sink. Never infer hidden timing from spell names, guessed durations, inaccessible values or combat-log estimates.
 - Treat unavailable, secret, false and zero as different results. A failed secrecy/permission probe is not permission to inspect or write a value.
+- Performance cleanup must preserve these checks. Shared protected member readers can remove temporary closures; reusing a typography record must still run the existing current-profile lookup and formatter retry path. Native NPC color discovery keeps first-witness priority and current physical/unit association; do not retain a plate, identity or RGB between callbacks to avoid discovery. Full safe lifecycle discovery still recovers late-created/replaced artwork.
 - Keep restricted Target/Focus aura rows and private aura anchors native. `UnitAuraStyling.lua` is an intentional compatibility stub, not an unfinished custom-aura feature.
 - Public native buff text >=10s may be padded only when its current formatted text is positively readable; never parse protected time or replace its native format. This adds a cosmetic native SetText on an existing aura refresh, so measure in-client performance.
 - Prepare geometry safely and retain event-driven native timer updates. `.334` reuses an already complete public layout receipt in combat; it does not permit new geometry writes there.

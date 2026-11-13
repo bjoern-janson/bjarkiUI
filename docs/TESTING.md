@@ -1,6 +1,6 @@
 # Testing and packaging bjarkiUI
 
-Current test target: **0.2.355-timer-spacing-recovery-test**, **16 manifest-loaded runtime modules**, and **36 top-level Lua scripts**: 35 behavioral suites plus `tests/syntax.lua`. Run both Lua 5.1 and Lua 5.4. The current aura suite reports **226 cases**; suite/assertion counts describe fixture coverage, not a percentage of live-client behavior covered.
+Current test target: **0.2.356-presentation-performance-test**, **16 manifest-loaded runtime modules**, and **37 top-level Lua scripts**: 36 behavioral suites plus `tests/syntax.lua`. Run both Lua 5.1 and Lua 5.4. The current aura suite reports **226 cases**; suite/assertion counts describe fixture coverage, not a percentage of live-client behavior covered.
 
 ## Portable verification
 
@@ -8,7 +8,7 @@ Run from the repository root with Python 3.10 or newer and native Lua/luac execu
 
 ```sh
 python tools/verify.py
-python tools/verify.py --output ../bjarkiUI-0.2.355-Timer-Spacing-Recovery.zip
+python tools/verify.py --output ../bjarkiUI-0.2.356-Presentation-Performance.zip
 ```
 
 The default uses Lua 5.1 and 5.4 with their matching compilers. `--output` is an optional ZIP filename **outside the checkout**, not a report path. Its parent directory must already exist and the file must be new. Packaging occurs only after verification succeeds. The [CI workflow](../.github/workflows/package-addon.yml) uses native interpreters and the same [verification tool](../tools/verify.py).
@@ -51,7 +51,7 @@ Substitute another top-level script for a focused regression. `tests/syntax.lua`
 | Player aura timers | [aura-presentation.lua](../tests/aura-presentation.lua) | Public/opaque timing, assignment and expiry, native update order, font/layout changes, combat, physical owner changes, nested writes and fallback text. |
 | Player cast timers | [castbar-digit-cells.lua](../tests/castbar-digit-cells.lua) | Frozen 0.2.309 native duration-to-text bindings, unmodified Blizzard source text, fixed positions and thresholds, casts/channels, permission refusals, and rejected alpha handoffs returning native text. |
 | Tracked buffs and decoration | [presentation.lua](../tests/presentation.lua), [icon-skin.lua](../tests/icon-skin.lua) | Active pool iteration, item/widget reuse, threshold resets, masks/rims, external writes and restoration. |
-| Health/name ownership | [health-color-observer.lua](../tests/health-color-observer.lua), [name-color-ownership.lua](../tests/name-color-ownership.lua) | Native color observation, recipient changes, partial restoration, stale ownership and combat-exit reconciliation. |
+| Health/name ownership | [health-color-observer.lua](../tests/health-color-observer.lua), [nameplate-color-discovery.lua](../tests/nameplate-color-discovery.lua), [name-color-ownership.lua](../tests/name-color-ownership.lua) | Native color observation, first-witness ordering, verified nameplate callback context, reentrant lookup/identity fallback, recipient changes, partial restoration and combat-exit reconciliation. |
 | Unit status typography | [status-style.lua](../tests/status-style.lua), [status-scale.lua](../tests/status-scale.lua), [status-combat.lua](../tests/status-combat.lua), [pet-status-text.lua](../tests/pet-status-text.lua) | Current native font, shadow/style, scale refresh and pet presentation. |
 | Hit-text placement | [hit-text-lifecycle.lua](../tests/hit-text-lifecycle.lua), [hit-text-write-recovery.lua](../tests/hit-text-write-recovery.lua) | Geometry, lifecycle refresh and refused setter recovery. |
 | Party order | [party-order-recovery.lua](../tests/party-order-recovery.lua), [party-presentation.lua](../tests/party-presentation.lua) | Changed anchors only, dependent-anchor rollback, denied permission, roster/pet changes and later repair. |

@@ -178,7 +178,7 @@ do
         setHealthColor=function() writes=writes+1;return true end,
         nativeHealthStyle={Restore=function() writes=writes+1 end},
     }
-    local apply=evaluate(between("local function applyHealthColor(bar, unit)","function nativeHealthStyle.Install(bar, unit)"),
+    local apply=evaluate(between("local function applyHealthColor(","function nativeHealthStyle.Install(bar, unit)"),
         "local isSecret=_G.isSecret\nlocal CLASS_HEALTH_UNITS=_G.CLASS_HEALTH_UNITS\n" ..
         "local readableUnitToken=_G.readableUnitToken\nlocal healthBar=_G.healthBar\n" ..
         "local readableBool=_G.readableBool\nlocal isPlayerUnit=_G.isPlayerUnit\n" ..

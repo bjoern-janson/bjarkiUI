@@ -12,6 +12,7 @@ bjarkiUINativeDigitCells = api
 local installed = setmetatable({}, {__mode='k'})
 local petButtons = setmetatable({}, {__mode='k'})
 local buffCells = setmetatable({}, {__mode='k'})
+local buffLayoutHookNames = {'SetPoint','ClearAllPoints','SetAllPoints','SetScale','SetTextScale'}
 local fontWidths = {}
 local nativeFormatters
 local probe
@@ -26,14 +27,17 @@ end
 local function accepted(ok,result)
     return ok and (type(result)=='nil' or (public(result) and result~=false))
 end
+local function readMember(o,key)
+    return o[key]
+end
 local function m(o,key)
     if not public(o) then return nil end
-    local ok, value = pcall(function() return o[key] end)
+    local ok, value = pcall(readMember,o,key)
     if ok and public(value) and type(value)=='function' then return value end
 end
 local function field(o,key)
     if not public(o) then return nil end
-    local ok,v=pcall(function()return o[key] end)
+    local ok,v=pcall(readMember,o,key)
     if ok and public(v) then return v end
     return nil
 end
@@ -1726,7 +1730,7 @@ function api.PrepareBuff(label,checkFont,afterFont,refreshTypography)
         if not state.fontHook then return false end
     end
     state.layoutHooks=state.layoutHooks or {}
-    for _,name in ipairs({'SetPoint','ClearAllPoints','SetAllPoints','SetScale','SetTextScale'}) do
+    for _,name in ipairs(buffLayoutHookNames) do
         if not state.layoutHooks[name] and m(label,name) then
             if not outOfCombat() or type(hooksecurefunc)~='function' then return false end
             state.layoutHooks[name]=accepted(pcall(hooksecurefunc,label,name,function(source)

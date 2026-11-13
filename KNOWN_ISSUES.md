@@ -1,6 +1,10 @@
 # Known issues and bugs
 
-Current test branch is **0.2.355-timer-spacing-recovery-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Verification evidence](docs/BUILD_VERIFICATION.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+Current test branch is **0.2.356-presentation-performance-test**, based on main 0.2.335-cast-recovery-test. The repairs below are supported by source inspection and offline fixtures; they do not close the recorded live reports. [Current verification evidence](docs/VERIFICATION_0.2.356.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+
+## 0.2.356 performance cleanup — offline evidence, live cost still open
+
+The .355 performance parse identified temporary protected-lookup functions on active timer paths and redundant NPC native-color discovery. The .356 cleanup targets that reproduced work while preserving presentation and native ownership. Its [comparison and verification](docs/VERIFICATION_0.2.356.md) distinguish Lua CPU samples, GC-stopped heap growth and native-call counts from live frame times or addon memory. Soft Dark's combat-exit discovery remains because a settled tint record does not prove that all current native artwork has been discovered. Existing timer rendering reports below remain open; this patch does not establish their in-client resolution.
 
 ## 0.2.355 timer spacing recovery — live follow-up required
 

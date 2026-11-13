@@ -1,0 +1,6179 @@
+{
+  "schema": "bjarkiui-0.2.356-offline-performance-evidence-v2",
+  "comparison": ".355 versus .356; same expected presentation",
+  "method": "Unchanged 24036-byte frozen workload prefix; back-to-back versions alternate first by scenario and round; three rounds of three samples.",
+  "cpu_sample_order": "round1 sample1..3, round2 sample1..3, round3 sample1..3",
+  "limits": "Offline native Lua plus bounded instrumented native mocks. CPU ratios include host variability. GC-stopped transient heap growth is not client RAM. No WoW FPS, native-rendering, taint, or client-GC conclusion.",
+  "runs_in_process_order": [
+    {
+      "lua_version": "Lua 5.1.5  Copyright (C) 1994-2012 Lua.org, PUC-Rio",
+      "interpreter_sha256": "cc60d123ce70ee015ddc429ec4002f9b941dcc32b5aca8e03e30d03e5922eb3d",
+      "started_utc": "2026-11-13T07:51:47.636931+00:00",
+      "finished_utc": "2026-11-13T07:54:26.430874+00:00",
+      "raw_result_basename": "timer-paired-lua51.jsonl",
+      "raw_result_sha256": "591716187f7e1378949b04feec9163cad874373449b1a889315a80fe274589cf",
+      "full_provenance_sha256": "788ebb266ca6ceed2e9fddb1b24771605bd27929c980070f6f30d984b1a9e0a8",
+      "source_unchanged_before_after": true,
+      "settings": {
+        "pair_rounds": 3,
+        "samples_per_version": 3,
+        "cpu_ops_per_sample": 3000,
+        "allocation_ops_per_sample": 1000,
+        "retain_ops_per_batch": 1000,
+        "warmup_ops": 1000
+      },
+      "workload": {
+        "frozen_harness_sha256": "007f951830e41986afbdb7ea75d314ff1352e68a04207877f31f9bf5399b4f0c",
+        "reused_prefix_sha256": "7a495986995b092f7895710d6af77af050c0eb68f4d4ff71bf6da0e3e212d048",
+        "appended_suffix_sha256": "9968e79772fee451691015bb5ded705692c5782e02dac7a74348ce86828d09d8"
+      },
+      "scenarios": {
+        "baseline_buff_duration_only": {
+          "first_version_by_round": [
+            ".355",
+            ".356",
+            ".355"
+          ],
+          "output_and_geometry_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "native_calls_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "versions": {
+            ".355": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  0.358,
+                  0.337333333333,
+                  0.208,
+                  0.581000000002,
+                  0.382333333334,
+                  0.413666666669,
+                  0.20033333333,
+                  0.177333333336,
+                  0.169333333332
+                ],
+                "min": 0.169333333332,
+                "median": 0.337333333333,
+                "max": 0.581000000002
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  0.437,
+                  0.169,
+                  0.163,
+                  1.11199999999,
+                  0.166000000007,
+                  0.346999999991,
+                  0.239000000008,
+                  0.169,
+                  0.164999999996
+                ],
+                "min": 0.163,
+                "median": 0.169,
+                "max": 1.11199999999
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "min": 0,
+                "median": 0,
+                "max": 0
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "native_source_writes": 1
+              },
+              "output_geometry_signature_sha256": "cc0e00d45e5318b2098546958e091afc05eb6a524d9fe942c4a598fbc96d2eac"
+            },
+            ".356": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  0.831666666667,
+                  0.418,
+                  0.583,
+                  0.270333333333,
+                  0.882333333332,
+                  0.310333333336,
+                  0.232666666667,
+                  0.220333333331,
+                  0.221333333333
+                ],
+                "min": 0.220333333331,
+                "median": 0.310333333336,
+                "max": 0.882333333332
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  0.932,
+                  0.684,
+                  0.649,
+                  0.169,
+                  0.18399999999,
+                  0.172000000006,
+                  0.385999999992,
+                  0.349999999997,
+                  0.168000000002
+                ],
+                "min": 0.168000000002,
+                "median": 0.349999999997,
+                "max": 0.932
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "min": 0,
+                "median": 0,
+                "max": 0
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "native_source_writes": 1
+              },
+              "output_geometry_signature_sha256": "cc0e00d45e5318b2098546958e091afc05eb6a524d9fe942c4a598fbc96d2eac"
+            }
+          },
+          "cpu_gc_on_356_over_355": {
+            "round_values": [
+              1.72826086957,
+              0.750201450446,
+              1.24812030074
+            ],
+            "min": 0.750201450446,
+            "median": 1.24812030074,
+            "max": 1.72826086957
+          },
+          "cpu_gc_on_356_minus_355_us_per_op": {
+            "round_values": [
+              0.245666666667,
+              -0.103333333333,
+              0.0439999999979
+            ],
+            "min": -0.103333333333,
+            "median": 0.0439999999979,
+            "max": 0.245666666667
+          },
+          "cpu_gc_off_356_over_355": {
+            "round_values": [
+              4.04733727811,
+              0.495677233461,
+              2.07100591715
+            ],
+            "min": 0.495677233461,
+            "median": 2.07100591715,
+            "max": 4.04733727811
+          },
+          "transient_bytes_356_minus_355_per_op": {
+            "round_values": [
+              0,
+              0,
+              0
+            ],
+            "min": 0,
+            "median": 0,
+            "max": 0
+          },
+          "native_call_delta_356_minus_355": {}
+        },
+        "baseline_buff_full_native": {
+          "first_version_by_round": [
+            ".356",
+            ".355",
+            ".356"
+          ],
+          "output_and_geometry_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "native_calls_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "versions": {
+            ".355": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  0.541666666667,
+                  1.36133333333,
+                  2.625,
+                  0.878,
+                  1.76233333333,
+                  1.71466666667,
+                  0.820999999997,
+                  0.720666666666,
+                  0.617333333333
+                ],
+                "min": 0.541666666667,
+                "median": 0.878,
+                "max": 2.625
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  0.489,
+                  1.467,
+                  0.879,
+                  1.167,
+                  2.26699999999,
+                  0.512000000001,
+                  0.900000000001,
+                  0.845999999996,
+                  0.476999999989
+                ],
+                "min": 0.476999999989,
+                "median": 0.879,
+                "max": 2.26699999999
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "min": 0,
+                "median": 0,
+                "max": 0
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "native_source_writes": 1,
+                "source_font_writes": 1,
+                "source_geometry_writes": 1
+              },
+              "output_geometry_signature_sha256": "cc0e00d45e5318b2098546958e091afc05eb6a524d9fe942c4a598fbc96d2eac"
+            },
+            ".356": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  0.815666666667,
+                  0.767333333333,
+                  0.734333333333,
+                  1.163,
+                  2.08566666666,
+                  3.80666666667,
+                  1.212,
+                  0.499999999998,
+                  0.484666666665
+                ],
+                "min": 0.484666666665,
+                "median": 0.815666666667,
+                "max": 3.80666666667
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  0.584,
+                  0.665,
+                  0.802,
+                  3.08699999999,
+                  2.122,
+                  0.574999999998,
+                  2.59399999999,
+                  0.475000000009,
+                  0.489999999999
+                ],
+                "min": 0.475000000009,
+                "median": 0.665,
+                "max": 3.08699999999
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "min": 0,
+                "median": 0,
+                "max": 0
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "native_source_writes": 1,
+                "source_font_writes": 1,
+                "source_geometry_writes": 1
+              },
+              "output_geometry_signature_sha256": "cc0e00d45e5318b2098546958e091afc05eb6a524d9fe942c4a598fbc96d2eac"
+            }
+          },
+          "cpu_gc_on_356_over_355": {
+            "round_values": [
+              0.563663075416,
+              1.21636858476,
+              0.69380203515
+            ],
+            "min": 0.563663075416,
+            "median": 0.69380203515,
+            "max": 1.21636858476
+          },
+          "cpu_gc_on_356_minus_355_us_per_op": {
+            "round_values": [
+              -0.594,
+              0.370999999996,
+              -0.220666666668
+            ],
+            "min": -0.594,
+            "median": -0.220666666668,
+            "max": 0.370999999996
+          },
+          "cpu_gc_off_356_over_355": {
+            "round_values": [
+              0.75654152446,
+              1.81833761783,
+              0.579196217496
+            ],
+            "min": 0.579196217496,
+            "median": 0.75654152446,
+            "max": 1.81833761783
+          },
+          "transient_bytes_356_minus_355_per_op": {
+            "round_values": [
+              0,
+              0,
+              0
+            ],
+            "min": 0,
+            "median": 0,
+            "max": 0
+          },
+          "native_call_delta_356_minus_355": {}
+        },
+        "baseline_action_native_setcooldown": {
+          "first_version_by_round": [
+            ".355",
+            ".356",
+            ".355"
+          ],
+          "output_and_geometry_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "native_calls_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "versions": {
+            ".355": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  0.0943333333333,
+                  0.093,
+                  0.112,
+                  0.262333333334,
+                  0.236000000001,
+                  0.266333333334,
+                  0.0990000000011,
+                  0.132666666668,
+                  0.122
+                ],
+                "min": 0.093,
+                "median": 0.122,
+                "max": 0.266333333334
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  0.156,
+                  0.223,
+                  0.098,
+                  0.115999999991,
+                  0.0950000000017,
+                  0.0940000000043,
+                  0.0940000000043,
+                  0.0979999999942,
+                  0.0950000000017
+                ],
+                "min": 0.0940000000043,
+                "median": 0.0979999999942,
+                "max": 0.223
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "min": 0,
+                "median": 0,
+                "max": 0
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "native_set_cooldown": 1
+              },
+              "output_geometry_signature_sha256": "d8cc33f367f8f6e665dc93083210102aa13be6b276058dac890eca896e5383de"
+            },
+            ".356": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  0.251666666667,
+                  0.365333333333,
+                  0.130333333333,
+                  0.191000000001,
+                  0.105666666665,
+                  0.206999999998,
+                  0.510999999998,
+                  0.10766666667,
+                  0.0939999999995
+                ],
+                "min": 0.0939999999995,
+                "median": 0.191000000001,
+                "max": 0.510999999998
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  0.157,
+                  0.105,
+                  0.095,
+                  0.0950000000017,
+                  1.215,
+                  0.0980000000084,
+                  0.147999999996,
+                  0.0940000000043,
+                  0.731999999999
+                ],
+                "min": 0.0940000000043,
+                "median": 0.105,
+                "max": 1.215
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "min": 0,
+                "median": 0,
+                "max": 0
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "native_set_cooldown": 1
+              },
+              "output_geometry_signature_sha256": "d8cc33f367f8f6e665dc93083210102aa13be6b276058dac890eca896e5383de"
+            }
+          },
+          "cpu_gc_on_356_over_355": {
+            "round_values": [
+              2.66784452297,
+              0.728081321475,
+              0.882513661227
+            ],
+            "min": 0.728081321475,
+            "median": 0.882513661227,
+            "max": 2.66784452297
+          },
+          "cpu_gc_on_356_minus_355_us_per_op": {
+            "round_values": [
+              0.157333333333,
+              -0.0713333333332,
+              -0.0143333333303
+            ],
+            "min": -0.0713333333332,
+            "median": -0.0143333333303,
+            "max": 0.157333333333
+          },
+          "cpu_gc_off_356_over_355": {
+            "round_values": [
+              0.673076923077,
+              1.03157894744,
+              1.55789473677
+            ],
+            "min": 0.673076923077,
+            "median": 1.03157894744,
+            "max": 1.55789473677
+          },
+          "transient_bytes_356_minus_355_per_op": {
+            "round_values": [
+              0,
+              0,
+              0
+            ],
+            "min": 0,
+            "median": 0,
+            "max": 0
+          },
+          "native_call_delta_356_minus_355": {}
+        },
+        "buff_public_unchanged_duration_only": {
+          "first_version_by_round": [
+            ".356",
+            ".355",
+            ".356"
+          ],
+          "output_and_geometry_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "native_calls_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "versions": {
+            ".355": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  24.5393333333,
+                  23.4996666667,
+                  26.031,
+                  28.476,
+                  34.791,
+                  35.678,
+                  15.4956666667,
+                  16.029,
+                  15.3696666667
+                ],
+                "min": 15.3696666667,
+                "median": 24.5393333333,
+                "max": 35.678
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  22.559,
+                  21.063,
+                  41.492,
+                  39.16,
+                  36.432,
+                  37.274,
+                  22.667,
+                  15.113,
+                  15.818
+                ],
+                "min": 15.113,
+                "median": 22.667,
+                "max": 41.492
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "min": 0,
+                "median": 0,
+                "max": 0
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "hook_callbacks": 1,
+                "native_source_writes": 1,
+                "set_alpha": 1,
+                "set_text": 1,
+                "source_set_text": 1
+              },
+              "output_geometry_signature_sha256": "fd6ed8fa96bc45f4b7034461b0e4c6bda148954f106dca19fbac5deed36addea"
+            },
+            ".356": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  33.2643333333,
+                  20.825,
+                  35.925,
+                  65.5696666667,
+                  61.0473333333,
+                  54.246,
+                  15.38,
+                  14.966,
+                  15.1216666667
+                ],
+                "min": 14.966,
+                "median": 33.2643333333,
+                "max": 65.5696666667
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  25.533,
+                  19.321,
+                  22.661,
+                  43.628,
+                  57.681,
+                  30.246,
+                  13.522,
+                  14.263,
+                  17.412
+                ],
+                "min": 13.522,
+                "median": 22.661,
+                "max": 57.681
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "min": 0,
+                "median": 0,
+                "max": 0
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "hook_callbacks": 1,
+                "native_source_writes": 1,
+                "set_alpha": 1,
+                "set_text": 1,
+                "source_set_text": 1
+              },
+              "output_geometry_signature_sha256": "fd6ed8fa96bc45f4b7034461b0e4c6bda148954f106dca19fbac5deed36addea"
+            }
+          },
+          "cpu_gc_on_356_over_355": {
+            "round_values": [
+              1.35555163139,
+              1.75468751497,
+              0.975864220104
+            ],
+            "min": 0.975864220104,
+            "median": 1.35555163139,
+            "max": 1.75468751497
+          },
+          "cpu_gc_on_356_minus_355_us_per_op": {
+            "round_values": [
+              8.725,
+              26.2563333333,
+              -0.374000000003
+            ],
+            "min": -0.374000000003,
+            "median": 8.725,
+            "max": 26.2563333333
+          },
+          "cpu_gc_off_356_over_355": {
+            "round_values": [
+              1.00452147702,
+              1.1704673499,
+              0.901694272348
+            ],
+            "min": 0.901694272348,
+            "median": 1.00452147702,
+            "max": 1.1704673499
+          },
+          "transient_bytes_356_minus_355_per_op": {
+            "round_values": [
+              0,
+              0,
+              0
+            ],
+            "min": 0,
+            "median": 0,
+            "max": 0
+          },
+          "native_call_delta_356_minus_355": {}
+        },
+        "buff_public_changed_duration_only": {
+          "first_version_by_round": [
+            ".355",
+            ".356",
+            ".355"
+          ],
+          "output_and_geometry_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "native_calls_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "versions": {
+            ".355": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  32.8256666667,
+                  33.4906666667,
+                  37.8173333333,
+                  48.8246666667,
+                  34.4696666667,
+                  36.8893333333,
+                  27.4793333333,
+                  20.038,
+                  22.34
+                ],
+                "min": 20.038,
+                "median": 33.4906666667,
+                "max": 48.8246666667
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  30.624,
+                  23.226,
+                  38.942,
+                  59.234,
+                  35.707,
+                  37.123,
+                  23.608,
+                  19.795,
+                  20.992
+                ],
+                "min": 19.795,
+                "median": 30.624,
+                "max": 59.234
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "min": 0,
+                "median": 0,
+                "max": 0
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "cell_set_text": 3,
+                "hook_callbacks": 1,
+                "native_source_writes": 1,
+                "set_alpha": 1,
+                "set_text": 4,
+                "source_set_text": 1
+              },
+              "output_geometry_signature_sha256": "fd6ed8fa96bc45f4b7034461b0e4c6bda148954f106dca19fbac5deed36addea"
+            },
+            ".356": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  32.8396666667,
+                  47.4963333333,
+                  37.373,
+                  66.5433333333,
+                  71.0153333333,
+                  37.068,
+                  20.416,
+                  22.1223333333,
+                  21.4863333333
+                ],
+                "min": 20.416,
+                "median": 37.068,
+                "max": 71.0153333333
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  40.279,
+                  66.883,
+                  34.904,
+                  154.536,
+                  46.85,
+                  28.344,
+                  18.684,
+                  20.842,
+                  19.857
+                ],
+                "min": 18.684,
+                "median": 34.904,
+                "max": 154.536
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "min": 0,
+                "median": 0,
+                "max": 0
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "cell_set_text": 3,
+                "hook_callbacks": 1,
+                "native_source_writes": 1,
+                "set_alpha": 1,
+                "set_text": 4,
+                "source_set_text": 1
+              },
+              "output_geometry_signature_sha256": "fd6ed8fa96bc45f4b7034461b0e4c6bda148954f106dca19fbac5deed36addea"
+            }
+          },
+          "cpu_gc_on_356_over_355": {
+            "round_values": [
+              1.11592284418,
+              1.80386380887,
+              0.961787526112
+            ],
+            "min": 0.961787526112,
+            "median": 1.11592284418,
+            "max": 1.80386380887
+          },
+          "cpu_gc_on_356_minus_355_us_per_op": {
+            "round_values": [
+              3.88233333333,
+              29.654,
+              -0.853666666667
+            ],
+            "min": -0.853666666667,
+            "median": 3.88233333333,
+            "max": 29.654
+          },
+          "cpu_gc_off_356_over_355": {
+            "round_values": [
+              1.31527560084,
+              1.26202084961,
+              0.945931783537
+            ],
+            "min": 0.945931783537,
+            "median": 1.26202084961,
+            "max": 1.31527560084
+          },
+          "transient_bytes_356_minus_355_per_op": {
+            "round_values": [
+              0,
+              0,
+              0
+            ],
+            "min": 0,
+            "median": 0,
+            "max": 0
+          },
+          "native_call_delta_356_minus_355": {}
+        },
+        "buff_stock_readable_duration_only": {
+          "first_version_by_round": [
+            ".356",
+            ".355",
+            ".356"
+          ],
+          "output_and_geometry_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "native_calls_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "versions": {
+            ".355": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  39.2106666667,
+                  38.418,
+                  40.0813333333,
+                  130.144333333,
+                  76.783,
+                  95.1323333333,
+                  24.608,
+                  26.6996666667,
+                  24.6426666667
+                ],
+                "min": 24.608,
+                "median": 39.2106666667,
+                "max": 130.144333333
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  62.995,
+                  40.465,
+                  29.582,
+                  142.654,
+                  82.393,
+                  131.434,
+                  33.941,
+                  28.656,
+                  24.233
+                ],
+                "min": 24.233,
+                "median": 40.465,
+                "max": 142.654
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  680.139,
+                  680.139,
+                  680.139,
+                  680.139,
+                  680.139,
+                  680.139,
+                  680.139,
+                  680.139,
+                  680.139
+                ],
+                "min": 680.139,
+                "median": 680.139,
+                "max": 680.139
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "hook_callbacks": 1,
+                "native_source_writes": 1,
+                "parent_reads": 1,
+                "set_alpha": 1,
+                "set_text": 1,
+                "source_set_text": 1
+              },
+              "output_geometry_signature_sha256": "68effe383e02bdffc04c29c736303db5acf13c3d6a48549431fd0294fb680a20"
+            },
+            ".356": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  35.912,
+                  35.0026666667,
+                  31.6393333333,
+                  146.367,
+                  92.571,
+                  88.2376666667,
+                  24.6063333333,
+                  23.0243333333,
+                  22.3986666667
+                ],
+                "min": 22.3986666667,
+                "median": 35.0026666667,
+                "max": 146.367
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  46.083,
+                  35.583,
+                  29.163,
+                  78.83,
+                  44.98,
+                  50.525,
+                  18.15,
+                  29.394,
+                  19.594
+                ],
+                "min": 18.15,
+                "median": 35.583,
+                "max": 78.83
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  0.139,
+                  0.139,
+                  0.139,
+                  0.139,
+                  0.139,
+                  0.139,
+                  0.139,
+                  0.139,
+                  0.139
+                ],
+                "min": 0.139,
+                "median": 0.139,
+                "max": 0.139
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "hook_callbacks": 1,
+                "native_source_writes": 1,
+                "parent_reads": 1,
+                "set_alpha": 1,
+                "set_text": 1,
+                "source_set_text": 1
+              },
+              "output_geometry_signature_sha256": "68effe383e02bdffc04c29c736303db5acf13c3d6a48549431fd0294fb680a20"
+            }
+          },
+          "cpu_gc_on_356_over_355": {
+            "round_values": [
+              0.89268226333,
+              0.97307610101,
+              0.934327994806
+            ],
+            "min": 0.89268226333,
+            "median": 0.934327994806,
+            "max": 0.97307610101
+          },
+          "cpu_gc_on_356_minus_355_us_per_op": {
+            "round_values": [
+              -4.208,
+              -2.56133333333,
+              -1.61833333334
+            ],
+            "min": -4.208,
+            "median": -2.56133333333,
+            "max": -1.61833333334
+          },
+          "cpu_gc_off_356_over_355": {
+            "round_values": [
+              0.879352526875,
+              0.384413469878,
+              0.683766052485
+            ],
+            "min": 0.384413469878,
+            "median": 0.683766052485,
+            "max": 0.879352526875
+          },
+          "transient_bytes_356_minus_355_per_op": {
+            "round_values": [
+              -680,
+              -680,
+              -680
+            ],
+            "min": -680,
+            "median": -680,
+            "max": -680
+          },
+          "native_call_delta_356_minus_355": {}
+        },
+        "buff_opaque_duration_only": {
+          "first_version_by_round": [
+            ".355",
+            ".356",
+            ".355"
+          ],
+          "output_and_geometry_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "native_calls_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "versions": {
+            ".355": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  63.3336666667,
+                  64.0906666667,
+                  53.268,
+                  48.3266666667,
+                  64.6943333333,
+                  61.661,
+                  45.3493333333,
+                  37.9616666667,
+                  39.807
+                ],
+                "min": 37.9616666667,
+                "median": 53.268,
+                "max": 64.6943333333
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  45.436,
+                  99.187,
+                  63.915,
+                  55.571,
+                  54.054,
+                  54.949,
+                  35.054,
+                  36.128,
+                  38.373
+                ],
+                "min": 35.054,
+                "median": 54.054,
+                "max": 99.187
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  952.64,
+                  952.64,
+                  952.64,
+                  952.64,
+                  952.64,
+                  952.64,
+                  952.64,
+                  952.64,
+                  952.64
+                ],
+                "min": 952.64,
+                "median": 952.64,
+                "max": 952.64
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "aura_native_format_calls": 1,
+                "font_reads": 1,
+                "hook_callbacks": 1,
+                "native_source_writes": 1,
+                "parent_reads": 2,
+                "scale_reads": 1,
+                "set_alpha": 1,
+                "set_text": 1,
+                "source_set_text": 1,
+                "text_scale_reads": 1
+              },
+              "output_geometry_signature_sha256": "1a9dae3e367dd48c338b95db70ecee600d6c4d7ef75aab41ead6870252cc13c2"
+            },
+            ".356": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  51.5933333333,
+                  54.4733333333,
+                  55.4223333333,
+                  50.1973333333,
+                  39.9696666667,
+                  33.7596666667,
+                  34.4093333333,
+                  32.6386666667,
+                  37.236
+                ],
+                "min": 32.6386666667,
+                "median": 39.9696666667,
+                "max": 55.4223333333
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  57.545,
+                  39.783,
+                  72.602,
+                  38.76,
+                  37.268,
+                  31.607,
+                  31.841,
+                  42.835,
+                  33.447
+                ],
+                "min": 31.607,
+                "median": 38.76,
+                "max": 72.602
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  0.64,
+                  0.64,
+                  0.64,
+                  0.64,
+                  0.64,
+                  0.64,
+                  0.64,
+                  0.64,
+                  0.64
+                ],
+                "min": 0.64,
+                "median": 0.64,
+                "max": 0.64
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "aura_native_format_calls": 1,
+                "font_reads": 1,
+                "hook_callbacks": 1,
+                "native_source_writes": 1,
+                "parent_reads": 2,
+                "scale_reads": 1,
+                "set_alpha": 1,
+                "set_text": 1,
+                "source_set_text": 1,
+                "text_scale_reads": 1
+              },
+              "output_geometry_signature_sha256": "1a9dae3e367dd48c338b95db70ecee600d6c4d7ef75aab41ead6870252cc13c2"
+            }
+          },
+          "cpu_gc_on_356_over_355": {
+            "round_values": [
+              0.860100736312,
+              0.648216322581,
+              0.864404083034
+            ],
+            "min": 0.648216322581,
+            "median": 0.860100736312,
+            "max": 0.864404083034
+          },
+          "cpu_gc_on_356_minus_355_us_per_op": {
+            "round_values": [
+              -8.86033333333,
+              -21.6913333333,
+              -5.39766666667
+            ],
+            "min": -21.6913333333,
+            "median": -8.86033333333,
+            "max": -5.39766666667
+          },
+          "cpu_gc_off_356_over_355": {
+            "round_values": [
+              0.90033638426,
+              0.678228903165,
+              0.925791629761
+            ],
+            "min": 0.678228903165,
+            "median": 0.90033638426,
+            "max": 0.925791629761
+          },
+          "transient_bytes_356_minus_355_per_op": {
+            "round_values": [
+              -952,
+              -952,
+              -952
+            ],
+            "min": -952,
+            "median": -952,
+            "max": -952
+          },
+          "native_call_delta_356_minus_355": {}
+        },
+        "buff_public_unchanged_full_native": {
+          "first_version_by_round": [
+            ".356",
+            ".355",
+            ".356"
+          ],
+          "output_and_geometry_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "native_calls_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "versions": {
+            ".355": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  77.02,
+                  81.3973333333,
+                  65.9683333333,
+                  78.63,
+                  85.7746666667,
+                  85.355,
+                  53.7426666667,
+                  50.4316666667,
+                  49.8783333333
+                ],
+                "min": 49.8783333333,
+                "median": 77.02,
+                "max": 85.7746666667
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  103.274,
+                  65.779,
+                  59.533,
+                  67.508,
+                  67.381,
+                  55.25,
+                  48.278,
+                  44.785,
+                  42.016
+                ],
+                "min": 42.016,
+                "median": 59.533,
+                "max": 103.274
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  2296,
+                  2296,
+                  2296,
+                  2296,
+                  2296,
+                  2296,
+                  2296,
+                  2296,
+                  2296
+                ],
+                "min": 2296,
+                "median": 2296,
+                "max": 2296
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "font_reads": 1,
+                "hook_callbacks": 3,
+                "native_source_writes": 1,
+                "parent_reads": 1,
+                "scale_reads": 2,
+                "set_alpha": 1,
+                "set_text": 1,
+                "source_font_writes": 1,
+                "source_geometry_writes": 1,
+                "source_set_text": 1,
+                "text_scale_reads": 1
+              },
+              "output_geometry_signature_sha256": "fd6ed8fa96bc45f4b7034461b0e4c6bda148954f106dca19fbac5deed36addea"
+            },
+            ".356": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  76.2526666667,
+                  83.7853333333,
+                  105.21,
+                  70.7433333333,
+                  61.7393333333,
+                  54.715,
+                  48.2373333333,
+                  46.627,
+                  41.99
+                ],
+                "min": 41.99,
+                "median": 61.7393333333,
+                "max": 105.21
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  76.455,
+                  98.756,
+                  94.229,
+                  92.625,
+                  92.325,
+                  49.438,
+                  44.435,
+                  44.561,
+                  38.197
+                ],
+                "min": 38.197,
+                "median": 76.455,
+                "max": 98.756
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  384,
+                  384,
+                  384,
+                  384,
+                  384,
+                  384,
+                  384,
+                  384,
+                  384
+                ],
+                "min": 384,
+                "median": 384,
+                "max": 384
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "font_reads": 1,
+                "hook_callbacks": 3,
+                "native_source_writes": 1,
+                "parent_reads": 1,
+                "scale_reads": 2,
+                "set_alpha": 1,
+                "set_text": 1,
+                "source_font_writes": 1,
+                "source_geometry_writes": 1,
+                "source_set_text": 1,
+                "text_scale_reads": 1
+              },
+              "output_geometry_signature_sha256": "fd6ed8fa96bc45f4b7034461b0e4c6bda148954f106dca19fbac5deed36addea"
+            }
+          },
+          "cpu_gc_on_356_over_355": {
+            "round_values": [
+              1.08783865663,
+              0.723324155976,
+              0.924557982749
+            ],
+            "min": 0.723324155976,
+            "median": 0.924557982749,
+            "max": 1.08783865663
+          },
+          "cpu_gc_on_356_minus_355_us_per_op": {
+            "round_values": [
+              6.76533333333,
+              -23.6156666667,
+              -3.80466666666
+            ],
+            "min": -23.6156666667,
+            "median": -3.80466666666,
+            "max": 6.76533333333
+          },
+          "cpu_gc_off_356_over_355": {
+            "round_values": [
+              1.43250885541,
+              1.37019337796,
+              0.992184883331
+            ],
+            "min": 0.992184883331,
+            "median": 1.37019337796,
+            "max": 1.43250885541
+          },
+          "transient_bytes_356_minus_355_per_op": {
+            "round_values": [
+              -1912,
+              -1912,
+              -1912
+            ],
+            "min": -1912,
+            "median": -1912,
+            "max": -1912
+          },
+          "native_call_delta_356_minus_355": {}
+        },
+        "buff_public_changed_full_native": {
+          "first_version_by_round": [
+            ".355",
+            ".356",
+            ".355"
+          ],
+          "output_and_geometry_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "native_calls_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "versions": {
+            ".355": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  90.3703333333,
+                  106.040333333,
+                  82.558,
+                  68.2406666667,
+                  91.2683333333,
+                  83.808,
+                  60.639,
+                  62.1223333333,
+                  85.4813333333
+                ],
+                "min": 60.639,
+                "median": 83.808,
+                "max": 106.040333333
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  84.043,
+                  104.337,
+                  69.058,
+                  47.654,
+                  51.4,
+                  61.503,
+                  60.049,
+                  80.53,
+                  87.829
+                ],
+                "min": 47.654,
+                "median": 69.058,
+                "max": 104.337
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  2296,
+                  2296,
+                  2296,
+                  2296,
+                  2296,
+                  2296,
+                  2296,
+                  2296,
+                  2296
+                ],
+                "min": 2296,
+                "median": 2296,
+                "max": 2296
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "cell_set_text": 3,
+                "font_reads": 1,
+                "hook_callbacks": 3,
+                "native_source_writes": 1,
+                "parent_reads": 1,
+                "scale_reads": 2,
+                "set_alpha": 1,
+                "set_text": 4,
+                "source_font_writes": 1,
+                "source_geometry_writes": 1,
+                "source_set_text": 1,
+                "text_scale_reads": 1
+              },
+              "output_geometry_signature_sha256": "fd6ed8fa96bc45f4b7034461b0e4c6bda148954f106dca19fbac5deed36addea"
+            },
+            ".356": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  72.7193333333,
+                  64.0256666667,
+                  65.2266666667,
+                  96.111,
+                  64.088,
+                  65.099,
+                  77.0186666667,
+                  63.299,
+                  97.5793333333
+                ],
+                "min": 63.299,
+                "median": 65.2266666667,
+                "max": 97.5793333333
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  61.843,
+                  50.793,
+                  57.3,
+                  68.174,
+                  55.782,
+                  52.516,
+                  62.659,
+                  65.506,
+                  97.227
+                ],
+                "min": 50.793,
+                "median": 61.843,
+                "max": 97.227
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  384,
+                  384,
+                  384,
+                  384,
+                  384,
+                  384,
+                  384,
+                  384,
+                  384
+                ],
+                "min": 384,
+                "median": 384,
+                "max": 384
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "cell_set_text": 3,
+                "font_reads": 1,
+                "hook_callbacks": 3,
+                "native_source_writes": 1,
+                "parent_reads": 1,
+                "scale_reads": 2,
+                "set_alpha": 1,
+                "set_text": 4,
+                "source_font_writes": 1,
+                "source_geometry_writes": 1,
+                "source_set_text": 1,
+                "text_scale_reads": 1
+              },
+              "output_geometry_signature_sha256": "fd6ed8fa96bc45f4b7034461b0e4c6bda148954f106dca19fbac5deed36addea"
+            }
+          },
+          "cpu_gc_on_356_over_355": {
+            "round_values": [
+              0.721770787611,
+              0.776763554792,
+              1.23979030622
+            ],
+            "min": 0.721770787611,
+            "median": 0.776763554792,
+            "max": 1.23979030622
+          },
+          "cpu_gc_on_356_minus_355_us_per_op": {
+            "round_values": [
+              -25.1436666667,
+              -18.709,
+              14.8963333333
+            ],
+            "min": -25.1436666667,
+            "median": -18.709,
+            "max": 14.8963333333
+          },
+          "cpu_gc_off_356_over_355": {
+            "round_values": [
+              0.681793843628,
+              1.08525291829,
+              0.813435986589
+            ],
+            "min": 0.681793843628,
+            "median": 0.813435986589,
+            "max": 1.08525291829
+          },
+          "transient_bytes_356_minus_355_per_op": {
+            "round_values": [
+              -1912,
+              -1912,
+              -1912
+            ],
+            "min": -1912,
+            "median": -1912,
+            "max": -1912
+          },
+          "native_call_delta_356_minus_355": {}
+        },
+        "buff_stock_readable_full_native": {
+          "first_version_by_round": [
+            ".356",
+            ".355",
+            ".356"
+          ],
+          "output_and_geometry_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "native_calls_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "versions": {
+            ".355": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  86.0983333333,
+                  98.1086666667,
+                  98.4323333333,
+                  76.1746666667,
+                  86.0336666667,
+                  164.401,
+                  100.505333333,
+                  118.862666667,
+                  84.7603333333
+                ],
+                "min": 76.1746666667,
+                "median": 98.1086666667,
+                "max": 164.401
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  75.198,
+                  86.051,
+                  64.26,
+                  72.038,
+                  83.538,
+                  85.288,
+                  156.491,
+                  94.023,
+                  90.068
+                ],
+                "min": 64.26,
+                "median": 85.288,
+                "max": 156.491
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  2840.139,
+                  2840.139,
+                  2840.139,
+                  2840.139,
+                  2840.139,
+                  2840.139,
+                  2840.139,
+                  2840.139,
+                  2840.139
+                ],
+                "min": 2840.139,
+                "median": 2840.139,
+                "max": 2840.139
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "font_reads": 1,
+                "hook_callbacks": 3,
+                "native_source_writes": 1,
+                "parent_reads": 2,
+                "scale_reads": 2,
+                "set_alpha": 1,
+                "set_text": 1,
+                "source_font_writes": 1,
+                "source_geometry_writes": 1,
+                "source_set_text": 1,
+                "text_scale_reads": 1
+              },
+              "output_geometry_signature_sha256": "68effe383e02bdffc04c29c736303db5acf13c3d6a48549431fd0294fb680a20"
+            },
+            ".356": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  79.5483333333,
+                  64.814,
+                  72.0783333333,
+                  63.1283333333,
+                  88.655,
+                  63.1243333333,
+                  77.7086666667,
+                  59.6086666667,
+                  66.332
+                ],
+                "min": 59.6086666667,
+                "median": 66.332,
+                "max": 88.655
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  72.474,
+                  67.797,
+                  74.525,
+                  76.267,
+                  59.674,
+                  63.494,
+                  136.212,
+                  75.532,
+                  75.043
+                ],
+                "min": 59.674,
+                "median": 74.525,
+                "max": 136.212
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  384.139,
+                  384.139,
+                  384.139,
+                  384.139,
+                  384.139,
+                  384.139,
+                  384.139,
+                  384.139,
+                  384.139
+                ],
+                "min": 384.139,
+                "median": 384.139,
+                "max": 384.139
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "font_reads": 1,
+                "hook_callbacks": 3,
+                "native_source_writes": 1,
+                "parent_reads": 2,
+                "scale_reads": 2,
+                "set_alpha": 1,
+                "set_text": 1,
+                "source_font_writes": 1,
+                "source_geometry_writes": 1,
+                "source_set_text": 1,
+                "text_scale_reads": 1
+              },
+              "output_geometry_signature_sha256": "68effe383e02bdffc04c29c736303db5acf13c3d6a48549431fd0294fb680a20"
+            }
+          },
+          "cpu_gc_on_356_over_355": {
+            "round_values": [
+              0.734678553713,
+              0.733763139236,
+              0.659984876424
+            ],
+            "min": 0.659984876424,
+            "median": 0.733763139236,
+            "max": 0.734678553713
+          },
+          "cpu_gc_on_356_minus_355_us_per_op": {
+            "round_values": [
+              -26.0303333333,
+              -22.9053333333,
+              -34.1733333333
+            ],
+            "min": -34.1733333333,
+            "median": -26.0303333333,
+            "max": -22.9053333333
+          },
+          "cpu_gc_off_356_over_355": {
+            "round_values": [
+              0.963775632331,
+              0.760061289473,
+              0.803335354115
+            ],
+            "min": 0.760061289473,
+            "median": 0.803335354115,
+            "max": 0.963775632331
+          },
+          "transient_bytes_356_minus_355_per_op": {
+            "round_values": [
+              -2456,
+              -2456,
+              -2456
+            ],
+            "min": -2456,
+            "median": -2456,
+            "max": -2456
+          },
+          "native_call_delta_356_minus_355": {}
+        },
+        "buff_opaque_full_native": {
+          "first_version_by_round": [
+            ".355",
+            ".356",
+            ".355"
+          ],
+          "output_and_geometry_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "native_calls_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "versions": {
+            ".355": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  123.294,
+                  111.066,
+                  112.289666667,
+                  109.366333333,
+                  106.736,
+                  129.167333333,
+                  296.24,
+                  156.315,
+                  171.628
+                ],
+                "min": 106.736,
+                "median": 123.294,
+                "max": 296.24
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  140.059,
+                  72.489,
+                  85.338,
+                  80.022,
+                  105.043,
+                  101.635,
+                  126.076,
+                  118.258,
+                  76.648
+                ],
+                "min": 72.489,
+                "median": 101.635,
+                "max": 140.059
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  3112.64,
+                  3112.64,
+                  3112.64,
+                  3112.64,
+                  3112.64,
+                  3112.64,
+                  3112.64,
+                  3112.64,
+                  3112.64
+                ],
+                "min": 3112.64,
+                "median": 3112.64,
+                "max": 3112.64
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "aura_native_format_calls": 1,
+                "font_reads": 2,
+                "hook_callbacks": 3,
+                "native_source_writes": 1,
+                "parent_reads": 3,
+                "scale_reads": 3,
+                "set_alpha": 1,
+                "set_text": 1,
+                "source_font_writes": 1,
+                "source_geometry_writes": 1,
+                "source_set_text": 1,
+                "text_scale_reads": 2
+              },
+              "output_geometry_signature_sha256": "1a9dae3e367dd48c338b95db70ecee600d6c4d7ef75aab41ead6870252cc13c2"
+            },
+            ".356": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  404.917333333,
+                  534.327,
+                  429.752666667,
+                  110.454,
+                  83.165,
+                  85.0023333333,
+                  72.355,
+                  61.5906666667,
+                  71.8443333333
+                ],
+                "min": 61.5906666667,
+                "median": 85.0023333333,
+                "max": 534.327
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  1404.734,
+                  507.093,
+                  80.174,
+                  66.716,
+                  77.731,
+                  86.011,
+                  71.105,
+                  75.605,
+                  106.913
+                ],
+                "min": 66.716,
+                "median": 80.174,
+                "max": 1404.734
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  384.64,
+                  384.64,
+                  384.64,
+                  384.64,
+                  384.64,
+                  384.64,
+                  384.64,
+                  384.64,
+                  384.64
+                ],
+                "min": 384.64,
+                "median": 384.64,
+                "max": 384.64
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "aura_native_format_calls": 1,
+                "font_reads": 2,
+                "hook_callbacks": 3,
+                "native_source_writes": 1,
+                "parent_reads": 3,
+                "scale_reads": 3,
+                "set_alpha": 1,
+                "set_text": 1,
+                "source_font_writes": 1,
+                "source_geometry_writes": 1,
+                "source_set_text": 1,
+                "text_scale_reads": 2
+              },
+              "output_geometry_signature_sha256": "1a9dae3e367dd48c338b95db70ecee600d6c4d7ef75aab41ead6870252cc13c2"
+            }
+          },
+          "cpu_gc_on_356_over_355": {
+            "round_values": [
+              3.82717911117,
+              0.777225776366,
+              0.418604967332
+            ],
+            "min": 0.418604967332,
+            "median": 0.777225776366,
+            "max": 3.82717911117
+          },
+          "cpu_gc_on_356_minus_355_us_per_op": {
+            "round_values": [
+              317.463,
+              -24.364,
+              -99.7836666667
+            ],
+            "min": -99.7836666667,
+            "median": -24.364,
+            "max": 317.463
+          },
+          "cpu_gc_off_356_over_355": {
+            "round_values": [
+              5.94217113127,
+              0.7648054312,
+              0.639322498267
+            ],
+            "min": 0.639322498267,
+            "median": 0.7648054312,
+            "max": 5.94217113127
+          },
+          "transient_bytes_356_minus_355_per_op": {
+            "round_values": [
+              -2728,
+              -2728,
+              -2728
+            ],
+            "min": -2728,
+            "median": -2728,
+            "max": -2728
+          },
+          "native_call_delta_356_minus_355": {}
+        },
+        "buff_same_profile_safe_setup": {
+          "first_version_by_round": [
+            ".356",
+            ".355",
+            ".356"
+          ],
+          "output_and_geometry_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "native_calls_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "versions": {
+            ".355": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  318.712,
+                  282.946,
+                  523.982,
+                  289.953666667,
+                  275.690333333,
+                  314.960333333,
+                  638.997,
+                  493.522333333,
+                  375.645
+                ],
+                "min": 275.690333333,
+                "median": 318.712,
+                "max": 638.997
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  318.699,
+                  259.717,
+                  521.71,
+                  299.213,
+                  317.278,
+                  265.049,
+                  420.744,
+                  480.778,
+                  401.089
+                ],
+                "min": 259.717,
+                "median": 318.699,
+                "max": 521.71
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  2744.64,
+                  2744.64,
+                  2744.64,
+                  2744.64,
+                  2744.64,
+                  2744.64,
+                  2744.64,
+                  2744.64,
+                  2744.64
+                ],
+                "min": 2744.64,
+                "median": 2744.64,
+                "max": 2744.64
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "font_reads": 2,
+                "parent_reads": 3,
+                "scale_reads": 2,
+                "scheduled_callbacks": 1,
+                "text_scale_reads": 2
+              },
+              "output_geometry_signature_sha256": "ffde8b280d3764a63df03ccc0b24cda377e85feec2e5cb1d32f54ab6b6bb0b84"
+            },
+            ".356": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  315.928666667,
+                  304.575,
+                  370.140333333,
+                  234.084,
+                  239.132,
+                  222.391,
+                  226.763666667,
+                  266.653,
+                  209.766333333
+                ],
+                "min": 209.766333333,
+                "median": 239.132,
+                "max": 370.140333333
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  282.948,
+                  431.686,
+                  438.788,
+                  247.826,
+                  203.179,
+                  241.03,
+                  337.466,
+                  226.806,
+                  185.195
+                ],
+                "min": 185.195,
+                "median": 247.826,
+                "max": 438.788
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  480.64,
+                  480.64,
+                  480.64,
+                  480.64,
+                  480.64,
+                  480.64,
+                  480.64,
+                  480.64,
+                  480.64
+                ],
+                "min": 480.64,
+                "median": 480.64,
+                "max": 480.64
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "font_reads": 2,
+                "parent_reads": 3,
+                "scale_reads": 2,
+                "scheduled_callbacks": 1,
+                "text_scale_reads": 2
+              },
+              "output_geometry_signature_sha256": "ffde8b280d3764a63df03ccc0b24cda377e85feec2e5cb1d32f54ab6b6bb0b84"
+            }
+          },
+          "cpu_gc_on_356_over_355": {
+            "round_values": [
+              0.991266932738,
+              0.807315191738,
+              0.459480050548
+            ],
+            "min": 0.459480050548,
+            "median": 0.807315191738,
+            "max": 0.991266932738
+          },
+          "cpu_gc_on_356_minus_355_us_per_op": {
+            "round_values": [
+              -2.78333333333,
+              -55.8696666667,
+              -266.758666667
+            ],
+            "min": -266.758666667,
+            "median": -55.8696666667,
+            "max": -2.78333333333
+          },
+          "cpu_gc_off_356_over_355": {
+            "round_values": [
+              1.35452574373,
+              0.805546550451,
+              0.539059380526
+            ],
+            "min": 0.539059380526,
+            "median": 0.805546550451,
+            "max": 1.35452574373
+          },
+          "transient_bytes_356_minus_355_per_op": {
+            "round_values": [
+              -2264,
+              -2264,
+              -2264
+            ],
+            "min": -2264,
+            "median": -2264,
+            "max": -2264
+          },
+          "native_call_delta_356_minus_355": {}
+        },
+        "action_rebind": {
+          "first_version_by_round": [
+            ".355",
+            ".356",
+            ".355"
+          ],
+          "output_and_geometry_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "native_calls_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "versions": {
+            ".355": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  67.5246666667,
+                  58.2233333333,
+                  62.004,
+                  30.9113333333,
+                  27.5186666667,
+                  34.8236666667,
+                  55.498,
+                  67.6923333333,
+                  83.4136666667
+                ],
+                "min": 27.5186666667,
+                "median": 58.2233333333,
+                "max": 83.4136666667
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  80.761,
+                  32.772,
+                  41.35,
+                  25.632,
+                  27.002,
+                  20.518,
+                  52.702,
+                  41.635,
+                  66.013
+                ],
+                "min": 20.518,
+                "median": 41.35,
+                "max": 80.761
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  1496,
+                  1496,
+                  1496,
+                  1496,
+                  1496,
+                  1496,
+                  1496,
+                  1496,
+                  1496
+                ],
+                "min": 1496,
+                "median": 1496,
+                "max": 1496
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "action_duration_requests": 1,
+                "binding_set_duration": 6,
+                "hook_callbacks": 1,
+                "native_set_cooldown": 1
+              },
+              "output_geometry_signature_sha256": "86573024b51a0977a551fb3a2704b4ef8468db2a85945707329c1644dc3e8f3f"
+            },
+            ".356": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  34.0123333333,
+                  17.9546666667,
+                  21.066,
+                  35.3023333333,
+                  23.332,
+                  27.1,
+                  14.9136666667,
+                  14.0093333333,
+                  14.64
+                ],
+                "min": 14.0093333333,
+                "median": 21.066,
+                "max": 35.3023333333
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  14.849,
+                  13.777,
+                  15.075,
+                  19.745,
+                  25.753,
+                  28.131,
+                  14.954,
+                  15.143,
+                  13.876
+                ],
+                "min": 13.777,
+                "median": 15.075,
+                "max": 28.131
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "min": 0,
+                "median": 0,
+                "max": 0
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "action_duration_requests": 1,
+                "binding_set_duration": 6,
+                "hook_callbacks": 1,
+                "native_set_cooldown": 1
+              },
+              "output_geometry_signature_sha256": "86573024b51a0977a551fb3a2704b4ef8468db2a85945707329c1644dc3e8f3f"
+            }
+          },
+          "cpu_gc_on_356_over_355": {
+            "round_values": [
+              0.339752274047,
+              0.876701102077,
+              0.216272645351
+            ],
+            "min": 0.216272645351,
+            "median": 0.339752274047,
+            "max": 0.876701102077
+          },
+          "cpu_gc_on_356_minus_355_us_per_op": {
+            "round_values": [
+              -40.938,
+              -3.81133333334,
+              -53.0523333333
+            ],
+            "min": -53.0523333333,
+            "median": -40.938,
+            "max": -3.81133333334
+          },
+          "cpu_gc_off_356_over_355": {
+            "round_values": [
+              0.359105199516,
+              1.00472066167,
+              0.283746347387
+            ],
+            "min": 0.283746347387,
+            "median": 0.359105199516,
+            "max": 1.00472066167
+          },
+          "transient_bytes_356_minus_355_per_op": {
+            "round_values": [
+              -1496,
+              -1496,
+              -1496
+            ],
+            "min": -1496,
+            "median": -1496,
+            "max": -1496
+          },
+          "native_call_delta_356_minus_355": {}
+        },
+        "action_idle_setcooldown": {
+          "first_version_by_round": [
+            ".356",
+            ".355",
+            ".356"
+          ],
+          "output_and_geometry_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "native_calls_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "versions": {
+            ".355": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  13.8416666667,
+                  12.5783333333,
+                  15.331,
+                  15.0463333333,
+                  14.7863333333,
+                  16.3846666667,
+                  12.1016666667,
+                  9.33333333333,
+                  9.73766666667
+                ],
+                "min": 9.33333333333,
+                "median": 13.8416666667,
+                "max": 16.3846666667
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  14.822,
+                  14.634,
+                  47.253,
+                  11.093,
+                  10.565,
+                  16.803,
+                  8.44000000001,
+                  11.469,
+                  8.32500000001
+                ],
+                "min": 8.32500000001,
+                "median": 11.469,
+                "max": 47.253
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  680,
+                  680,
+                  680,
+                  680,
+                  680,
+                  680,
+                  680,
+                  680,
+                  680
+                ],
+                "min": 680,
+                "median": 680,
+                "max": 680
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "action_duration_requests": 1,
+                "hook_callbacks": 1,
+                "native_set_cooldown": 1
+              },
+              "output_geometry_signature_sha256": "a04ab26b02e46bf16cfc1f6036f5fbe1d82d5058ab0123773486acc0544dd007"
+            },
+            ".356": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  31.9686666667,
+                  31.7033333333,
+                  19.7846666667,
+                  11.1936666667,
+                  12.1416666667,
+                  12.3886666667,
+                  7.40133333333,
+                  9.63533333334,
+                  6.88366666667
+                ],
+                "min": 6.88366666667,
+                "median": 12.1416666667,
+                "max": 31.9686666667
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  33.608,
+                  22.424,
+                  44.674,
+                  13.285,
+                  10.53,
+                  11.268,
+                  6.845,
+                  11.009,
+                  9.28500000001
+                ],
+                "min": 6.845,
+                "median": 11.268,
+                "max": 44.674
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "min": 0,
+                "median": 0,
+                "max": 0
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "action_duration_requests": 1,
+                "hook_callbacks": 1,
+                "native_set_cooldown": 1
+              },
+              "output_geometry_signature_sha256": "a04ab26b02e46bf16cfc1f6036f5fbe1d82d5058ab0123773486acc0544dd007"
+            }
+          },
+          "cpu_gc_on_356_over_355": {
+            "round_values": [
+              2.29042745334,
+              0.806951859811,
+              0.760072570431
+            ],
+            "min": 0.760072570431,
+            "median": 0.806951859811,
+            "max": 2.29042745334
+          },
+          "cpu_gc_on_356_minus_355_us_per_op": {
+            "round_values": [
+              17.8616666667,
+              -2.90466666667,
+              -2.33633333334
+            ],
+            "min": -2.90466666667,
+            "median": -2.33633333334,
+            "max": 17.8616666667
+          },
+          "cpu_gc_off_356_over_355": {
+            "round_values": [
+              2.26744029146,
+              1.01577571441,
+              1.10011848341
+            ],
+            "min": 1.01577571441,
+            "median": 1.10011848341,
+            "max": 2.26744029146
+          },
+          "transient_bytes_356_minus_355_per_op": {
+            "round_values": [
+              -680,
+              -680,
+              -680
+            ],
+            "min": -680,
+            "median": -680,
+            "max": -680
+          },
+          "native_call_delta_356_minus_355": {}
+        },
+        "action_same_profile_safe_scan": {
+          "first_version_by_round": [
+            ".355",
+            ".356",
+            ".355"
+          ],
+          "output_and_geometry_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "native_calls_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "versions": {
+            ".355": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  2033.56933333,
+                  959.148666667,
+                  612.982333333,
+                  504.907333333,
+                  632.243,
+                  487.314333333,
+                  381.322666667,
+                  431.104,
+                  484.097666667
+                ],
+                "min": 381.322666667,
+                "median": 504.907333333,
+                "max": 2033.56933333
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  3799.946,
+                  555.305,
+                  556.047,
+                  484.87,
+                  318.856,
+                  370.522,
+                  402.947,
+                  431.845,
+                  511.801
+                ],
+                "min": 318.856,
+                "median": 484.87,
+                "max": 3799.946
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  7106.47,
+                  7106.47,
+                  7106.47,
+                  7106.47,
+                  7106.47,
+                  7106.47,
+                  7106.47,
+                  7106.47,
+                  7106.47
+                ],
+                "min": 7106.47,
+                "median": 7106.47,
+                "max": 7106.47
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "font_reads": 4,
+                "permission_queries": 38,
+                "scale_reads": 6,
+                "scheduled_callbacks": 1,
+                "text_scale_reads": 4
+              },
+              "output_geometry_signature_sha256": "86573024b51a0977a551fb3a2704b4ef8468db2a85945707329c1644dc3e8f3f"
+            },
+            ".356": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  627.627666667,
+                  622.690666667,
+                  620.726,
+                  429.933333333,
+                  460.301,
+                  483.586333333,
+                  445.150666667,
+                  393.432,
+                  1489.74266667
+                ],
+                "min": 393.432,
+                "median": 483.586333333,
+                "max": 1489.74266667
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  541.298,
+                  558.829,
+                  508.138,
+                  438.342,
+                  416.94,
+                  413.776,
+                  434.287,
+                  378.375,
+                  733.391
+                ],
+                "min": 378.375,
+                "median": 438.342,
+                "max": 733.391
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  4386.47,
+                  4386.47,
+                  4386.47,
+                  4386.47,
+                  4386.47,
+                  4386.47,
+                  4386.47,
+                  4386.47,
+                  4386.47
+                ],
+                "min": 4386.47,
+                "median": 4386.47,
+                "max": 4386.47
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "font_reads": 4,
+                "permission_queries": 38,
+                "scale_reads": 6,
+                "scheduled_callbacks": 1,
+                "text_scale_reads": 4
+              },
+              "output_geometry_signature_sha256": "86573024b51a0977a551fb3a2704b4ef8468db2a85945707329c1644dc3e8f3f"
+            }
+          },
+          "cpu_gc_on_356_over_355": {
+            "round_values": [
+              0.649211835774,
+              0.911654415794,
+              1.03258301168
+            ],
+            "min": 0.649211835774,
+            "median": 0.911654415794,
+            "max": 1.03258301168
+          },
+          "cpu_gc_on_356_minus_355_us_per_op": {
+            "round_values": [
+              -336.458,
+              -44.6063333333,
+              14.0466666667
+            ],
+            "min": -336.458,
+            "median": -44.6063333333,
+            "max": 14.0466666667
+          },
+          "cpu_gc_off_356_over_355": {
+            "round_values": [
+              0.973475263782,
+              1.12527731147,
+              1.0056548067
+            ],
+            "min": 0.973475263782,
+            "median": 1.0056548067,
+            "max": 1.12527731147
+          },
+          "transient_bytes_356_minus_355_per_op": {
+            "round_values": [
+              -2720,
+              -2720,
+              -2720
+            ],
+            "min": -2720,
+            "median": -2720,
+            "max": -2720
+          },
+          "native_call_delta_356_minus_355": {}
+        }
+      }
+    },
+    {
+      "lua_version": "Lua 5.4.6  Copyright (C) 1994-2023 Lua.org, PUC-Rio",
+      "interpreter_sha256": "524d7cf3ea821a227998cc57015691b71e4ddcfcb6558234402852783981778d",
+      "started_utc": "2026-11-13T07:54:36.778565+00:00",
+      "finished_utc": "2026-11-13T07:56:36.911552+00:00",
+      "raw_result_basename": "timer-paired-lua54.jsonl",
+      "raw_result_sha256": "4efff8664aabe1290473cf36e7063da9798074897954d61abbc64fcd0ef2233c",
+      "full_provenance_sha256": "ec8c5c27b9b07d02331a9e94c987736ffbe7b299fdd8b0592782f8decef9b91b",
+      "source_unchanged_before_after": true,
+      "settings": {
+        "pair_rounds": 3,
+        "samples_per_version": 3,
+        "cpu_ops_per_sample": 3000,
+        "allocation_ops_per_sample": 1000,
+        "retain_ops_per_batch": 1000,
+        "warmup_ops": 1000
+      },
+      "workload": {
+        "frozen_harness_sha256": "007f951830e41986afbdb7ea75d314ff1352e68a04207877f31f9bf5399b4f0c",
+        "reused_prefix_sha256": "7a495986995b092f7895710d6af77af050c0eb68f4d4ff71bf6da0e3e212d048",
+        "appended_suffix_sha256": "9968e79772fee451691015bb5ded705692c5782e02dac7a74348ce86828d09d8"
+      },
+      "scenarios": {
+        "baseline_buff_duration_only": {
+          "first_version_by_round": [
+            ".355",
+            ".356",
+            ".355"
+          ],
+          "output_and_geometry_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "native_calls_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "versions": {
+            ".355": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  2.13966666667,
+                  1.371,
+                  0.103,
+                  0.134666666667,
+                  0.193333333333,
+                  0.110333333334,
+                  0.188333333336,
+                  0.114000000001,
+                  0.141666666669
+                ],
+                "min": 0.103,
+                "median": 0.141666666669,
+                "max": 2.13966666667
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  0.223,
+                  0.146,
+                  2.565,
+                  0.214,
+                  0.136999999999,
+                  0.105999999999,
+                  0.119999999995,
+                  0.304000000014,
+                  0.288999999995
+                ],
+                "min": 0.105999999999,
+                "median": 0.214,
+                "max": 2.565
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "min": 0,
+                "median": 0,
+                "max": 0
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "native_source_writes": 1
+              },
+              "output_geometry_signature_sha256": "cc0e00d45e5318b2098546958e091afc05eb6a524d9fe942c4a598fbc96d2eac"
+            },
+            ".356": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  2.378,
+                  3.386,
+                  0.369333333333,
+                  0.142333333334,
+                  0.171333333333,
+                  0.102666666667,
+                  0.142333333334,
+                  0.128666666669,
+                  0.175333333336
+                ],
+                "min": 0.102666666667,
+                "median": 0.171333333333,
+                "max": 3.386
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  0.525,
+                  0.148,
+                  1.256,
+                  0.111999999998,
+                  0.104,
+                  0.102999999999,
+                  0.11099999999,
+                  0.263000000004,
+                  0.127999999989
+                ],
+                "min": 0.102999999999,
+                "median": 0.127999999989,
+                "max": 1.256
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "min": 0,
+                "median": 0,
+                "max": 0
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "native_source_writes": 1
+              },
+              "output_geometry_signature_sha256": "cc0e00d45e5318b2098546958e091afc05eb6a524d9fe942c4a598fbc96d2eac"
+            }
+          },
+          "cpu_gc_on_356_over_355": {
+            "round_values": [
+              1.7345003647,
+              1.05693069308,
+              1.00470588234
+            ],
+            "min": 1.00470588234,
+            "median": 1.05693069308,
+            "max": 1.7345003647
+          },
+          "cpu_gc_on_356_minus_355_us_per_op": {
+            "round_values": [
+              1.007,
+              0.00766666666744,
+              0.000666666664983
+            ],
+            "min": 0.000666666664983,
+            "median": 0.00766666666744,
+            "max": 1.007
+          },
+          "cpu_gc_off_356_over_355": {
+            "round_values": [
+              2.35426008969,
+              0.759124087601,
+              0.442906574366
+            ],
+            "min": 0.442906574366,
+            "median": 0.759124087601,
+            "max": 2.35426008969
+          },
+          "transient_bytes_356_minus_355_per_op": {
+            "round_values": [
+              0,
+              0,
+              0
+            ],
+            "min": 0,
+            "median": 0,
+            "max": 0
+          },
+          "native_call_delta_356_minus_355": {}
+        },
+        "baseline_buff_full_native": {
+          "first_version_by_round": [
+            ".356",
+            ".355",
+            ".356"
+          ],
+          "output_and_geometry_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "native_calls_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "versions": {
+            ".355": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  0.527,
+                  0.320333333333,
+                  1.137,
+                  0.405333333334,
+                  0.362333333333,
+                  0.354666666667,
+                  0.498666666663,
+                  0.885666666666,
+                  0.937666666668
+                ],
+                "min": 0.320333333333,
+                "median": 0.498666666663,
+                "max": 1.137
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  0.329,
+                  4.834,
+                  4.543,
+                  0.339,
+                  0.440000000001,
+                  0.313999999999,
+                  0.494000000003,
+                  0.546999999997,
+                  0.362999999993
+                ],
+                "min": 0.313999999999,
+                "median": 0.440000000001,
+                "max": 4.834
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "min": 0,
+                "median": 0,
+                "max": 0
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "native_source_writes": 1,
+                "source_font_writes": 1,
+                "source_geometry_writes": 1
+              },
+              "output_geometry_signature_sha256": "cc0e00d45e5318b2098546958e091afc05eb6a524d9fe942c4a598fbc96d2eac"
+            },
+            ".356": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  0.384666666667,
+                  0.351666666667,
+                  1.20933333333,
+                  0.372,
+                  0.402333333334,
+                  0.377666666668,
+                  0.626666666667,
+                  0.459999999999,
+                  0.471333333332
+                ],
+                "min": 0.351666666667,
+                "median": 0.402333333334,
+                "max": 1.20933333333
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  0.315,
+                  3.441,
+                  0.305,
+                  0.467999999998,
+                  0.447999999999,
+                  0.312000000001,
+                  0.718000000006,
+                  0.474000000011,
+                  0.52500000001
+                ],
+                "min": 0.305,
+                "median": 0.467999999998,
+                "max": 3.441
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "min": 0,
+                "median": 0,
+                "max": 0
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "native_source_writes": 1,
+                "source_font_writes": 1,
+                "source_geometry_writes": 1
+              },
+              "output_geometry_signature_sha256": "cc0e00d45e5318b2098546958e091afc05eb6a524d9fe942c4a598fbc96d2eac"
+            }
+          },
+          "cpu_gc_on_356_over_355": {
+            "round_values": [
+              0.729917773561,
+              1.04231830727,
+              0.532179149416
+            ],
+            "min": 0.532179149416,
+            "median": 0.729917773561,
+            "max": 1.04231830727
+          },
+          "cpu_gc_on_356_minus_355_us_per_op": {
+            "round_values": [
+              -0.142333333333,
+              0.0153333333349,
+              -0.414333333334
+            ],
+            "min": -0.414333333334,
+            "median": -0.142333333333,
+            "max": 0.0153333333349
+          },
+          "cpu_gc_off_356_over_355": {
+            "round_values": [
+              0.0693374422188,
+              1.3215339233,
+              1.06275303645
+            ],
+            "min": 0.0693374422188,
+            "median": 1.06275303645,
+            "max": 1.3215339233
+          },
+          "transient_bytes_356_minus_355_per_op": {
+            "round_values": [
+              0,
+              0,
+              0
+            ],
+            "min": 0,
+            "median": 0,
+            "max": 0
+          },
+          "native_call_delta_356_minus_355": {}
+        },
+        "baseline_action_native_setcooldown": {
+          "first_version_by_round": [
+            ".355",
+            ".356",
+            ".355"
+          ],
+          "output_and_geometry_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "native_calls_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "versions": {
+            ".355": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  0.0636666666666,
+                  0.666666666667,
+                  0.069,
+                  0.187333333334,
+                  0.0626666666671,
+                  0.0833333333337,
+                  0.0626666666648,
+                  0.100666666668,
+                  0.063000000002
+                ],
+                "min": 0.0626666666648,
+                "median": 0.069,
+                "max": 0.666666666667
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  0.0640000000001,
+                  0.073,
+                  0.063,
+                  0.0640000000018,
+                  0.0640000000018,
+                  0.0630000000008,
+                  1.419,
+                  0.0619999999998,
+                  0.0619999999998
+                ],
+                "min": 0.0619999999998,
+                "median": 0.0640000000001,
+                "max": 1.419
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "min": 0,
+                "median": 0,
+                "max": 0
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "native_set_cooldown": 1
+              },
+              "output_geometry_signature_sha256": "d8cc33f367f8f6e665dc93083210102aa13be6b276058dac890eca896e5383de"
+            },
+            ".356": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  0.0633333333333,
+                  0.0623333333333,
+                  0.0623333333333,
+                  0.0626666666671,
+                  0.0883333333341,
+                  0.0913333333337,
+                  0.0633333333298,
+                  0.0816666666689,
+                  0.0626666666648
+                ],
+                "min": 0.0623333333333,
+                "median": 0.0633333333298,
+                "max": 0.0913333333337
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  0.186,
+                  0.063,
+                  0.063,
+                  0.0629999999973,
+                  0.0629999999973,
+                  0.0619999999998,
+                  0.0639999999947,
+                  0.0629999999973,
+                  0.0619999999998
+                ],
+                "min": 0.0619999999998,
+                "median": 0.0629999999973,
+                "max": 0.186
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "min": 0,
+                "median": 0,
+                "max": 0
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "native_set_cooldown": 1
+              },
+              "output_geometry_signature_sha256": "d8cc33f367f8f6e665dc93083210102aa13be6b276058dac890eca896e5383de"
+            }
+          },
+          "cpu_gc_on_356_over_355": {
+            "round_values": [
+              0.903381642512,
+              1.06,
+              1.0052910052
+            ],
+            "min": 0.903381642512,
+            "median": 1.0052910052,
+            "max": 1.06
+          },
+          "cpu_gc_on_356_minus_355_us_per_op": {
+            "round_values": [
+              -0.00666666666667,
+              0.0050000000004,
+              0.000333333327755
+            ],
+            "min": -0.00666666666667,
+            "median": 0.000333333327755,
+            "max": 0.0050000000004
+          },
+          "cpu_gc_off_356_over_355": {
+            "round_values": [
+              0.984375,
+              0.984374999929,
+              1.01612903222
+            ],
+            "min": 0.984374999929,
+            "median": 0.984375,
+            "max": 1.01612903222
+          },
+          "transient_bytes_356_minus_355_per_op": {
+            "round_values": [
+              0,
+              0,
+              0
+            ],
+            "min": 0,
+            "median": 0,
+            "max": 0
+          },
+          "native_call_delta_356_minus_355": {}
+        },
+        "buff_public_unchanged_duration_only": {
+          "first_version_by_round": [
+            ".356",
+            ".355",
+            ".356"
+          ],
+          "output_and_geometry_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "native_calls_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "versions": {
+            ".355": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  9.86,
+                  14.0896666667,
+                  26.1693333333,
+                  13.5033333333,
+                  13.6043333333,
+                  14.1376666667,
+                  11.8473333333,
+                  11.7653333333,
+                  11.84
+                ],
+                "min": 9.86,
+                "median": 13.5033333333,
+                "max": 26.1693333333
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  9.044,
+                  24.146,
+                  31.994,
+                  12.177,
+                  10.621,
+                  14.644,
+                  11.296,
+                  17.434,
+                  12.633
+                ],
+                "min": 9.044,
+                "median": 12.633,
+                "max": 31.994
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  0.32,
+                  0.32,
+                  0.32,
+                  0.32,
+                  0.32,
+                  0.32,
+                  0.32,
+                  0.32,
+                  0.32
+                ],
+                "min": 0.32,
+                "median": 0.32,
+                "max": 0.32
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "hook_callbacks": 1,
+                "native_source_writes": 1,
+                "set_alpha": 1,
+                "set_text": 1,
+                "source_set_text": 1
+              },
+              "output_geometry_signature_sha256": "fd6ed8fa96bc45f4b7034461b0e4c6bda148954f106dca19fbac5deed36addea"
+            },
+            ".356": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  22.7296666667,
+                  20.0166666667,
+                  20.7976666667,
+                  10.9726666667,
+                  12.1006666667,
+                  12.3026666667,
+                  11.765,
+                  11.593,
+                  13.8056666667
+                ],
+                "min": 10.9726666667,
+                "median": 12.3026666667,
+                "max": 22.7296666667
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  26.619,
+                  24.312,
+                  25.768,
+                  13.15,
+                  10.865,
+                  12.391,
+                  10.14,
+                  12.434,
+                  13.148
+                ],
+                "min": 10.14,
+                "median": 13.148,
+                "max": 26.619
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  0.32,
+                  0.32,
+                  0.32,
+                  0.32,
+                  0.32,
+                  0.32,
+                  0.32,
+                  0.32,
+                  0.32
+                ],
+                "min": 0.32,
+                "median": 0.32,
+                "max": 0.32
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "hook_callbacks": 1,
+                "native_source_writes": 1,
+                "set_alpha": 1,
+                "set_text": 1,
+                "source_set_text": 1
+              },
+              "output_geometry_signature_sha256": "fd6ed8fa96bc45f4b7034461b0e4c6bda148954f106dca19fbac5deed36addea"
+            }
+          },
+          "cpu_gc_on_356_over_355": {
+            "round_values": [
+              1.47609359105,
+              0.889471491927,
+              0.993665540541
+            ],
+            "min": 0.889471491927,
+            "median": 0.993665540541,
+            "max": 1.47609359105
+          },
+          "cpu_gc_on_356_minus_355_us_per_op": {
+            "round_values": [
+              6.708,
+              -1.50366666667,
+              -0.0750000000001
+            ],
+            "min": -1.50366666667,
+            "median": -0.0750000000001,
+            "max": 6.708
+          },
+          "cpu_gc_off_356_over_355": {
+            "round_values": [
+              1.06717468732,
+              1.01757411514,
+              0.984247605478
+            ],
+            "min": 0.984247605478,
+            "median": 1.01757411514,
+            "max": 1.06717468732
+          },
+          "transient_bytes_356_minus_355_per_op": {
+            "round_values": [
+              0,
+              0,
+              0
+            ],
+            "min": 0,
+            "median": 0,
+            "max": 0
+          },
+          "native_call_delta_356_minus_355": {}
+        },
+        "buff_public_changed_duration_only": {
+          "first_version_by_round": [
+            ".355",
+            ".356",
+            ".355"
+          ],
+          "output_and_geometry_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "native_calls_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "versions": {
+            ".355": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  28.7903333333,
+                  31.7253333333,
+                  17.5433333333,
+                  17.1696666667,
+                  13.5293333333,
+                  10.774,
+                  15.35,
+                  14.9486666667,
+                  19.3783333333
+                ],
+                "min": 10.774,
+                "median": 17.1696666667,
+                "max": 31.7253333333
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  21.566,
+                  21.37,
+                  17.655,
+                  16.108,
+                  11.113,
+                  10.754,
+                  14.064,
+                  14.433,
+                  14.691
+                ],
+                "min": 10.754,
+                "median": 14.691,
+                "max": 21.566
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  0.384,
+                  0.384,
+                  0.384,
+                  0.384,
+                  0.384,
+                  0.384,
+                  0.384,
+                  0.384,
+                  0.384
+                ],
+                "min": 0.384,
+                "median": 0.384,
+                "max": 0.384
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "cell_set_text": 3,
+                "hook_callbacks": 1,
+                "native_source_writes": 1,
+                "set_alpha": 1,
+                "set_text": 4,
+                "source_set_text": 1
+              },
+              "output_geometry_signature_sha256": "fd6ed8fa96bc45f4b7034461b0e4c6bda148954f106dca19fbac5deed36addea"
+            },
+            ".356": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  19.7226666667,
+                  21.1543333333,
+                  26.2643333333,
+                  16.1023333333,
+                  16.5,
+                  16.854,
+                  20.8446666667,
+                  17.7023333333,
+                  27.0856666667
+                ],
+                "min": 16.1023333333,
+                "median": 19.7226666667,
+                "max": 27.0856666667
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  23.289,
+                  18.798,
+                  21.005,
+                  13.82,
+                  17.704,
+                  16.128,
+                  17.196,
+                  28.439,
+                  19.637
+                ],
+                "min": 13.82,
+                "median": 18.798,
+                "max": 28.439
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  0.384,
+                  0.384,
+                  0.384,
+                  0.384,
+                  0.384,
+                  0.384,
+                  0.384,
+                  0.384,
+                  0.384
+                ],
+                "min": 0.384,
+                "median": 0.384,
+                "max": 0.384
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "cell_set_text": 3,
+                "hook_callbacks": 1,
+                "native_source_writes": 1,
+                "set_alpha": 1,
+                "set_text": 4,
+                "source_set_text": 1
+              },
+              "output_geometry_signature_sha256": "fd6ed8fa96bc45f4b7034461b0e4c6bda148954f106dca19fbac5deed36addea"
+            }
+          },
+          "cpu_gc_on_356_over_355": {
+            "round_values": [
+              0.734772087854,
+              1.21957228738,
+              1.3579587405
+            ],
+            "min": 0.734772087854,
+            "median": 1.21957228738,
+            "max": 1.3579587405
+          },
+          "cpu_gc_on_356_minus_355_us_per_op": {
+            "round_values": [
+              -7.636,
+              2.97066666667,
+              5.49466666667
+            ],
+            "min": -7.636,
+            "median": 2.97066666667,
+            "max": 5.49466666667
+          },
+          "cpu_gc_off_356_over_355": {
+            "round_values": [
+              0.982919981282,
+              1.45127328354,
+              1.3605625996
+            ],
+            "min": 0.982919981282,
+            "median": 1.3605625996,
+            "max": 1.45127328354
+          },
+          "transient_bytes_356_minus_355_per_op": {
+            "round_values": [
+              0,
+              0,
+              0
+            ],
+            "min": 0,
+            "median": 0,
+            "max": 0
+          },
+          "native_call_delta_356_minus_355": {}
+        },
+        "buff_stock_readable_duration_only": {
+          "first_version_by_round": [
+            ".356",
+            ".355",
+            ".356"
+          ],
+          "output_and_geometry_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "native_calls_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "versions": {
+            ".355": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  29.9896666667,
+                  36.688,
+                  40.153,
+                  17.7663333333,
+                  22.393,
+                  21.1103333333,
+                  38.341,
+                  37.8256666667,
+                  26.2383333333
+                ],
+                "min": 17.7663333333,
+                "median": 29.9896666667,
+                "max": 40.153
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  45.522,
+                  43.306,
+                  53.426,
+                  21.277,
+                  22.949,
+                  19.222,
+                  32.393,
+                  25.951,
+                  31.573
+                ],
+                "min": 19.222,
+                "median": 31.573,
+                "max": 53.426
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  751.884,
+                  751.884,
+                  751.884,
+                  751.884,
+                  751.884,
+                  751.884,
+                  751.884,
+                  751.884,
+                  751.884
+                ],
+                "min": 751.884,
+                "median": 751.884,
+                "max": 751.884
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "hook_callbacks": 1,
+                "native_source_writes": 1,
+                "parent_reads": 1,
+                "set_alpha": 1,
+                "set_text": 1,
+                "source_set_text": 1
+              },
+              "output_geometry_signature_sha256": "68effe383e02bdffc04c29c736303db5acf13c3d6a48549431fd0294fb680a20"
+            },
+            ".356": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  24.1183333333,
+                  31.276,
+                  31.4076666667,
+                  20.1793333333,
+                  18.3336666667,
+                  16.8766666667,
+                  21.2823333333,
+                  21.6466666667,
+                  28.0716666667
+                ],
+                "min": 16.8766666667,
+                "median": 21.6466666667,
+                "max": 31.4076666667
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  19.271,
+                  35.176,
+                  40.494,
+                  17.839,
+                  21.51,
+                  32.298,
+                  24.134,
+                  21.652,
+                  19.943
+                ],
+                "min": 17.839,
+                "median": 21.652,
+                "max": 40.494
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  111.884,
+                  111.884,
+                  111.884,
+                  111.884,
+                  111.884,
+                  111.884,
+                  111.884,
+                  111.884,
+                  111.884
+                ],
+                "min": 111.884,
+                "median": 111.884,
+                "max": 111.884
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "hook_callbacks": 1,
+                "native_source_writes": 1,
+                "parent_reads": 1,
+                "set_alpha": 1,
+                "set_text": 1,
+                "source_set_text": 1
+              },
+              "output_geometry_signature_sha256": "68effe383e02bdffc04c29c736303db5acf13c3d6a48549431fd0294fb680a20"
+            }
+          },
+          "cpu_gc_on_356_over_355": {
+            "round_values": [
+              0.852485826428,
+              0.868468838326,
+              0.57227455784
+            ],
+            "min": 0.57227455784,
+            "median": 0.852485826428,
+            "max": 0.868468838326
+          },
+          "cpu_gc_on_356_minus_355_us_per_op": {
+            "round_values": [
+              -5.412,
+              -2.77666666667,
+              -16.179
+            ],
+            "min": -16.179,
+            "median": -5.412,
+            "max": -2.77666666667
+          },
+          "cpu_gc_off_356_over_355": {
+            "round_values": [
+              0.772725275691,
+              1.01095079194,
+              0.685775821113
+            ],
+            "min": 0.685775821113,
+            "median": 0.772725275691,
+            "max": 1.01095079194
+          },
+          "transient_bytes_356_minus_355_per_op": {
+            "round_values": [
+              -640,
+              -640,
+              -640
+            ],
+            "min": -640,
+            "median": -640,
+            "max": -640
+          },
+          "native_call_delta_356_minus_355": {}
+        },
+        "buff_opaque_duration_only": {
+          "first_version_by_round": [
+            ".355",
+            ".356",
+            ".355"
+          ],
+          "output_and_geometry_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "native_calls_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "versions": {
+            ".355": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  70.2193333333,
+                  56.7753333333,
+                  69.8706666667,
+                  31.12,
+                  31.0716666667,
+                  32.7666666667,
+                  84.4163333333,
+                  83.9283333333,
+                  61.7466666667
+                ],
+                "min": 31.0716666667,
+                "median": 61.7466666667,
+                "max": 84.4163333333
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  56.788,
+                  81.349,
+                  46.163,
+                  30.983,
+                  34.441,
+                  56.207,
+                  98.493,
+                  74.317,
+                  55.615
+                ],
+                "min": 30.983,
+                "median": 56.207,
+                "max": 98.493
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  896.576,
+                  896.576,
+                  896.576,
+                  896.576,
+                  896.576,
+                  896.576,
+                  896.576,
+                  896.576,
+                  896.576
+                ],
+                "min": 896.576,
+                "median": 896.576,
+                "max": 896.576
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "aura_native_format_calls": 1,
+                "font_reads": 1,
+                "hook_callbacks": 1,
+                "native_source_writes": 1,
+                "parent_reads": 2,
+                "scale_reads": 1,
+                "set_alpha": 1,
+                "set_text": 1,
+                "source_set_text": 1,
+                "text_scale_reads": 1
+              },
+              "output_geometry_signature_sha256": "1a9dae3e367dd48c338b95db70ecee600d6c4d7ef75aab41ead6870252cc13c2"
+            },
+            ".356": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  32.7213333333,
+                  35.534,
+                  37.736,
+                  27.824,
+                  26.8833333333,
+                  26.491,
+                  38.398,
+                  40.2893333333,
+                  29.658
+                ],
+                "min": 26.491,
+                "median": 32.7213333333,
+                "max": 40.2893333333
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  39.599,
+                  33.432,
+                  32.795,
+                  28.87,
+                  28.6,
+                  28.049,
+                  40.228,
+                  46.784,
+                  24.842
+                ],
+                "min": 24.842,
+                "median": 32.795,
+                "max": 46.784
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  0.576,
+                  0.576,
+                  0.576,
+                  0.576,
+                  0.576,
+                  0.576,
+                  0.576,
+                  0.576,
+                  0.576
+                ],
+                "min": 0.576,
+                "median": 0.576,
+                "max": 0.576
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "aura_native_format_calls": 1,
+                "font_reads": 1,
+                "hook_callbacks": 1,
+                "native_source_writes": 1,
+                "parent_reads": 2,
+                "scale_reads": 1,
+                "set_alpha": 1,
+                "set_text": 1,
+                "source_set_text": 1,
+                "text_scale_reads": 1
+              },
+              "output_geometry_signature_sha256": "1a9dae3e367dd48c338b95db70ecee600d6c4d7ef75aab41ead6870252cc13c2"
+            }
+          },
+          "cpu_gc_on_356_over_355": {
+            "round_values": [
+              0.508568211744,
+              0.863860325621,
+              0.457509383005
+            ],
+            "min": 0.457509383005,
+            "median": 0.508568211744,
+            "max": 0.863860325621
+          },
+          "cpu_gc_on_356_minus_355_us_per_op": {
+            "round_values": [
+              -34.3366666667,
+              -4.23666666667,
+              -45.5303333333
+            ],
+            "min": -45.5303333333,
+            "median": -34.3366666667,
+            "max": -4.23666666667
+          },
+          "cpu_gc_off_356_over_355": {
+            "round_values": [
+              0.5887159259,
+              0.830405621207,
+              0.541302797476
+            ],
+            "min": 0.541302797476,
+            "median": 0.5887159259,
+            "max": 0.830405621207
+          },
+          "transient_bytes_356_minus_355_per_op": {
+            "round_values": [
+              -896,
+              -896,
+              -896
+            ],
+            "min": -896,
+            "median": -896,
+            "max": -896
+          },
+          "native_call_delta_356_minus_355": {}
+        },
+        "buff_public_unchanged_full_native": {
+          "first_version_by_round": [
+            ".356",
+            ".355",
+            ".356"
+          ],
+          "output_and_geometry_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "native_calls_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "versions": {
+            ".355": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  46.951,
+                  51.9916666667,
+                  52.8196666667,
+                  42.7596666667,
+                  42.5693333333,
+                  40.0333333333,
+                  51.7533333333,
+                  52.4233333333,
+                  46.3623333333
+                ],
+                "min": 40.0333333333,
+                "median": 46.951,
+                "max": 52.8196666667
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  50.824,
+                  45.072,
+                  45.532,
+                  39.325,
+                  43.934,
+                  49.884,
+                  41.736,
+                  43.481,
+                  67.8
+                ],
+                "min": 39.325,
+                "median": 45.072,
+                "max": 67.8
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  2048.384,
+                  2048.384,
+                  2048.384,
+                  2048.384,
+                  2048.384,
+                  2048.384,
+                  2048.384,
+                  2048.384,
+                  2048.384
+                ],
+                "min": 2048.384,
+                "median": 2048.384,
+                "max": 2048.384
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "font_reads": 1,
+                "hook_callbacks": 3,
+                "native_source_writes": 1,
+                "parent_reads": 1,
+                "scale_reads": 2,
+                "set_alpha": 1,
+                "set_text": 1,
+                "source_font_writes": 1,
+                "source_geometry_writes": 1,
+                "source_set_text": 1,
+                "text_scale_reads": 1
+              },
+              "output_geometry_signature_sha256": "fd6ed8fa96bc45f4b7034461b0e4c6bda148954f106dca19fbac5deed36addea"
+            },
+            ".356": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  44.15,
+                  40.469,
+                  39.5813333333,
+                  40.818,
+                  56.2403333333,
+                  85.4583333333,
+                  38.8683333333,
+                  43.4906666667,
+                  50.514
+                ],
+                "min": 38.8683333333,
+                "median": 43.4906666667,
+                "max": 85.4583333333
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  37.526,
+                  42.592,
+                  39.91,
+                  58.489,
+                  59.677,
+                  58.016,
+                  45.191,
+                  50.622,
+                  63.019
+                ],
+                "min": 37.526,
+                "median": 50.622,
+                "max": 63.019
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  248.384,
+                  248.384,
+                  248.384,
+                  248.384,
+                  248.384,
+                  248.384,
+                  248.384,
+                  248.384,
+                  248.384
+                ],
+                "min": 248.384,
+                "median": 248.384,
+                "max": 248.384
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "font_reads": 1,
+                "hook_callbacks": 3,
+                "native_source_writes": 1,
+                "parent_reads": 1,
+                "scale_reads": 2,
+                "set_alpha": 1,
+                "set_text": 1,
+                "source_font_writes": 1,
+                "source_geometry_writes": 1,
+                "source_set_text": 1,
+                "text_scale_reads": 1
+              },
+              "output_geometry_signature_sha256": "fd6ed8fa96bc45f4b7034461b0e4c6bda148954f106dca19fbac5deed36addea"
+            }
+          },
+          "cpu_gc_on_356_over_355": {
+            "round_values": [
+              0.778374739542,
+              1.32114667836,
+              0.840345227361
+            ],
+            "min": 0.778374739542,
+            "median": 0.840345227361,
+            "max": 1.32114667836
+          },
+          "cpu_gc_on_356_minus_355_us_per_op": {
+            "round_values": [
+              -11.5226666667,
+              13.671,
+              -8.26266666666
+            ],
+            "min": -11.5226666667,
+            "median": -8.26266666666,
+            "max": 13.671
+          },
+          "cpu_gc_off_356_over_355": {
+            "round_values": [
+              0.876526399016,
+              1.33129239314,
+              1.16423265334
+            ],
+            "min": 0.876526399016,
+            "median": 1.16423265334,
+            "max": 1.33129239314
+          },
+          "transient_bytes_356_minus_355_per_op": {
+            "round_values": [
+              -1800,
+              -1800,
+              -1800
+            ],
+            "min": -1800,
+            "median": -1800,
+            "max": -1800
+          },
+          "native_call_delta_356_minus_355": {}
+        },
+        "buff_public_changed_full_native": {
+          "first_version_by_round": [
+            ".355",
+            ".356",
+            ".355"
+          ],
+          "output_and_geometry_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "native_calls_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "versions": {
+            ".355": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  48.213,
+                  56.8873333333,
+                  49.3666666667,
+                  57.2806666667,
+                  62.0736666667,
+                  45.6883333333,
+                  66.881,
+                  56.623,
+                  56.1866666667
+                ],
+                "min": 45.6883333333,
+                "median": 56.623,
+                "max": 66.881
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  50.249,
+                  48.478,
+                  46.384,
+                  45.03,
+                  49.461,
+                  67.381,
+                  44.564,
+                  48.78,
+                  48.962
+                ],
+                "min": 44.564,
+                "median": 48.78,
+                "max": 67.381
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  2048.448,
+                  2048.384,
+                  2048.384,
+                  2048.384,
+                  2048.384,
+                  2048.384,
+                  2048.448,
+                  2048.384,
+                  2048.384
+                ],
+                "min": 2048.384,
+                "median": 2048.384,
+                "max": 2048.448
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "cell_set_text": 3,
+                "font_reads": 1,
+                "hook_callbacks": 3,
+                "native_source_writes": 1,
+                "parent_reads": 1,
+                "scale_reads": 2,
+                "set_alpha": 1,
+                "set_text": 4,
+                "source_font_writes": 1,
+                "source_geometry_writes": 1,
+                "source_set_text": 1,
+                "text_scale_reads": 1
+              },
+              "output_geometry_signature_sha256": "fd6ed8fa96bc45f4b7034461b0e4c6bda148954f106dca19fbac5deed36addea"
+            },
+            ".356": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  44.859,
+                  44.2006666667,
+                  56.4956666667,
+                  102.344333333,
+                  63.096,
+                  52.0286666667,
+                  46.3873333333,
+                  44.8903333333,
+                  55.555
+                ],
+                "min": 44.2006666667,
+                "median": 52.0286666667,
+                "max": 102.344333333
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  43.133,
+                  40.635,
+                  53.34,
+                  55.228,
+                  83.613,
+                  77.958,
+                  39.053,
+                  49.417,
+                  47.372
+                ],
+                "min": 39.053,
+                "median": 49.417,
+                "max": 83.613
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  248.384,
+                  248.384,
+                  248.384,
+                  248.384,
+                  248.384,
+                  248.384,
+                  248.384,
+                  248.384,
+                  248.384
+                ],
+                "min": 248.384,
+                "median": 248.384,
+                "max": 248.384
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "cell_set_text": 3,
+                "font_reads": 1,
+                "hook_callbacks": 3,
+                "native_source_writes": 1,
+                "parent_reads": 1,
+                "scale_reads": 2,
+                "set_alpha": 1,
+                "set_text": 4,
+                "source_font_writes": 1,
+                "source_geometry_writes": 1,
+                "source_set_text": 1,
+                "text_scale_reads": 1
+              },
+              "output_geometry_signature_sha256": "fd6ed8fa96bc45f4b7034461b0e4c6bda148954f106dca19fbac5deed36addea"
+            }
+          },
+          "cpu_gc_on_356_over_355": {
+            "round_values": [
+              0.908690074274,
+              1.10152349251,
+              0.819231289994
+            ],
+            "min": 0.819231289994,
+            "median": 0.908690074274,
+            "max": 1.10152349251
+          },
+          "cpu_gc_on_356_minus_355_us_per_op": {
+            "round_values": [
+              -4.50766666667,
+              5.81533333333,
+              -10.2356666667
+            ],
+            "min": -10.2356666667,
+            "median": -4.50766666667,
+            "max": 5.81533333333
+          },
+          "cpu_gc_off_356_over_355": {
+            "round_values": [
+              0.889743801312,
+              1.57615090678,
+              0.971135711357
+            ],
+            "min": 0.889743801312,
+            "median": 0.971135711357,
+            "max": 1.57615090678
+          },
+          "transient_bytes_356_minus_355_per_op": {
+            "round_values": [
+              -1800,
+              -1800,
+              -1800
+            ],
+            "min": -1800,
+            "median": -1800,
+            "max": -1800
+          },
+          "native_call_delta_356_minus_355": {}
+        },
+        "buff_stock_readable_full_native": {
+          "first_version_by_round": [
+            ".356",
+            ".355",
+            ".356"
+          ],
+          "output_and_geometry_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "native_calls_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "versions": {
+            ".355": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  54.8363333333,
+                  56.8263333333,
+                  61.7743333333,
+                  56.4996666667,
+                  85.1616666667,
+                  58.845,
+                  52.533,
+                  52.479,
+                  56.118
+                ],
+                "min": 52.479,
+                "median": 56.4996666667,
+                "max": 85.1616666667
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  56.434,
+                  57.411,
+                  66.524,
+                  46.378,
+                  61.327,
+                  31.738,
+                  59.119,
+                  42.389,
+                  69.333
+                ],
+                "min": 31.738,
+                "median": 57.411,
+                "max": 69.333
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  2671.884,
+                  2671.884,
+                  2671.884,
+                  2671.884,
+                  2671.884,
+                  2671.884,
+                  2671.884,
+                  2671.884,
+                  2671.884
+                ],
+                "min": 2671.884,
+                "median": 2671.884,
+                "max": 2671.884
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "font_reads": 1,
+                "hook_callbacks": 3,
+                "native_source_writes": 1,
+                "parent_reads": 2,
+                "scale_reads": 2,
+                "set_alpha": 1,
+                "set_text": 1,
+                "source_font_writes": 1,
+                "source_geometry_writes": 1,
+                "source_set_text": 1,
+                "text_scale_reads": 1
+              },
+              "output_geometry_signature_sha256": "68effe383e02bdffc04c29c736303db5acf13c3d6a48549431fd0294fb680a20"
+            },
+            ".356": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  49.55,
+                  59.1013333333,
+                  65.091,
+                  59.9926666667,
+                  76.3546666667,
+                  51.4403333333,
+                  40.4616666667,
+                  38.5643333333,
+                  40.194
+                ],
+                "min": 38.5643333333,
+                "median": 51.4403333333,
+                "max": 76.3546666667
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  59.033,
+                  72.168,
+                  49.341,
+                  44.202,
+                  56.993,
+                  51.177,
+                  51.602,
+                  45.69,
+                  40.351
+                ],
+                "min": 40.351,
+                "median": 51.177,
+                "max": 72.168
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  359.884,
+                  359.884,
+                  359.884,
+                  359.884,
+                  359.884,
+                  359.884,
+                  359.884,
+                  359.884,
+                  359.884
+                ],
+                "min": 359.884,
+                "median": 359.884,
+                "max": 359.884
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "font_reads": 1,
+                "hook_callbacks": 3,
+                "native_source_writes": 1,
+                "parent_reads": 2,
+                "scale_reads": 2,
+                "set_alpha": 1,
+                "set_text": 1,
+                "source_font_writes": 1,
+                "source_geometry_writes": 1,
+                "source_set_text": 1,
+                "text_scale_reads": 1
+              },
+              "output_geometry_signature_sha256": "68effe383e02bdffc04c29c736303db5acf13c3d6a48549431fd0294fb680a20"
+            }
+          },
+          "cpu_gc_on_356_over_355": {
+            "round_values": [
+              1.04003425642,
+              1.01950321466,
+              0.765119068014
+            ],
+            "min": 0.765119068014,
+            "median": 1.01950321466,
+            "max": 1.04003425642
+          },
+          "cpu_gc_on_356_minus_355_us_per_op": {
+            "round_values": [
+              2.275,
+              1.14766666667,
+              -12.339
+            ],
+            "min": -12.339,
+            "median": 1.14766666667,
+            "max": 2.275
+          },
+          "cpu_gc_off_356_over_355": {
+            "round_values": [
+              1.02825242549,
+              1.10347578593,
+              0.772847984574
+            ],
+            "min": 0.772847984574,
+            "median": 1.02825242549,
+            "max": 1.10347578593
+          },
+          "transient_bytes_356_minus_355_per_op": {
+            "round_values": [
+              -2312,
+              -2312,
+              -2312
+            ],
+            "min": -2312,
+            "median": -2312,
+            "max": -2312
+          },
+          "native_call_delta_356_minus_355": {}
+        },
+        "buff_opaque_full_native": {
+          "first_version_by_round": [
+            ".355",
+            ".356",
+            ".355"
+          ],
+          "output_and_geometry_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "native_calls_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "versions": {
+            ".355": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  88.977,
+                  59.0506666667,
+                  60.773,
+                  70.0436666667,
+                  83.604,
+                  82.0946666667,
+                  70.316,
+                  59.266,
+                  65.018
+                ],
+                "min": 59.0506666667,
+                "median": 70.0436666667,
+                "max": 88.977
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  83.292,
+                  56.957,
+                  58.948,
+                  76.037,
+                  67.153,
+                  79.461,
+                  52.36,
+                  58.077,
+                  56.358
+                ],
+                "min": 52.36,
+                "median": 58.948,
+                "max": 83.292
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  2816.576,
+                  2816.576,
+                  2816.576,
+                  2816.576,
+                  2816.576,
+                  2816.576,
+                  2816.576,
+                  2816.576,
+                  2816.576
+                ],
+                "min": 2816.576,
+                "median": 2816.576,
+                "max": 2816.576
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "aura_native_format_calls": 1,
+                "font_reads": 2,
+                "hook_callbacks": 3,
+                "native_source_writes": 1,
+                "parent_reads": 3,
+                "scale_reads": 3,
+                "set_alpha": 1,
+                "set_text": 1,
+                "source_font_writes": 1,
+                "source_geometry_writes": 1,
+                "source_set_text": 1,
+                "text_scale_reads": 2
+              },
+              "output_geometry_signature_sha256": "1a9dae3e367dd48c338b95db70ecee600d6c4d7ef75aab41ead6870252cc13c2"
+            },
+            ".356": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  64.0346666667,
+                  61.7606666667,
+                  83.1223333333,
+                  60.714,
+                  59.5456666667,
+                  84.3706666667,
+                  40.9273333333,
+                  43.0786666667,
+                  53.7333333333
+                ],
+                "min": 40.9273333333,
+                "median": 60.714,
+                "max": 84.3706666667
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  52.217,
+                  70.298,
+                  84.906,
+                  59.827,
+                  82.61,
+                  64.257,
+                  44.618,
+                  45.784,
+                  52.375
+                ],
+                "min": 44.618,
+                "median": 59.827,
+                "max": 84.906
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  248.576,
+                  248.576,
+                  248.576,
+                  248.576,
+                  248.576,
+                  248.576,
+                  248.576,
+                  248.576,
+                  248.576
+                ],
+                "min": 248.576,
+                "median": 248.576,
+                "max": 248.576
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "aura_native_format_calls": 1,
+                "font_reads": 2,
+                "hook_callbacks": 3,
+                "native_source_writes": 1,
+                "parent_reads": 3,
+                "scale_reads": 3,
+                "set_alpha": 1,
+                "set_text": 1,
+                "source_font_writes": 1,
+                "source_geometry_writes": 1,
+                "source_set_text": 1,
+                "text_scale_reads": 2
+              },
+              "output_geometry_signature_sha256": "1a9dae3e367dd48c338b95db70ecee600d6c4d7ef75aab41ead6870252cc13c2"
+            }
+          },
+          "cpu_gc_on_356_over_355": {
+            "round_values": [
+              1.0536696669,
+              0.73956083221,
+              0.662565238344
+            ],
+            "min": 0.662565238344,
+            "median": 0.73956083221,
+            "max": 1.0536696669
+          },
+          "cpu_gc_on_356_minus_355_us_per_op": {
+            "round_values": [
+              3.26166666667,
+              -21.3806666667,
+              -21.9393333333
+            ],
+            "min": -21.9393333333,
+            "median": -21.3806666667,
+            "max": 3.26166666667
+          },
+          "cpu_gc_off_356_over_355": {
+            "round_values": [
+              1.1925425799,
+              0.845075423807,
+              0.812378011995
+            ],
+            "min": 0.812378011995,
+            "median": 0.845075423807,
+            "max": 1.1925425799
+          },
+          "transient_bytes_356_minus_355_per_op": {
+            "round_values": [
+              -2568,
+              -2568,
+              -2568
+            ],
+            "min": -2568,
+            "median": -2568,
+            "max": -2568
+          },
+          "native_call_delta_356_minus_355": {}
+        },
+        "buff_same_profile_safe_setup": {
+          "first_version_by_round": [
+            ".356",
+            ".355",
+            ".356"
+          ],
+          "output_and_geometry_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "native_calls_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "versions": {
+            ".355": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  156.259333333,
+                  164.187333333,
+                  153.423333333,
+                  235.062666667,
+                  210.359666667,
+                  315.060666667,
+                  148.061,
+                  125.767,
+                  199.974
+                ],
+                "min": 125.767,
+                "median": 164.187333333,
+                "max": 315.060666667
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  227.102,
+                  182.22,
+                  146.134,
+                  160.123,
+                  260.845,
+                  186.43,
+                  161.189,
+                  165.439,
+                  258.546
+                ],
+                "min": 146.134,
+                "median": 182.22,
+                "max": 260.845
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  2496.576,
+                  2496.576,
+                  2496.576,
+                  2496.576,
+                  2496.576,
+                  2496.576,
+                  2496.576,
+                  2496.576,
+                  2496.576
+                ],
+                "min": 2496.576,
+                "median": 2496.576,
+                "max": 2496.576
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "font_reads": 2,
+                "parent_reads": 3,
+                "scale_reads": 2,
+                "scheduled_callbacks": 1,
+                "text_scale_reads": 2
+              },
+              "output_geometry_signature_sha256": "ffde8b280d3764a63df03ccc0b24cda377e85feec2e5cb1d32f54ab6b6bb0b84"
+            },
+            ".356": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  151.755333333,
+                  209.254666667,
+                  156.484333333,
+                  188.274666667,
+                  167.519,
+                  756.366333333,
+                  148.001,
+                  142.133,
+                  191.276666667
+                ],
+                "min": 142.133,
+                "median": 167.519,
+                "max": 756.366333333
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  148.377,
+                  157.721,
+                  157.565,
+                  217.765,
+                  235.8,
+                  620.812,
+                  125.802,
+                  142.698,
+                  163.547
+                ],
+                "min": 125.802,
+                "median": 157.721,
+                "max": 620.812
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  424.576,
+                  424.576,
+                  424.576,
+                  424.576,
+                  424.576,
+                  424.576,
+                  424.576,
+                  424.576,
+                  424.576
+                ],
+                "min": 424.576,
+                "median": 424.576,
+                "max": 424.576
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "font_reads": 2,
+                "parent_reads": 3,
+                "scale_reads": 2,
+                "scheduled_callbacks": 1,
+                "text_scale_reads": 2
+              },
+              "output_geometry_signature_sha256": "ffde8b280d3764a63df03ccc0b24cda377e85feec2e5cb1d32f54ab6b6bb0b84"
+            }
+          },
+          "cpu_gc_on_356_over_355": {
+            "round_values": [
+              1.00143991399,
+              0.800955206271,
+              0.999594761619
+            ],
+            "min": 0.800955206271,
+            "median": 0.999594761619,
+            "max": 1.00143991399
+          },
+          "cpu_gc_on_356_minus_355_us_per_op": {
+            "round_values": [
+              0.225,
+              -46.788,
+              -0.0599999999954
+            ],
+            "min": -46.788,
+            "median": -0.0599999999954,
+            "max": 0.225
+          },
+          "cpu_gc_off_356_over_355": {
+            "round_values": [
+              0.864696520689,
+              1.26481789412,
+              0.862541480546
+            ],
+            "min": 0.862541480546,
+            "median": 0.864696520689,
+            "max": 1.26481789412
+          },
+          "transient_bytes_356_minus_355_per_op": {
+            "round_values": [
+              -2072,
+              -2072,
+              -2072
+            ],
+            "min": -2072,
+            "median": -2072,
+            "max": -2072
+          },
+          "native_call_delta_356_minus_355": {}
+        },
+        "action_rebind": {
+          "first_version_by_round": [
+            ".355",
+            ".356",
+            ".355"
+          ],
+          "output_and_geometry_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "native_calls_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "versions": {
+            ".355": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  14.3513333333,
+                  20.924,
+                  25.089,
+                  67.9113333333,
+                  83.713,
+                  30.6543333333,
+                  18.9196666667,
+                  19.8773333333,
+                  16.9716666667
+                ],
+                "min": 14.3513333333,
+                "median": 20.924,
+                "max": 83.713
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  18.498,
+                  21.051,
+                  18.961,
+                  93.083,
+                  22.861,
+                  21.513,
+                  19.795,
+                  18.235,
+                  13.807
+                ],
+                "min": 13.807,
+                "median": 19.795,
+                "max": 93.083
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  1408.448,
+                  1408.448,
+                  1408.448,
+                  1408.448,
+                  1408.448,
+                  1408.448,
+                  1408.448,
+                  1408.448,
+                  1408.448
+                ],
+                "min": 1408.448,
+                "median": 1408.448,
+                "max": 1408.448
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "action_duration_requests": 1,
+                "binding_set_duration": 6,
+                "hook_callbacks": 1,
+                "native_set_cooldown": 1
+              },
+              "output_geometry_signature_sha256": "86573024b51a0977a551fb3a2704b4ef8468db2a85945707329c1644dc3e8f3f"
+            },
+            ".356": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  13.6716666667,
+                  13.5996666667,
+                  16.6013333333,
+                  47.063,
+                  18.9623333333,
+                  54.956,
+                  17.2306666667,
+                  16.076,
+                  25.7776666667
+                ],
+                "min": 13.5996666667,
+                "median": 17.2306666667,
+                "max": 54.956
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  13.538,
+                  13.123,
+                  14.033,
+                  16.229,
+                  47.579,
+                  76.466,
+                  16.575,
+                  30.432,
+                  15.774
+                ],
+                "min": 13.123,
+                "median": 16.229,
+                "max": 76.466
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  0.448,
+                  0.448,
+                  0.448,
+                  0.448,
+                  0.448,
+                  0.448,
+                  0.448,
+                  0.448,
+                  0.448
+                ],
+                "min": 0.448,
+                "median": 0.448,
+                "max": 0.448
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "action_duration_requests": 1,
+                "binding_set_duration": 6,
+                "hook_callbacks": 1,
+                "native_set_cooldown": 1
+              },
+              "output_geometry_signature_sha256": "86573024b51a0977a551fb3a2704b4ef8468db2a85945707329c1644dc3e8f3f"
+            }
+          },
+          "cpu_gc_on_356_over_355": {
+            "round_values": [
+              0.653396418785,
+              0.693006567387,
+              0.910727814091
+            ],
+            "min": 0.653396418785,
+            "median": 0.693006567387,
+            "max": 0.910727814091
+          },
+          "cpu_gc_on_356_minus_355_us_per_op": {
+            "round_values": [
+              -7.25233333333,
+              -20.8483333333,
+              -1.689
+            ],
+            "min": -20.8483333333,
+            "median": -7.25233333333,
+            "max": -1.689
+          },
+          "cpu_gc_off_356_over_355": {
+            "round_values": [
+              0.713991878065,
+              2.08123004243,
+              0.90896627365
+            ],
+            "min": 0.713991878065,
+            "median": 0.90896627365,
+            "max": 2.08123004243
+          },
+          "transient_bytes_356_minus_355_per_op": {
+            "round_values": [
+              -1408,
+              -1408,
+              -1408
+            ],
+            "min": -1408,
+            "median": -1408,
+            "max": -1408
+          },
+          "native_call_delta_356_minus_355": {}
+        },
+        "action_idle_setcooldown": {
+          "first_version_by_round": [
+            ".356",
+            ".355",
+            ".356"
+          ],
+          "output_and_geometry_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "native_calls_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "versions": {
+            ".355": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  6.396,
+                  11.7846666667,
+                  11.9303333333,
+                  23.8146666667,
+                  24.2116666667,
+                  24.4283333333,
+                  12.1426666667,
+                  9.91266666666,
+                  12.1576666667
+                ],
+                "min": 6.396,
+                "median": 12.1426666667,
+                "max": 24.4283333333
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  6.238,
+                  9.279,
+                  13.16,
+                  9.503,
+                  14.25,
+                  14.753,
+                  8.476,
+                  7.289,
+                  14.373
+                ],
+                "min": 6.238,
+                "median": 9.503,
+                "max": 14.753
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  640.448,
+                  640.448,
+                  640.448,
+                  640.448,
+                  640.448,
+                  640.448,
+                  640.448,
+                  640.448,
+                  640.448
+                ],
+                "min": 640.448,
+                "median": 640.448,
+                "max": 640.448
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "action_duration_requests": 1,
+                "hook_callbacks": 1,
+                "native_set_cooldown": 1
+              },
+              "output_geometry_signature_sha256": "a04ab26b02e46bf16cfc1f6036f5fbe1d82d5058ab0123773486acc0544dd007"
+            },
+            ".356": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  9.34633333333,
+                  7.278,
+                  14.617,
+                  55.6126666667,
+                  18.8676666667,
+                  28.991,
+                  8.267,
+                  7.05866666667,
+                  7.276
+                ],
+                "min": 7.05866666667,
+                "median": 9.34633333333,
+                "max": 55.6126666667
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  8.451,
+                  11.838,
+                  7.498,
+                  20.362,
+                  15.016,
+                  28,
+                  6.60500000001,
+                  8.23799999999,
+                  6.872
+                ],
+                "min": 6.60500000001,
+                "median": 8.451,
+                "max": 28
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  0.448,
+                  0.448,
+                  0.448,
+                  0.448,
+                  0.448,
+                  0.448,
+                  0.448,
+                  0.448,
+                  0.448
+                ],
+                "min": 0.448,
+                "median": 0.448,
+                "max": 0.448
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "action_duration_requests": 1,
+                "hook_callbacks": 1,
+                "native_set_cooldown": 1
+              },
+              "output_geometry_signature_sha256": "a04ab26b02e46bf16cfc1f6036f5fbe1d82d5058ab0123773486acc0544dd007"
+            }
+          },
+          "cpu_gc_on_356_over_355": {
+            "round_values": [
+              0.793092719353,
+              1.19739794865,
+              0.599209399363
+            ],
+            "min": 0.599209399363,
+            "median": 0.793092719353,
+            "max": 1.19739794865
+          },
+          "cpu_gc_on_356_minus_355_us_per_op": {
+            "round_values": [
+              -2.43833333333,
+              4.77933333333,
+              -4.86666666667
+            ],
+            "min": -4.86666666667,
+            "median": -2.43833333333,
+            "max": 4.77933333333
+          },
+          "cpu_gc_off_356_over_355": {
+            "round_values": [
+              0.910766246363,
+              1.4289122807,
+              0.810759792355
+            ],
+            "min": 0.810759792355,
+            "median": 0.910766246363,
+            "max": 1.4289122807
+          },
+          "transient_bytes_356_minus_355_per_op": {
+            "round_values": [
+              -640,
+              -640,
+              -640
+            ],
+            "min": -640,
+            "median": -640,
+            "max": -640
+          },
+          "native_call_delta_356_minus_355": {}
+        },
+        "action_same_profile_safe_scan": {
+          "first_version_by_round": [
+            ".355",
+            ".356",
+            ".355"
+          ],
+          "output_and_geometry_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "native_calls_match_per_round": [
+            true,
+            true,
+            true
+          ],
+          "versions": {
+            ".355": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  382.180666667,
+                  385.444333333,
+                  313.787666667,
+                  354.536333333,
+                  377.922,
+                  382.058,
+                  501.597,
+                  1989.045,
+                  894.587
+                ],
+                "min": 313.787666667,
+                "median": 382.180666667,
+                "max": 1989.045
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  360.826,
+                  324.28,
+                  322.59,
+                  417.714,
+                  392.833,
+                  304.653,
+                  4092.07,
+                  1347.58,
+                  1136.806
+                ],
+                "min": 304.653,
+                "median": 392.833,
+                "max": 4092.07
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  6408.4,
+                  6408.4,
+                  6408.4,
+                  6408.4,
+                  6408.4,
+                  6408.4,
+                  6408.4,
+                  6408.4,
+                  6408.4
+                ],
+                "min": 6408.4,
+                "median": 6408.4,
+                "max": 6408.4
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "font_reads": 4,
+                "permission_queries": 38,
+                "scale_reads": 6,
+                "scheduled_callbacks": 1,
+                "text_scale_reads": 4
+              },
+              "output_geometry_signature_sha256": "86573024b51a0977a551fb3a2704b4ef8468db2a85945707329c1644dc3e8f3f"
+            },
+            ".356": {
+              "cpu_gc_on_us_per_op": {
+                "samples_in_round_order": [
+                  328.191666667,
+                  373.263,
+                  406.664333333,
+                  434.358333333,
+                  529.686666667,
+                  425.761666667,
+                  1063.26766667,
+                  665.315333333,
+                  763.705
+                ],
+                "min": 328.191666667,
+                "median": 434.358333333,
+                "max": 1063.26766667
+              },
+              "cpu_gc_stopped_us_per_op": {
+                "samples_in_round_order": [
+                  283.103,
+                  396.398,
+                  343.907,
+                  385.533,
+                  408.395,
+                  424.806,
+                  1026.742,
+                  722.731,
+                  1938.421
+                ],
+                "min": 283.103,
+                "median": 408.395,
+                "max": 1938.421
+              },
+              "gc_stopped_transient_bytes_per_op": {
+                "samples_in_round_order": [
+                  3848.4,
+                  3848.4,
+                  3848.4,
+                  3848.4,
+                  3848.4,
+                  3848.4,
+                  3848.4,
+                  3848.4,
+                  3848.4
+                ],
+                "min": 3848.4,
+                "median": 3848.4,
+                "max": 3848.4
+              },
+              "retained_delta_bytes_after_batch1_by_round": [
+                0,
+                0,
+                0
+              ],
+              "retained_delta_bytes_after_batch2_by_round": [
+                0,
+                0,
+                0
+              ],
+              "native_calls_per_op": {
+                "font_reads": 4,
+                "permission_queries": 38,
+                "scale_reads": 6,
+                "scheduled_callbacks": 1,
+                "text_scale_reads": 4
+              },
+              "output_geometry_signature_sha256": "86573024b51a0977a551fb3a2704b4ef8468db2a85945707329c1644dc3e8f3f"
+            }
+          },
+          "cpu_gc_on_356_over_355": {
+            "round_values": [
+              0.976666358494,
+              1.14933328394,
+              0.853695615966
+            ],
+            "min": 0.853695615966,
+            "median": 0.976666358494,
+            "max": 1.14933328394
+          },
+          "cpu_gc_on_356_minus_355_us_per_op": {
+            "round_values": [
+              -8.91766666667,
+              56.4363333333,
+              -130.882
+            ],
+            "min": -130.882,
+            "median": -8.91766666667,
+            "max": 56.4363333333
+          },
+          "cpu_gc_off_356_over_355": {
+            "round_values": [
+              1.06052485506,
+              1.03961479815,
+              0.761915433592
+            ],
+            "min": 0.761915433592,
+            "median": 1.03961479815,
+            "max": 1.06052485506
+          },
+          "transient_bytes_356_minus_355_per_op": {
+            "round_values": [
+              -2560,
+              -2560,
+              -2560
+            ],
+            "min": -2560,
+            "median": -2560,
+            "max": -2560
+          },
+          "native_call_delta_356_minus_355": {}
+        }
+      }
+    }
+  ],
+  "measured_sources": {
+    ".355": {
+      "runtime_module_count": 16,
+      "package_input_count": 19,
+      "sha256_by_package_path": {
+        "NativePrecision.lua": "affdf19621f67853b2578c33b2171062e5117b370b8374a9b36fe612445d8c1d",
+        "bjarkiUI.lua": "0857b6a914d3bb09659961d7759be1086d9c9d6b1d5880a011aa6bf4ccbc5f3c",
+        "PartyOrder.lua": "cf26d91ce5f1c06221945ab31eb97f5350d0d4560d699a996a53cffea01aba9c",
+        "PartyPresentation.lua": "9c9f9a049ce373ef7b4b24e81fc25e5d2ac51dd7f2878eeff62972018d7c6ccf",
+        "SoftDark.lua": "ded406950119d42a694fbbe8e81e1fa8daa8156c457d3f089436c52732958b2d",
+        "ClassicPartyPresentation.lua": "f11a52dc27b03ede61f03b4e47907670bc01b83251aa4ce7ba12f2b13a70e8e1",
+        "TrackedBuffSeconds.lua": "6a3e09147efcd18b49ef20bec562448cf07030384b55d1aed7618478651cf722",
+        "ActionTimerSpacing.lua": "093a73f15f7b1c98a57545c45fddc7aeba5ffcd300ca020ff98aa34355271bae",
+        "CooldownSeconds.lua": "5f8c510df486636a1f3dc009393710040cb20e7057583e9bde4b2c8a90e178f1",
+        "NativeDigitCells.lua": "f5b95d616750c8982f1ffcd898e790b226a1f655996482f852e596f2b9b1255c",
+        "CastBarDigits.lua": "0a112e9ae401869357ff1dcd1393585abbb57e6a2f41676cd9bd1ea59a4363cd",
+        "IconSkin.lua": "384245991992245b8fc2472c2d5e06f8814487fa62ddb201e063d683696df87c",
+        "UnitAuraStyling.lua": "105aaba10693a216e78872ec9f9f918e9840fa73c3d8f95ecf9bda9c27f2bd76",
+        "BuffPresentation.lua": "069c5142c89817f8d94b7bbd85cc46bb73ebd6550d22b249bb5671bd782375e0",
+        "FrameLabelTweaks.lua": "f930494c41565259397cc9346e40ec967743c0ee6020164870d5cee0f1393b83",
+        "RestIndicatorPlacement.lua": "a862f772fad5b074dc3936a706a58c40a8683e8d56755c1899da1da8f5b4b7eb",
+        "bjarkiUI.toc": "681a6f21472d6980534f5e55f81bd3bf127434e7454ba472534e5ddfd294e4fd",
+        "bjarkiUI_Camelot.toc": "681a6f21472d6980534f5e55f81bd3bf127434e7454ba472534e5ddfd294e4fd",
+        "Media/TimerSpacer.tga": "6254f2d8ab2d5c655fd9144e9b81b9d53cf90e6af95b1b89d02072e02eb82817"
+      },
+      "package_manifest_sha256": "23201e578cca405f78332b0f1bd5188e889d0dad939b3b39246d4e9cc0bcd1eb",
+      "baseline_commit": "7d416dcdf296e2029c83bbf872fb2211cbbabf28"
+    },
+    ".356": {
+      "runtime_module_count": 16,
+      "package_input_count": 19,
+      "sha256_by_package_path": {
+        "NativePrecision.lua": "affdf19621f67853b2578c33b2171062e5117b370b8374a9b36fe612445d8c1d",
+        "bjarkiUI.lua": "0d27cb3703917a3abfdc2160a0d6cde97bb7185dc775d67c858ab8c2b01e948e",
+        "PartyOrder.lua": "cf26d91ce5f1c06221945ab31eb97f5350d0d4560d699a996a53cffea01aba9c",
+        "PartyPresentation.lua": "9c9f9a049ce373ef7b4b24e81fc25e5d2ac51dd7f2878eeff62972018d7c6ccf",
+        "SoftDark.lua": "ded406950119d42a694fbbe8e81e1fa8daa8156c457d3f089436c52732958b2d",
+        "ClassicPartyPresentation.lua": "f11a52dc27b03ede61f03b4e47907670bc01b83251aa4ce7ba12f2b13a70e8e1",
+        "TrackedBuffSeconds.lua": "6a3e09147efcd18b49ef20bec562448cf07030384b55d1aed7618478651cf722",
+        "ActionTimerSpacing.lua": "093a73f15f7b1c98a57545c45fddc7aeba5ffcd300ca020ff98aa34355271bae",
+        "CooldownSeconds.lua": "5f8c510df486636a1f3dc009393710040cb20e7057583e9bde4b2c8a90e178f1",
+        "NativeDigitCells.lua": "1bd96672ec43eba0918bac1040d418af6f2760b766faeba686219cf4fc40043a",
+        "CastBarDigits.lua": "0a112e9ae401869357ff1dcd1393585abbb57e6a2f41676cd9bd1ea59a4363cd",
+        "IconSkin.lua": "384245991992245b8fc2472c2d5e06f8814487fa62ddb201e063d683696df87c",
+        "UnitAuraStyling.lua": "105aaba10693a216e78872ec9f9f918e9840fa73c3d8f95ecf9bda9c27f2bd76",
+        "BuffPresentation.lua": "2582ca46f2a007e6ca3842d70dc2b7c601d6ec2d50b4dd721a169e05f946071d",
+        "FrameLabelTweaks.lua": "f930494c41565259397cc9346e40ec967743c0ee6020164870d5cee0f1393b83",
+        "RestIndicatorPlacement.lua": "a862f772fad5b074dc3936a706a58c40a8683e8d56755c1899da1da8f5b4b7eb",
+        "bjarkiUI.toc": "80bcd7eee2f3099c7ca71d73b6618f3e0b1e985e79495ce577ccef7e9fa90632",
+        "bjarkiUI_Camelot.toc": "80bcd7eee2f3099c7ca71d73b6618f3e0b1e985e79495ce577ccef7e9fa90632",
+        "Media/TimerSpacer.tga": "6254f2d8ab2d5c655fd9144e9b81b9d53cf90e6af95b1b89d02072e02eb82817"
+      },
+      "package_manifest_sha256": "58ce1d231359c3862ab4c33b0f9d21c045a776a63f1d1dae473e2f4ac121ea38"
+    }
+  },
+  "final_package_sources": {
+    ".355": {
+      "runtime_module_count": 16,
+      "package_input_count": 19,
+      "sha256_by_package_path": {
+        "NativePrecision.lua": "affdf19621f67853b2578c33b2171062e5117b370b8374a9b36fe612445d8c1d",
+        "bjarkiUI.lua": "0857b6a914d3bb09659961d7759be1086d9c9d6b1d5880a011aa6bf4ccbc5f3c",
+        "PartyOrder.lua": "cf26d91ce5f1c06221945ab31eb97f5350d0d4560d699a996a53cffea01aba9c",
+        "PartyPresentation.lua": "9c9f9a049ce373ef7b4b24e81fc25e5d2ac51dd7f2878eeff62972018d7c6ccf",
+        "SoftDark.lua": "ded406950119d42a694fbbe8e81e1fa8daa8156c457d3f089436c52732958b2d",
+        "ClassicPartyPresentation.lua": "f11a52dc27b03ede61f03b4e47907670bc01b83251aa4ce7ba12f2b13a70e8e1",
+        "TrackedBuffSeconds.lua": "6a3e09147efcd18b49ef20bec562448cf07030384b55d1aed7618478651cf722",
+        "ActionTimerSpacing.lua": "093a73f15f7b1c98a57545c45fddc7aeba5ffcd300ca020ff98aa34355271bae",
+        "CooldownSeconds.lua": "5f8c510df486636a1f3dc009393710040cb20e7057583e9bde4b2c8a90e178f1",
+        "NativeDigitCells.lua": "f5b95d616750c8982f1ffcd898e790b226a1f655996482f852e596f2b9b1255c",
+        "CastBarDigits.lua": "0a112e9ae401869357ff1dcd1393585abbb57e6a2f41676cd9bd1ea59a4363cd",
+        "IconSkin.lua": "384245991992245b8fc2472c2d5e06f8814487fa62ddb201e063d683696df87c",
+        "UnitAuraStyling.lua": "105aaba10693a216e78872ec9f9f918e9840fa73c3d8f95ecf9bda9c27f2bd76",
+        "BuffPresentation.lua": "069c5142c89817f8d94b7bbd85cc46bb73ebd6550d22b249bb5671bd782375e0",
+        "FrameLabelTweaks.lua": "f930494c41565259397cc9346e40ec967743c0ee6020164870d5cee0f1393b83",
+        "RestIndicatorPlacement.lua": "a862f772fad5b074dc3936a706a58c40a8683e8d56755c1899da1da8f5b4b7eb",
+        "bjarkiUI.toc": "681a6f21472d6980534f5e55f81bd3bf127434e7454ba472534e5ddfd294e4fd",
+        "bjarkiUI_Camelot.toc": "681a6f21472d6980534f5e55f81bd3bf127434e7454ba472534e5ddfd294e4fd",
+        "Media/TimerSpacer.tga": "6254f2d8ab2d5c655fd9144e9b81b9d53cf90e6af95b1b89d02072e02eb82817"
+      },
+      "package_manifest_sha256": "23201e578cca405f78332b0f1bd5188e889d0dad939b3b39246d4e9cc0bcd1eb",
+      "baseline_commit": "7d416dcdf296e2029c83bbf872fb2211cbbabf28"
+    },
+    ".356": {
+      "runtime_module_count": 16,
+      "package_input_count": 19,
+      "sha256_by_package_path": {
+        "NativePrecision.lua": "affdf19621f67853b2578c33b2171062e5117b370b8374a9b36fe612445d8c1d",
+        "bjarkiUI.lua": "b0b0034f54a371cc7ae60056a4dd9cc658a18663c86e9f3c2593dd8f1b611375",
+        "PartyOrder.lua": "cf26d91ce5f1c06221945ab31eb97f5350d0d4560d699a996a53cffea01aba9c",
+        "PartyPresentation.lua": "9c9f9a049ce373ef7b4b24e81fc25e5d2ac51dd7f2878eeff62972018d7c6ccf",
+        "SoftDark.lua": "ded406950119d42a694fbbe8e81e1fa8daa8156c457d3f089436c52732958b2d",
+        "ClassicPartyPresentation.lua": "f11a52dc27b03ede61f03b4e47907670bc01b83251aa4ce7ba12f2b13a70e8e1",
+        "TrackedBuffSeconds.lua": "6a3e09147efcd18b49ef20bec562448cf07030384b55d1aed7618478651cf722",
+        "ActionTimerSpacing.lua": "093a73f15f7b1c98a57545c45fddc7aeba5ffcd300ca020ff98aa34355271bae",
+        "CooldownSeconds.lua": "5f8c510df486636a1f3dc009393710040cb20e7057583e9bde4b2c8a90e178f1",
+        "NativeDigitCells.lua": "1bd96672ec43eba0918bac1040d418af6f2760b766faeba686219cf4fc40043a",
+        "CastBarDigits.lua": "0a112e9ae401869357ff1dcd1393585abbb57e6a2f41676cd9bd1ea59a4363cd",
+        "IconSkin.lua": "384245991992245b8fc2472c2d5e06f8814487fa62ddb201e063d683696df87c",
+        "UnitAuraStyling.lua": "105aaba10693a216e78872ec9f9f918e9840fa73c3d8f95ecf9bda9c27f2bd76",
+        "BuffPresentation.lua": "2582ca46f2a007e6ca3842d70dc2b7c601d6ec2d50b4dd721a169e05f946071d",
+        "FrameLabelTweaks.lua": "f930494c41565259397cc9346e40ec967743c0ee6020164870d5cee0f1393b83",
+        "RestIndicatorPlacement.lua": "a862f772fad5b074dc3936a706a58c40a8683e8d56755c1899da1da8f5b4b7eb",
+        "bjarkiUI.toc": "80bcd7eee2f3099c7ca71d73b6618f3e0b1e985e79495ce577ccef7e9fa90632",
+        "bjarkiUI_Camelot.toc": "80bcd7eee2f3099c7ca71d73b6618f3e0b1e985e79495ce577ccef7e9fa90632",
+        "Media/TimerSpacer.tga": "6254f2d8ab2d5c655fd9144e9b81b9d53cf90e6af95b1b89d02072e02eb82817"
+      },
+      "package_manifest_sha256": "23e25f387d6c93347472b4b4c2897a7deda5956f29003703ed1d69f007e507ad"
+    }
+  },
+  "post_measurement_main_guard": {
+    "timer_measurements_rerun": false,
+    "explanation": "Final main-only native color revision receipt guard was added after timer measurements. Measured full-package hashes remain distinct. All actually loaded timer source bytes are identical to final; final health counters were replayed separately.",
+    "changed_package_paths_since_measurement": [
+      "bjarkiUI.lua"
+    ],
+    "timer_loaded_inputs": {
+      "NativePrecision.lua": {
+        "measured_sha256": "affdf19621f67853b2578c33b2171062e5117b370b8374a9b36fe612445d8c1d",
+        "final_sha256": "affdf19621f67853b2578c33b2171062e5117b370b8374a9b36fe612445d8c1d"
+      },
+      "ActionTimerSpacing.lua": {
+        "measured_sha256": "093a73f15f7b1c98a57545c45fddc7aeba5ffcd300ca020ff98aa34355271bae",
+        "final_sha256": "093a73f15f7b1c98a57545c45fddc7aeba5ffcd300ca020ff98aa34355271bae"
+      },
+      "CooldownSeconds.lua": {
+        "measured_sha256": "5f8c510df486636a1f3dc009393710040cb20e7057583e9bde4b2c8a90e178f1",
+        "final_sha256": "5f8c510df486636a1f3dc009393710040cb20e7057583e9bde4b2c8a90e178f1"
+      },
+      "NativeDigitCells.lua": {
+        "measured_sha256": "1bd96672ec43eba0918bac1040d418af6f2760b766faeba686219cf4fc40043a",
+        "final_sha256": "1bd96672ec43eba0918bac1040d418af6f2760b766faeba686219cf4fc40043a"
+      },
+      "BuffPresentation.lua": {
+        "measured_sha256": "2582ca46f2a007e6ca3842d70dc2b7c601d6ec2d50b4dd721a169e05f946071d",
+        "final_sha256": "2582ca46f2a007e6ca3842d70dc2b7c601d6ec2d50b4dd721a169e05f946071d"
+      },
+      "tests/support/lua51.lua": {
+        "measured_sha256": "88db89675a305f6bf32a6c206adc4bec84317472e4aaab22274e8409949fe203",
+        "final_sha256": "88db89675a305f6bf32a6c206adc4bec84317472e4aaab22274e8409949fe203"
+      }
+    },
+    "original_portable_evidence_sha256": "c2fe033294e7044b084a165be9f44be86d51a7c53d32d0633e38a6992ce39afa",
+    "final_health_provenance_sha256": "a4fbee803c3fe7797d2959bc2f3051fe2b721b1db11cc082edbb3bbb6957bbb7",
+    "final_health_fixture_rows_per_version_interpreter": 64,
+    "all_final_health_rgba_outputs_match_baseline": true,
+    "final_health_counts_match_pre_guard": true
+  },
+  "pre_guard_health_counter_deltas": {
+    "file": "health-counter-deltas-0.2.356.tsv",
+    "sha256": "c736bbc6c300fbc32dc0436328301dde7ab745f212e9d678d0c37852daab85ac",
+    "all_fixture_rgba_outputs_match": true,
+    "only_changed_counter_metrics_listed": true
+  },
+  "final_health_counter_deltas": {
+    "file": "health-counter-deltas-0.2.356-final.tsv",
+    "sha256": "0a1c133f8c4fbe2fd1ce4d226210428270aab0e7bb3dba5851b66d042e62e05d",
+    "all_fixture_rgba_outputs_match": true,
+    "only_changed_counter_metrics_listed": true
+  }
+}
