@@ -2,6 +2,15 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.358-timer-gate-prewarm-test — prepare idle action gates before combat
+
+- The .357 live capture reports 12 minimum-duration fallbacks, with named `gate-unsupported/combat-cold` samples. Source reproduction finds that a safe retry cleared a failed gate, then an unchanged, already-active zero-clock presenter skipped preparing it again before combat.
+- Prepare the current positive-minimum/color gate during existing safe prepared-action scans before the active fast return. Also prepare it when the native minimum changes out of combat, including an idle zero-to-positive change. Updated native source colors are prepared after successful style resynchronization.
+- Retain the existing synthetic calibration, exact native clocks, minimum/GCD policy, cache limits and failure caching between safe epochs. The first restricted combat update reuses already-created resources.
+- Give refused public-zero shutdown and a style-pending fallback after native Clear explicit public stage names. This changes diagnostic receipts, not timer behavior or native access.
+- Cover all three idle preparation gaps using the actual modules and real event handler, plus named fallback recovery. Keep native fonts, settings, approved frame presentation and saved Edit Mode layouts.
+- Secret-ID buff decimals are not repaired by an action gate change. Document a supported native helpful-buff-container proposal, including the actual always-expanded policy and remaining ordering/ownership compatibility questions.
+
 ## 0.2.357-timer-handoff-recovery-test — recover refused action visibility handoffs
 
 - Retain a prepared stock fallback after the first refused hide/readback, allowing the existing native cooldown update to recover fixed action cells. Reuse the existing regions, bindings and hooks, including during combat.

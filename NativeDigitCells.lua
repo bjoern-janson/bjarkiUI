@@ -679,6 +679,11 @@ local function minimumGate(state,minimum)
     minimumFailures[key]=not ok and stage or nil;state.minimumGateFailure=minimumFailures[key]
     return ok and gate or nil
 end
+local function prepareActionMinimumGate(state)
+    if not outOfCombat() then return end
+    local minimum=publicMilliseconds(state.cooldown,'GetMinimumCountdownDuration')
+    if minimum and minimum>0 then minimumGate(state,minimum) end
+end
 local function resetMinimumGate(state)
     if not state.minimumGated then return true end
     local complete=true
@@ -741,6 +746,7 @@ local function setDuration(state,duration)
         state.fallbackReason=nil
         local stopped=setRendering(state,false)
         if state.epoch~=epoch then return nil end
+        if not stopped then state.fallbackReason='zero-shutdown-refused' end
         return stopped
     end
     local allowed=aboveNativeMinimum(state)
@@ -865,6 +871,7 @@ local function refreshCurrentClock(state)
         return
     end
     if state.stylePending then
+        state.fallbackReason=state.fallbackReason or 'style-pending'
         -- A native tick can finish the visibility handoff, but only safe
         -- discovery may finish a changed/partially refused cell style.
         setRendering(state,false)
@@ -1006,8 +1013,7 @@ local function prepareAction(state,label,formatters,createBinding)
     if not style then return false end
     local desired=actionDigitsForFont(label,formatters)
     state.timerColor=style.color
-    local minimum=publicMilliseconds(state.cooldown,'GetMinimumCountdownDuration')
-    if minimum and minimum>0 then minimumGate(state,minimum) end
+    prepareActionMinimumGate(state)
     if not state.cellsReady or not sameActionStyle(state.actionStyle,style) then
         if not makeCells(label,state.cooldown,true,state.cells,false,style) then return false end
         state.cellsReady=true
@@ -1071,6 +1077,7 @@ local function prepareAction(state,label,formatters,createBinding)
         state.minimumHook=pcall(hooksecurefunc,state.cooldown,'SetMinimumCountdownDuration',function()
             state.epoch=state.epoch+1
             state.pendingSet=true
+            prepareActionMinimumGate(state)
             refreshAction(state,false)
         end)
         if not state.minimumHook then return false end
@@ -1198,7 +1205,12 @@ installAction=function(button,prepared,petIndex)
         refreshAction(state)
         if state.restorePending then return false end
     end
-    if not prepared and state and state.prepared and not resyncActionStyle(state) then return false end
+    if not prepared and state and state.prepared then
+        if not resyncActionStyle(state) then return false end
+        -- A zero clock can remain active across safe retries and style changes.
+        -- Prepare its current gate before the unchanged-presenter fast path.
+        prepareActionMinimumGate(state)
+    end
     -- An already-configured suffix can acquire new font/scale metrics at
     -- layout discovery, including on a retry of a partially prepared button.
     if not prepared and state and state.readyBindings>=4 then setCellFormatter(state,4,nativeFormatters[4]) end

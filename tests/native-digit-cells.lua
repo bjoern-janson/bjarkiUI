@@ -1469,6 +1469,7 @@ do
  local clock={IsZero=function()return false end}
  C_ActionBar.GetActionCooldownDuration=function()reads=reads+1;return clock end
  local owner={action=5,cooldown=container()};local cd=owner.cooldown
+ local firstBinding=#allBindings+1
  function owner:GetName()names=names+1;return 'ActionButton5' end
  function cd:GetCountdownFontString()return nativeLabel end
  function cd:GetHideCountdownNumbers()reads=reads+1;return self.hidden==true end
@@ -1506,6 +1507,41 @@ do
  local restored=report()
  ok(restored:find('cells=1 stock=0 idle=0',1,true),'next readable update recovers')
  ok(not restored:find('ActionButton5',1,true),'recovered buttons leave the fallback list')
+ -- A public zero can still fail to shut down an existing binding. Preserve
+ -- that observed failure stage while hiding its cells and returning stock.
+ local first=allBindings[firstBinding];local enable=first.SetEnabled
+ first.SetEnabled=function(self,on)if not on then return false end;return enable(self,on)end
+ clock={IsZero=function()return true end};total=1500;cd:SetCooldown(0,1.5,1)
+ local zeroShutdown=report()
+ eq(cd.hidden,false,'zero shutdown refusal returns the native number to stock')
+ first:Tick(8.4);ok(first.label.hidden,'a refused zero shutdown cannot repaint visible old digits')
+ first.SetEnabled=enable;cd:Clear();clock=realClock;total=12000;cd:SetCooldown(0,12,1)
+ ok(report():find('cells=1 stock=0 idle=0',1,true),'next real clock recovers from zero shutdown refusal')
+ for i=firstBinding,firstBinding+5 do allBindings[i]:Tick(8.4)end
+ eq(first.label.text..allBindings[firstBinding+1].label.text..allBindings[firstBinding+2].label.text,
+  '8.4','recovered zero-shutdown cells display the current native tenth')
+ ok(not first.label.hidden,'recovered zero-shutdown cells are visible again')
+
+ -- Native Clear may erase the last cause while a style repair is still
+ -- pending. A later normal set must name that pending stage, without styling.
+ local font=nativeLabel.GetFont
+ nativeLabel.GetFont=function()return nil end
+ ok(not diagnosticAPI.InstallAction(owner),'unavailable native font leaves a pending safe style repair')
+ nativeLabel.GetFont=font;cd:SetCooldown(0,12,1)
+ ok(report():find('ActionButton5:style-unavailable',1,true),'ordinary set preserves the precise existing style receipt')
+ cd:Clear();ok(report():find('cells=0 stock=0 idle=1',1,true),'a cleared pending style remains idle')
+ local nativeText=nativeLabel.text;nativeLabel:SetText('12')
+ currentCombat=true;cd:SetCooldown(0,12,1);currentCombat=false
+ local pendingStyle=report()
+ eq(cd.hidden,false,'a pending style leaves the native number visible after Clear')
+ eq(nativeLabel.text,'12','a pending style preserves the current native countdown text')
+ for i=firstBinding,firstBinding+5 do ok(not allBindings[i].enabled,'pending style keeps every replacement binding stopped')end
+ ok(diagnosticAPI.InstallAction(owner),'safe discovery completes the pending style repair')
+ ok(report():find('cells=1 stock=0 idle=0',1,true),'safe style recovery leaves the fallback list')
+ nativeLabel:SetText(nativeText)
+ local stages='zero='..zeroShutdown..'; style='..pendingStyle
+ ok(zeroShutdown:find('ActionButton5:zero-shutdown-refused',1,true),'zero shutdown has a named public stage: '..stages)
+ ok(pendingStyle:find('ActionButton5:style-pending',1,true),'post-Clear style repair has a named public stage: '..pendingStyle)
  cd:Clear();ok(report():find('cells=0 stock=0 idle=1',1,true),'native Clear is idle')
  local retained={}
  total=secret
@@ -1735,6 +1771,83 @@ do
    local r,g,blue,a=b:GetFormattedTextColor():GetRGBA()
    eq(r,.4,'new gate takes RGB from stock source');eq(g,.5);eq(blue,.6);eq(a,.7,'new gate takes source alpha')
   end
+ end
+ -- Idle native clocks may own the presenter before their gate succeeds. A
+ -- safe epoch, changed native minimum, or changed source color must prepare
+ -- that gate even while the clock remains zero and geometry is unchanged.
+ for _,scenario in ipairs({'retry','minimum','color'})do
+  temporaryFailure=scenario=='retry'
+  local idleClock=duration();idleClock:SetTimeFromStart(100,0,1);idleClock.seconds=0
+  function idleClock:IsZero()return self.sealed and opaque(false)or self.total==0 end
+  C_ActionBar.GetActionCooldownDuration=function(_,ignore)eq(ignore,true);return idleClock end
+  local idleMinimum=scenario=='minimum' and 0 or 2000
+  local idleOwner={action=5,cooldown=container()};local idleCD=idleOwner.cooldown;local idleLabel=label(idleCD)
+  function idleOwner:GetName()return 'ActionButton5'end
+  idleCD.CreateFontString=function(self)return alphaLabel(label(self))end
+  function idleCD:GetCountdownFontString()return idleLabel end
+  function idleCD:GetHideCountdownNumbers()return self.hidden==true end
+  function idleCD:SetHideCountdownNumbers(v)self.hidden=v end
+  function idleCD:GetMinimumCountdownDuration()return idleMinimum end
+  function idleCD:SetMinimumCountdownDuration(v)idleMinimum=v end
+  function idleCD:GetCooldownDisplayDuration()return idleClock.sealed and opaque(1)or idleClock.total*1000 end
+  function idleCD:GetCooldownDuration()return idleClock.sealed and opaque(1)or idleClock.total*1000 end
+  function idleCD:SetCooldown()end;function idleCD:Clear()end
+  assert(loadfile(addon..'/NativeDigitCells.lua'))()
+  local idleAPI=bjarkiUINativeDigitCells
+  ActionButton5=idleOwner
+  local startAttempts=colorAttempts
+  ok(idleAPI.InstallAction(idleOwner),scenario..' public zero clock acquires prepared idle presenter')
+  eq(idleCD:GetHideCountdownNumbers(),true,'idle presenter owns the native visibility handoff')
+  if scenario=='retry' then
+   eq(colorAttempts,startAttempts+1,'initial idle calibration records the refusal')
+   idleCD:SetCooldown();idleAPI.InstallAction(idleOwner);idleCD:SetMinimumCountdownDuration(2000)
+   eq(colorAttempts,startAttempts+1,'idle native updates and scans retain the failed gate')
+   event:OnEvent('PLAYER_REGEN_ENABLED')
+   eq(colorAttempts,startAttempts+2,'safe event attempts the refused idle gate once')
+   idleCD:SetCooldown();idleAPI.InstallAction(idleOwner);idleCD:SetMinimumCountdownDuration(2000)
+   eq(colorAttempts,startAttempts+2,'failed idle retry remains cached within the epoch')
+   temporaryFailure=false
+   event:OnEvent('PLAYER_REGEN_ENABLED')
+   eq(colorAttempts,startAttempts+5,'next safe event completes all three idle calibration samples')
+  elseif scenario=='minimum' then
+   eq(colorAttempts,startAttempts,'zero minimum needs no calibration')
+   idleCD:SetMinimumCountdownDuration(3000)
+   eq(colorAttempts,startAttempts+3,'positive native minimum setter prepares idle gate before any scan')
+  else
+   eq(colorAttempts,startAttempts+3,'initial source color calibrates while idle')
+   idleLabel.GetTextColor=function()return .4,.5,.6,.7 end
+   event:OnEvent('EDIT_MODE_LAYOUTS_UPDATED')
+   eq(colorAttempts,startAttempts+6,'changed source color calibrates while the clock remains idle')
+  end
+  local preparedAttempts,preparedAllocations=colorAttempts,allocations
+  local preparedBindings,preparedLabels,preparedMetrics=#allBindings,#labelList,metrics
+  event:OnEvent('PLAYER_REGEN_ENABLED');event:OnEvent('PLAYER_ENTERING_WORLD')
+  eq(colorAttempts,preparedAttempts,'unchanged safe idle events reuse the successful gate')
+  eq(allocations,preparedAllocations,'successful idle gate reuse allocates no native resources')
+  currentCombat=true
+  event:OnEvent('PLAYER_ENTERING_WORLD')
+  idleClock.sealed=true;idleClock.total=12;idleClock.seconds=6.3
+  idleCD:SetCooldown()
+  eq(colorAttempts,preparedAttempts,'first secret combat cooldown performs no calibration')
+  eq(allocations,preparedAllocations,'first secret combat cooldown allocates no native curves or clocks')
+  eq(#allBindings,preparedBindings,'first secret combat cooldown reuses native bindings')
+  eq(#labelList,preparedLabels,'first secret combat cooldown creates no labels')
+  eq(metrics,preparedMetrics,'first secret combat cooldown performs no font measurement')
+  eq(idleCD:GetHideCountdownNumbers(),true,scenario..' warm idle gate keeps stock hidden in combat')
+  local shown=''
+  for _,b in ipairs(allBindings)do
+   if b.label and b.label.parent==idleCD and b.enabled then
+    eq(b.duration,idleClock,'fixed cell receives the exact current native clock')
+    b:Tick(idleClock.seconds)
+    local r,g,blue,a=b:GetFormattedTextColor():GetRGBA()
+    if scenario=='color' then
+     eq(r,.4,'idle color rescan preserves current source red');eq(g,.5);eq(blue,.6);eq(a,.7)
+    end
+    if a*(b.label.alpha or 1)>0 and not b.label.hidden then shown=shown..b.label.text end
+   end
+  end
+  eq(shown,'6.3',scenario..' first secret combat update paints the native fixed digits')
+  currentCombat=false
  end
  ActionButton5=oldButton
  CreateFrame,C_DurationUtil.CreateDuration,C_CurveUtil,CreateColor,GetTime=oldCreate,oldDuration,oldCurves,oldColor,oldTime
