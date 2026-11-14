@@ -1,14 +1,14 @@
 # bjarkiUI
 
-**0.2.370-combat-level-highlights-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
+**0.2.371-consistent-decimals-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
 
 ## Latest test build
 
-**.370:** Player keeps its plain level badge. Target and Focus each highlight only while their own represented unit is in combat, and only when the native numeric level is displayed. Prepared visibility updates handle combat entry/exit and target/focus switches during combat through unit events. Five reusable textures provide the three bases and two highlights; no polling or new clock is added. [Changes](CHANGELOG.md) · [Verification](docs/VERIFICATION_0.2.370.md)
+**.371:** Supported action, buff and cast decimal timers use compact spacing around the point while preserving each element's native font and size. Native action strings reuse the independently validated buff layout where supported; compatibility cells and cast cells share one spacing calculation. Action decimals stay at `9.9` immediately below ten. Cast cells follow current font/scale changes, carry rounded tenths into the integer, and accept native formats without a suffix. No addon timer loop is added. The .370 combat-aware level badges remain included. [Changes](CHANGELOG.md) · [Verification](docs/VERIFICATION_0.2.371.md)
 
 ## Install
 
-1. Download the supplied `bjarkiUI-0.2.370-Combat-Level-Highlights.zip` test package. The stacked development PR does not trigger the workflow restricted to `main`.
+1. Download the supplied `bjarkiUI-0.2.371-Consistent-Decimals.zip` test package. The stacked development PR does not trigger the workflow restricted to `main`.
 2. Extract its `bjarkiUI` folder into the Forever client's `Interface/AddOns/` directory. Check that `Interface/AddOns/bjarkiUI/bjarkiUI.toc` exists.
 3. Enable the addon and reload the interface. Use `/bui help` for the main commands and `/bdark` for Soft Dark controls.
 
@@ -33,10 +33,10 @@ Historical **0.2.340-leader-crown-nudge-test** nudged the native crowns horizont
 | Surface | Behavior and native fallback |
 | --- | --- |
 | Action and pet-action countdowns | Prefer the original native label with verified fixed-spacing formatting and exact current font. Tenths appear below 10 seconds; whole seconds continue through 90.99 seconds; rounded-up minutes begin at 91 seconds (`2m`), with hours/days at their existing boundaries. The original widget owns timing, appearance, countdown preferences and minimum/GCD policy. Unsupported preparation retains the compatibility cells/native fallback. |
-| Player cast/channel timer | Restores the pinned 0.2.309 native duration-bound fixed-digit renderer for casts/channels; Blizzard's original `CastTimeText` is never cleared. The original timer remains visible whenever binding setup or native alpha handoff fails. Native font, settings and Edit Mode remain authoritative. |
-| Player buff/debuff timer | Public short durations retain prepared fixed cells. For an ordinary label with a positively public native seconds selector, restricted seconds can pass unchanged to a localized one-decimal native text sink, covering the native below-90-second band. Supported public-identity duration objects retain their existing formatter route. No rows are replaced; private anchors, inaccessible selectors and refused sinks retain native behavior. |
+| Player cast/channel timer | Native duration-bound cells share compact decimal spacing and coherent rounding, refresh the current native font/style/scales, and preserve the localized cast template. Blizzard's original `CastTimeText` is never cleared; refused setup or alpha handoff retains native presentation. Settings and Edit Mode remain authoritative. |
+| Player buff/debuff timer | Supported public values and genuine native duration objects use tenths below ten with prepared compact text/cells. Ten seconds and above retain native unit formats. An opaque seconds selector alone proves only the below-90 band and cannot authorize decimals; unsupported opaque timers retain native text. Private anchors and inaccessible/refused sources remain native. |
 | Tracked buff icons | Accessible native cooldown widgets receive the ten-second tenths threshold; timing, longer formats and visibility remain native. |
-| Unit frames and party | Unit names, status typography, readable class colors, cosmetic labels and vertical compact-party ordering use guarded native presentation hooks. Compact party names/health fills are class colored and their native numeric text gets the same LoL-style outline-free shadow. Camelot level badge artwork and visibility are native at the original lower-corner positions; level numbers are centered beside the portraits. Layout repairs touch displaced anchors and retain rollback state after partial failure. |
+| Unit frames and party | Unit names, status typography, readable class colors, cosmetic labels and vertical compact-party ordering use guarded native presentation hooks. Compact party names/health fills are class colored and their native numeric text gets the same LoL-style outline-free shadow. Native lower-corner level circles remain in place; level numbers sit in nameplate-style side badges. Player stays plain; Target/Focus highlight only for their own represented unit's combat state. Layout repairs touch displaced anchors and retain rollback state after partial failure. |
 | Soft Dark and icon borders | Eligible native artwork receives reversible tinting or nameplate-style icon decoration. Restoration checks current ownership before replacing a later writer's work. |
 
 Historical **0.2.339-zzz-right-of-secondary-test** placed the original resting animation beyond the upper-right secondary portrait. The .350 upper-left and .351 right-of-crown experiments were subsequently rejected; .352 hides the Z texture completely.
@@ -75,6 +75,6 @@ Start with [AGENTS.md](AGENTS.md), then the [code map](docs/CODE_MAP.md). The tw
 - [Timer sources, native writers, hooks and cleanup](docs/TIMER_LIFECYCLE.md)
 - [Default manifest](bjarkiUI.toc) · [Camelot manifest](bjarkiUI_Camelot.toc)
 - [Package workflow](.github/workflows/package-addon.yml) · [Changelog](CHANGELOG.md)
-- [Current verification and live evidence](docs/VERIFICATION_0.2.370.md)
+- [Current verification and live evidence](docs/VERIFICATION_0.2.371.md)
 
 `ARCHITECTURE.md` records implementation history, including retired experiments. The 0.2.309 audit documents, `tests/snapshot-0.2.309/` and `tools/audit/` are historical reproduction material, not the current test or packaging entry point. Reproduce that audit at its [pinned revision](https://github.com/bjoern-janson/bjarkiUI/tree/d1797e392e0eb466906632e4dc047eb830b2ac78). Current source and top-level tests take precedence over historical descriptions. [Architecture history](ARCHITECTURE.md) · [Audit baseline](docs/AUDIT_BASELINE.md)

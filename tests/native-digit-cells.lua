@@ -283,6 +283,7 @@ end
 do
  nativeLabel:SetScale(1.5);nativeLabel:SetTextScale(1.25)
  ok(api.InstallAction(button),'native relative scale and text scale resynchronize')
+ ok(math.abs(digits[3].points[4]-6.3125)<0.000001,'decimal center distance receives text scale exactly once')
  for _,cell in ipairs(digits)do
   eq(cell:GetEffectiveScale(),nativeLabel:GetEffectiveScale(),'receiving cell matches native physical scale')
   eq(cell:GetTextScale(),1.25,'receiving cell matches native text scale')
@@ -304,6 +305,7 @@ for _,f in ipairs(digits) do
 end
 eq(digits[1].points[4],-digits[3].points[4],'mirror centers')
 eq(digits[2].points[4],0,'decimal point fixed on icon center')
+ok(math.abs(digits[3].points[4]-5.05)<0.000001,'decimal centers use native advances without cell-box padding')
 eq(digits[1].width,digits[3].width,'equal-width digit cells')
 eq(digits[5].width,digits[6].width,'equal-width whole-second digit cells')
 ok(math.abs((digits[5].points[4]+digits[6].points[4])/2-0.45)<0.00001,
@@ -419,6 +421,7 @@ ok(api.PrepareBuff(p),'public buff cell preparation')
 eq(created-beforeBuff,3,'buffs still use exactly three decimal cells')
 ok(api.ShowBuff(p,87),'readable buff split')
 local buffList={labelList[#labelList-2],labelList[#labelList-1],labelList[#labelList]}
+for i=1,3 do eq(buffList[i].points[4],digits[i].points[4],'same-font buff and action decimal columns agree') end
 eq(buffList[1].text..buffList[2].text..buffList[3].text,'8.7','public buff stable output')
 for _,digit in ipairs(buffList) do
  eq(digit.points[1],'TOP','buff top anchor matches Blizzard native label')

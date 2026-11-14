@@ -182,13 +182,14 @@ local function writeActionStyle(style,label)
     end
     return true
 end
--- A hidden font probe may over-report visible glyph ink in Forever.
--- Keep spacing modest and bounded by the original font size, with independent
--- positions for decimals and two-digit whole seconds.
-local function decimalStep(width,dot,size)
-    -- Tighten the decimal cluster without changing glyphs or their font.
-    return math.max(1,math.min((width+dot)/2-0.45,size*0.53))
+-- Use the native numeral/point advances for a symmetric decimal cluster.
+-- Cell box padding is not glyph advance. Keep the existing font-size ceiling
+-- for hidden probes that over-report width. Casts use this same pure geometry;
+-- callers pass already public measurements and apply text scale exactly once.
+local function decimalStep(digitAdvance,pointAdvance,size,textScale)
+    return math.max(1,math.min((digitAdvance+pointAdvance)/2,size*0.53))*(textScale or 1)
 end
+api.GetDecimalCellStep=decimalStep
 local function wholeStep(width,size)
     -- Just inside the .305 spacing; two-digit cluster is nudged right below.
     return math.min(width+0.15,size*0.71)
@@ -205,7 +206,7 @@ local function makeCells(native,center,withWhole,existing,keepText,actionStyle)
     if not create then return nil end
     local cells=existing or {}
     local textScale=actionStyle and actionStyle.scale[2] or 1
-    local decimal=decimalStep(width,dot,size)*textScale
+    local decimal=decimalStep(width-0.5,dot-0.5,size,textScale)
     local halfWhole=wholeStep(width,size)*textScale/2
     -- Buffs need just the first three decimal cells. Actions also use a
     -- centered unit label and two slightly right-shifted whole-second digits.

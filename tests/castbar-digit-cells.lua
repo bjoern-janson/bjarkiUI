@@ -7,6 +7,8 @@ local function eq(got,want,why) ok(got==want,(why or '')..' expected '..tostring
 local events={};local callbacks={};local frames={};local fontStrings={};local bindings={};local nativeReads=0
 local combat=false;local availability=true;local unsupported=false;local alphaDenied=false;local restoreDenied=false
 local alphaFalse=false;local restoreFalse=false
+local measurements=0;local geometryWrites=0;local bindingFalse=false;local badNativeCarry=false
+local floatThresholds=false
 local opaque=setmetatable({},{__index=function()error('secret duration was read')end,
  __tostring=function()error('secret converted to text')end})
 issecretvalue=function(v)return v==opaque end
@@ -15,26 +17,35 @@ CAST_BAR_CAST_TIME='%.1f s'
 local digits={['0']=9,['1']=4,['2']=8,['3']=8,['4']=8,['5']=8,
  ['6']=8,['7']=8,['8']=9,['9']=8,['.']=3,[' ']=3,['s']=6}
 local function label(parent)
- local f={parent=parent,alpha=1,shown=true,content='',font='Fonts\\FRIZQT__.TTF',size=16,flags='OUTLINE'}
+ local f={parent=parent,alpha=1,shown=true,content='',font='Fonts\\FRIZQT__.TTF',size=16,flags='OUTLINE',
+  scale=1,textScale=1,smooth=false,color={1,1,1,1},shadowColor={0,0,0,1},shadowOffset={1,-1}}
  function f:IsForbidden()return false end
  function f:GetFont()return self.font,self.size,self.flags end
- function f:SetFont(path,size,flags)self.font=path;self.size=size;self.flags=flags end
- function f:GetStringWidth()local t=0;for i=1,#self.content do t=t+(digits[self.content:sub(i,i)] or 7)end;return t end
- function f:GetTextColor()return 1,1,1,1 end
+ function f:SetFont(path,size,flags)geometryWrites=geometryWrites+1;self.font=path;self.size=size;self.flags=flags end
+ function f:GetStringWidth()measurements=measurements+1;local t=0;for i=1,#self.content do t=t+(digits[self.content:sub(i,i)] or 7)end;return t*self.size/16*self.textScale end
+ function f:GetEffectiveScale()return self.scale*self.parent:GetEffectiveScale()end
+ function f:SetScale(v)geometryWrites=geometryWrites+1;self.scale=v end
+ function f:GetTextScale()return self.textScale end
+ function f:SetTextScale(v)geometryWrites=geometryWrites+1;self.textScale=v end
+ function f:GetSmoothScaling()return self.smooth end
+ function f:SetSmoothScaling(v)geometryWrites=geometryWrites+1;self.smooth=v end
+ function f:GetTextColor()return table.unpack(self.color)end
  function f:SetTextColor(...)self.color={...}end
- function f:GetShadowColor()return 0,0,0,1 end
+ function f:GetShadowColor()return table.unpack(self.shadowColor)end
  function f:SetShadowColor(...)self.shadowColor={...}end
- function f:GetShadowOffset()return 1,-1 end
+ function f:GetShadowOffset()return table.unpack(self.shadowOffset)end
  function f:SetShadowOffset(...)self.shadowOffset={...}end
  function f:SetText(s)self.content=s end
  function f:GetText()return self.content end
- function f:SetPoint(...)self.point={...}end
+ function f:SetPoint(...)geometryWrites=geometryWrites+1;self.point={...}end
+ function f:ClearAllPoints()geometryWrites=geometryWrites+1;self.point=nil end
  function f:SetJustifyH(v)self.justifyH=v end
  function f:SetJustifyV(v)self.justifyV=v end
  function f:SetSize(w,h)self.width=w;self.height=h end
  function f:SetMaxLines(v)self.maxLines=v end
  function f:SetWordWrap(v)self.wordWrap=v end
  function f:Hide()self.shown=false end
+ function f:Show()self.shown=true end
  function f:IsShown()return self.shown end
  function f:GetAlpha()return self.alpha end
  function f:SetAlpha(v)
@@ -44,8 +55,10 @@ local function label(parent)
  end
  fontStrings[#fontStrings+1]=f;return f
 end
-local bar={unit='player',casting=false,channeling=false,showCastTimeSetting=true,isInEditMode=false}
+local bar={unit='player',casting=false,channeling=false,showCastTimeSetting=true,isInEditMode=false,scale=1}
 function bar:IsForbidden()return false end
+function bar:GetEffectiveScale()return self.scale end
+function bar:SetScale(v)self.scale=v end
 function bar:CreateFontString()return label(self)end
 bar.CastTimeText=label(bar)
 function bar:UpdateCastTimeTextShown()
@@ -68,7 +81,13 @@ local function render(rules,num)
   local c=active.components[1]
   if c.div then n=n/c.div end
   if c.mod then n=n%c.mod end
-  if c.step then n=math.floor(n/c.step+0.5)*c.step end
+  if c.step then
+   local q=n/c.step
+   if c.rounding==1 then q=math.ceil(q)
+   elseif c.rounding==2 then q=math.floor(q)
+   else q=math.floor(q+0.5)end
+   n=q*c.step
+  end
  end
  if active.format:find('%%') then return string.format(active.format,n) end
  return active.format
@@ -77,8 +96,26 @@ Enum={NumericRuleFormatRounding={Nearest=0,Down=2,Up=1}}
 C_StringUtil={CreateNumericRuleFormatter=function()
  local f={}
  function f:IsForbidden()return false end
- function f:SetBreakpoints(v)if unsupported then error('formatter unsupported')end;self.rules=v end
- function f:FormatNumber(value)return render(self.rules,value)end
+ function f:SetBreakpoints(v)
+  if unsupported then error('formatter unsupported')end
+  if floatThresholds then
+   local copy={}
+   for i,rule in ipairs(v)do
+    local r={};for k,value in pairs(rule)do r[k]=value end
+    if r.threshold>0 then
+     local step=2^(math.floor(math.log(r.threshold)/math.log(2))-23)
+     r.threshold=math.ceil(r.threshold/step)*step
+    end
+    copy[i]=r
+   end
+   v=copy
+  end
+  self.rules=v
+ end
+ function f:FormatNumber(value)
+  if badNativeCarry and self.rules[2] and self.rules[2].components and value==0.96 then return '9'end
+  return render(self.rules,value)
+ end
  return f
 end}
 C_DurationUtil={CreateDurationTextBinding=function()
@@ -91,6 +128,7 @@ C_DurationUtil={CreateDurationTextBinding=function()
  function b:SetZeroDurationText(v)self.zero=v end
  function b:SetExpiredText(v)self.expired=v end
  function b:SetDuration(v)
+  if bindingFalse then return false end
   -- A secret payload is forwarded untouched into the native sink.
   ok(v==opaque,'native duration forwarded unchanged')
   self.duration=v
@@ -127,18 +165,18 @@ CreateFrame=function()
 end
 local source=assert(loadfile(addon..'/CastBarDigits.lua'))
 local private={}
+assert(loadfile(addon..'/NativeDigitCells.lua'))('bjarkiUI',private)
 source('bjarkiUI',private)
 ok(events.PLAYER_LOGIN and events.UNIT_SPELLCAST_START and events.UNIT_SPELLCAST_CHANNEL_START,'cast events subscribed')
 eq(#frames,1,'only one lightweight event frame')
-eq(#bindings,9,'nine native bindings for separate compact 1/2-digit cast layouts')
-ok(#fontStrings==11,'one native label, one font probe, nine fixed glyphs')
-local labels={};for i=#fontStrings-8,#fontStrings do labels[#labels+1]=fontStrings[i] end
+eq(#bindings,10,'native compact tracks and one full-format overflow binding')
+ok(#fontStrings==12,'one native label, one reusable probe and ten receiving labels')
+local labels={};for _,b in ipairs(bindings)do labels[#labels+1]=b.label end
 local function fire(event,unit) assert(events[event],event);frames[1].OnEvent(frames[1],event,unit)end
 local function textAt(value)
  for _,b in ipairs(bindings)do b:Tick(value)end
  local out=''
- if value<10 then for i=6,9 do out=out..labels[i].content end
- else for i=1,5 do out=out..labels[i].content end end
+ for i=1,#labels do out=out..labels[i].content end
  return out
 end
 for _,v in ipairs(labels) do
@@ -148,18 +186,20 @@ for _,v in ipairs(labels) do
 end
 -- The stock CastTimeText uses LEFT(bar RIGHT, 10, 0), independent of
 -- whether a cast has 1 or 2 digits. Both replacements must start there.
-eq(labels[1].point[4],10,'two-digit track begins at Blizzard cast-label origin')
-eq(labels[6].point[4],10,'one-digit track begins at Blizzard cast-label origin')
-local nativeAdvance=(8+8+8)/3 -- measured '23.7 s' minus '.' and ' s'
-eq(labels[2].point[4],10+nativeAdvance,'units use natural font advance')
+eq(labels[1].point[4],14.5,'two-digit first numeral centered on native origin plus half numeral advance')
+eq(labels[6].point[4],14.5,'one-digit first numeral has the same native origin')
+local nativeAdvance=9 -- maximum public native numeral advance; no cell padding
+eq(labels[2].point[4],14.5+nativeAdvance,'units use native numeral advance')
 ok(labels[2].point[4]-labels[1].point[4]<labels[1].width,
     'digit cells closer than maximum glyph width, no huge gaps')
-eq(labels[3].point[4],10+2*nativeAdvance,'double-digit point natural spacing')
-eq(labels[7].point[4],10+nativeAdvance,'single-digit point natural spacing')
+eq(labels[3].point[4]-labels[2].point[4],6,'double-digit point uses compact raw native advances')
+eq(labels[4].point[4]-labels[3].point[4],6,'double-digit point has symmetric numeral centers')
+eq(labels[7].point[4]-labels[6].point[4],6,'single-digit point uses compact raw native advances')
+eq(labels[8].point[4]-labels[7].point[4],6,'single-digit point has symmetric numeral centers')
 local barRight=277
 local nativeX=barRight+10
-local twoDigitFirstGlyphX=barRight+labels[1].point[4]
-local oneDigitFirstGlyphX=barRight+labels[6].point[4]
+local twoDigitFirstGlyphX=barRight+labels[1].point[4]-nativeAdvance/2
+local oneDigitFirstGlyphX=barRight+labels[6].point[4]-nativeAdvance/2
 eq(twoDigitFirstGlyphX,nativeX,'24.0 starts with Blizzard 23.7 left edge')
 eq(oneDigitFirstGlyphX,nativeX,'3.1 starts with Blizzard left edge')
 local beforeLabels=#fontStrings
@@ -173,8 +213,22 @@ ok(bar.CastTimeText.alpha==0,'native timer hidden only when bindings are live')
 for _,b in ipairs(bindings)do ok(b.enabled and b.interval==0.1,'0.1-sec native timer binding')end
 for _,example in ipairs({{0,'0.0 s'},{0.1,'0.1 s'},{1.2,'1.2 s'},{3.1,'3.1 s'},
  {8.7,'8.7 s'},{9.9,'9.9 s'},{10,'10.0 s'},{10.7,'10.7 s'},{36.9,'36.9 s'},
- {65.5,'65.5 s'},{99.9,'99.9 s'},{100,''}}) do
+ {65.5,'65.5 s'},{99.9,'99.9 s'},{100,'100.0 s'}}) do
  eq(textAt(example[1]),example[2],'fixed-width cast text at '..example[1])
+end
+-- Native tenths must carry into the integer cells in the same update.
+-- The original integer breakpoints kept the old second when tenths became 0.
+for _,example in ipairs({{0.96,'1.0 s'},{1.96,'2.0 s'},{9.96,'10.0 s'},
+ {10.96,'11.0 s'},{19.96,'20.0 s'},{99.94,'99.9 s'},{99.95,'100.0 s'},{99.96,'100.0 s'},{100.06,'100.1 s'}})do
+ eq(textAt(example[1]),example[2],'coherent native decimal carry at '..example[1])
+end
+-- Native numeric-rule Nearest supplies the one coherent midpoint policy for
+-- every cell and the overflow label. Raw printf has a different tie policy.
+for _,example in ipairs({{0.25,'0.3 s'},{1.25,'1.3 s'},{9.25,'9.3 s'},
+ {99.25,'99.3 s'},{100.25,'100.3 s'},
+ {9.949999809265137,'9.9 s'},{9.950000762939453,'10.0 s'},
+ {99.9499969482421875,'99.9 s'},{99.95000457763671875,'100.0 s'}})do
+ eq(textAt(example[1]),example[2],'native midpoint/representable transition at '..example[1])
 end
 -- Every 0.1-second display from 0.0 to 99.9 uses a fixed set of cells,
 -- with no unexpected rounding to a second digit or overlapping presenter.
@@ -259,6 +313,190 @@ ok(bindings[1].enabled,'refused native restoration keeps visible fixed cells')
 restoreFalse=false;fire('PLAYER_REGEN_ENABLED')
 eq(bar.CastTimeText.alpha,1,'native restored after false refusal recovers')
 for _,b in ipairs(bindings)do ok(not b.enabled,'no stale bindings after false refusal')end
+-- Every receiving label follows current native typography, rather than the
+-- font cached at login. Geometry is measured only after an actual change.
+local allocatedLabels,allocatedBindings=#fontStrings,#bindings
+bar.CastTimeText:SetFont('Fonts\\ARIALN.TTF',20,'MONOCHROME')
+bar.CastTimeText:SetTextScale(1.25)
+bar.CastTimeText:SetSmoothScaling(true)
+bar:SetScale(2)
+bar.CastTimeText:SetScale(1.5)
+bar.CastTimeText:SetTextColor(0.4,0.7,0.9,0.8)
+bar.CastTimeText:SetShadowOffset(2,-2)
+for _,v in ipairs(labels)do
+ eq(v.font,'Fonts\\ARIALN.TTF','current native font copied after style setter')
+ eq(v.size,20,'current native size copied after style setter')
+ eq(v.flags,'MONOCHROME','current native flags copied after style setter')
+ eq(v:GetEffectiveScale(),3,'receiving label follows native effective scale')
+ eq(v:GetTextScale(),1.25,'native text scale retained')
+ eq(v:GetSmoothScaling(),true,'native smooth scaling retained')
+ eq(v.color[2],0.7,'current native color retained')
+ eq(v.shadowOffset[1],2,'current native shadow offset retained')
+end
+-- 16px fixture advances 9/3 become 11.25/3.75 at 20px. Their half-sum
+-- is 7.5, multiplied ONCE by 1.25 text scale, then by effective scale 3
+-- for screen-space distance. A copied setter alone cannot prove this.
+eq(labels[7].point[4]-labels[6].point[4],9.375,'scaled integer/point center distance')
+eq(labels[8].point[4]-labels[7].point[4],9.375,'scaled point/tenths center distance')
+eq((labels[7].point[4]-labels[6].point[4])*labels[7]:GetEffectiveScale(),28.125,
+ 'scaled decimal spacing in screen units')
+eq(labels[10].point[4],10,'full-format overflow keeps the native origin')
+eq(#fontStrings,allocatedLabels,'style changes reuse font probe and receiving labels')
+eq(#bindings,allocatedBindings,'style changes reuse native duration bindings')
+local beforeMeasures=measurements
+bar.CastTimeText:SetFont('Fonts\\ARIALN.TTF',20,'MONOCHROME')
+bar.CastTimeText:SetTextScale(1.25)
+fire('PLAYER_REGEN_ENABLED')
+eq(measurements,beforeMeasures,'unchanged native style and safe epochs do not measure again')
+bar.casting=true;bar:UpdateCastTimeTextShown()
+local beforeGeometry=geometryWrites
+beforeMeasures=measurements
+for _,v in ipairs({0.96,3.1,8.8,9.96,19.96,99.96})do textAt(v)end
+eq(measurements,beforeMeasures,'native timer ticks perform no geometry measurement')
+eq(geometryWrites,beforeGeometry,'native timer ticks perform no style or anchor writes')
+-- A native typography change during combat hands back to stock; the next
+-- existing safe epoch rebuilds the same cells with the current typography.
+combat=true
+beforeMeasures=measurements
+bar.CastTimeText:SetFont('Fonts\\FRIZQT__.TTF',18,'OUTLINE')
+eq(bar.CastTimeText.alpha,1,'combat font change restores the stock timer')
+fire('UNIT_SPELLCAST_DELAYED','player')
+eq(measurements,beforeMeasures,'combat font changes never measure glyphs')
+eq(bar.CastTimeText.alpha,1,'dirty combat profile cannot reacquire old cells')
+combat=false;fire('PLAYER_REGEN_ENABLED')
+eq(labels[6].size,18,'combat exit refreshes current native typography')
+eq(bar.CastTimeText.alpha,0,'native binding resumes after safe typography refresh')
+eq(#bindings,allocatedBindings,'combat refresh does not add duration bindings')
+-- Unreadable style values are not permission to reuse a stale font.
+bar.CastTimeText:SetFont('Fonts\\FRIZQT__.TTF',opaque,'OUTLINE')
+eq(bar.CastTimeText.alpha,1,'secret font size restores native presentation')
+bar.CastTimeText:SetFont('Fonts\\FRIZQT__.TTF',18,'OUTLINE')
+eq(bar.CastTimeText.alpha,0,'readable native font recovers at style setter')
+-- An empty native suffix is a valid native cast template, not a setup error.
+CAST_BAR_CAST_TIME='%.1f';fire('PLAYER_REGEN_ENABLED')
+eq(textAt(3.2),'3.2','suffix-free native template activates compact decimals')
+eq(textAt(99.96),'100.0','suffix-free overflow preserves native formatting')
+eq(labels[5].content,'','two-digit suffix is genuinely empty')
+eq(labels[9].content,'','one-digit suffix is genuinely empty')
+eq(labels[5].width,0,'empty suffix reserves no extra width')
+eq(#bindings,allocatedBindings,'native suffix changes reuse existing bindings')
+-- Explicit native binding refusal is failure, even when it does not throw.
+bindingFalse=true;fire('UNIT_SPELLCAST_DELAYED','player')
+eq(bar.CastTimeText.alpha,1,'false duration-binding refusal restores stock text')
+for _,b in ipairs(bindings)do ok(not b.enabled,'binding refusal stops all replacement tracks')end
+bindingFalse=false;fire('UNIT_SPELLCAST_DELAYED','player')
+eq(bar.CastTimeText.alpha,0,'native duration binding resumes after refusal clears')
+-- The public carry proof also runs in-client; a contradictory numeric-rule
+-- implementation must remain on Blizzard rather than hiding it speculatively.
+badNativeCarry=true;CAST_BAR_CAST_TIME='%.1f sec';fire('PLAYER_REGEN_ENABLED')
+eq(bar.CastTimeText.alpha,1,'unsupported native carry leaves stock visible')
+badNativeCarry=false;fire('PLAYER_REGEN_ENABLED')
+eq(bar.CastTimeText.alpha,0,'safe epoch retries refused native formatter')
+eq(textAt(9.96),'10.0 sec','recovered formatter preserves current native suffix')
+CAST_BAR_CAST_TIME='%.2f sec';fire('PLAYER_REGEN_ENABLED')
+eq(bar.CastTimeText.alpha,1,'unsupported native precision remains native')
+floatThresholds=true;CAST_BAR_CAST_TIME='%.1f xy';fire('PLAYER_REGEN_ENABLED')
+eq(bar.CastTimeText.alpha,1,'multi-character numeral in a single cell fails native geometry gate')
+floatThresholds=false;fire('PLAYER_REGEN_ENABLED')
+eq(bar.CastTimeText.alpha,0,'consistent native breakpoint precision recovers')
+eq(textAt(9.96),'10.0 xy','recovered native track uses two single-numeral cells')
+-- Physical native-label replacement reuses receiving regions but captures
+-- the new source style/alpha and leaves the retired native source restored.
+local retired=bar.CastTimeText
+bar.CastTimeText=label(bar)
+bar.CastTimeText:SetFont('Fonts\\MORPHEUS.TTF',12,'')
+bar.CastTimeText.alpha=0.7
+fire('PLAYER_REGEN_ENABLED')
+eq(retired.alpha,1,'retired native label restored before replacement takeover')
+eq(labels[6].font,'Fonts\\MORPHEUS.TTF','replacement source supplies current font')
+eq(labels[6].size,12,'replacement source supplies current size')
+eq(bar.CastTimeText.alpha,0,'replacement source hidden after current binding setup')
+retired:SetFont('Fonts\\ARIALN.TTF',22,'OUTLINE')
+eq(labels[6].font,'Fonts\\MORPHEUS.TTF','retired source style observer cannot repaint current cells')
+local replacedMeasures=measurements
+bar:SetScale(1)
+ok(measurements>replacedMeasures,'bar-scale observer follows the replacement source')
+eq(labels[6]:GetEffectiveScale(),1,'replacement source relative scale retained')
+-- A nested native font write invalidates the complete activation transaction.
+-- The older duration setter must not re-hide stock after the new style won.
+local setDuration=bindings[1].SetDuration
+local nested=true
+bindings[1].SetDuration=function(self,value)
+ setDuration(self,value)
+ if nested then nested=false;bar.CastTimeText:SetFont('Fonts\\MORPHEUS.TTF',22,'')end
+end
+combat=true;fire('UNIT_SPELLCAST_DELAYED','player')
+eq(bar.CastTimeText.alpha,0.7,'nested combat style write keeps current native timer visible')
+for _,b in ipairs(bindings)do ok(not b.enabled,'older activation cannot reenable after nested style change')end
+combat=false;bindings[1].SetDuration=setDuration;fire('PLAYER_REGEN_ENABLED')
+eq(labels[6].size,22,'safe epoch prepares the winning nested native font')
+eq(bar.CastTimeText.alpha,0,'fresh activation resumes after nested style change')
+-- A refused native stop may continue updating text. Hide those receiving
+-- labels and retain pending cleanup; never measure/reconfigure live cells.
+local setEnabled=bindings[1].SetEnabled
+bindings[1].SetEnabled=function(self,value)
+ if value==false then return false end
+ return setEnabled(self,value)
+end
+bar.casting=false;bar:UpdateCastTimeTextShown()
+eq(bar.CastTimeText.alpha,0.7,'refused binding stop restores native alpha first')
+bindings[1]:Tick(32.1)
+for _,v in ipairs(labels)do ok(not v.shown,'refused binding stop cannot repaint a visible overlay')end
+local pendingMeasures=measurements
+bar.CastTimeText:SetFont('Fonts\\MORPHEUS.TTF',14,'')
+eq(measurements,pendingMeasures,'pending native stop blocks typography preparation')
+eq(labels[6].size,22,'pending cleanup leaves existing receiving geometry intact')
+bindings[1].SetEnabled=setEnabled;fire('PLAYER_REGEN_ENABLED')
+eq(labels[6].size,14,'safe epoch refreshes typography after stop refusal clears')
+bar.casting=true;bar:UpdateCastTimeTextShown()
+eq(bar.CastTimeText.alpha,0,'recovered native bindings activate again')
+-- A native source replacement inside SetDuration cannot transfer the older
+-- hide receipt to the replacement. The ordinary next cast refresh also
+-- installs style hooks on the replacement, without waiting for world/regen.
+local replaced=bar.CastTimeText
+nested=true
+bindings[1].SetDuration=function(self,value)
+ setDuration(self,value)
+ if nested then nested=false;bar.CastTimeText=label(bar)end
+end
+fire('UNIT_SPELLCAST_DELAYED','player')
+eq(replaced.alpha,0.7,'older native source restored after binding-time replacement')
+eq(bar.CastTimeText.alpha,1,'replacement native source is not hidden by older activation')
+bindings[1].SetDuration=setDuration;fire('UNIT_SPELLCAST_DELAYED','player')
+eq(bar.CastTimeText.alpha,0,'ordinary cast refresh prepares replacement source')
+bar.CastTimeText:SetFont('Fonts\\ARIALN.TTF',17,'OUTLINE')
+eq(labels[6].size,17,'ordinary replacement refresh installs current native style hooks')
+local scaleGetter=bar.CastTimeText.GetTextScale
+bar.CastTimeText.GetTextScale=nil;fire('UNIT_SPELLCAST_DELAYED','player')
+eq(bar.CastTimeText.alpha,1,'missing native text-scale API stays stock instead of guessing one')
+bar.CastTimeText.GetTextScale=scaleGetter;fire('PLAYER_REGEN_ENABLED')
+eq(bar.CastTimeText.alpha,0,'current public scale recovers at a safe epoch')
+local smoothGetter=bar.CastTimeText.GetSmoothScaling
+bar.CastTimeText.GetSmoothScaling=opaque;fire('UNIT_SPELLCAST_DELAYED','player')
+eq(bar.CastTimeText.alpha,1,'secret native style method cannot be treated as a default')
+bar.CastTimeText.GetSmoothScaling=smoothGetter;fire('PLAYER_REGEN_ENABLED')
+eq(bar.CastTimeText.alpha,0,'public native style method recovers safely')
+-- A getter in the final post-hide style check can replace the physical source
+-- without a setter event. Validate identity again AFTER those native reads.
+local finalSource=bar.CastTimeText
+local finalShadow=finalSource.GetShadowOffset
+local finalReads=0
+finalSource.GetShadowOffset=function(self)
+ local x,y=finalShadow(self)
+ finalReads=finalReads+1
+ if finalReads==4 then bar.CastTimeText=label(bar)end
+ return x,y
+end
+fire('UNIT_SPELLCAST_DELAYED','player')
+eq(finalReads,4,'replacement occurs in the post-hide native style read')
+eq(bar.CastTimeText.alpha,1,'post-read replacement retains its own native visibility')
+for _,v in ipairs(labels)do ok(not v.shown,'post-read source replacement retires receiving labels')end
+for _,b in ipairs(bindings)do ok(not b.enabled,'post-read source replacement stops older bindings')end
+eq(finalSource.alpha,1,'retired source concealment is restored after final read invalidation')
+fire('UNIT_SPELLCAST_DELAYED','player')
+eq(bar.CastTimeText.alpha,0,'later native refresh prepares the winning physical source')
+bar.casting=false;bar:UpdateCastTimeTextShown()
+eq(bar.CastTimeText.alpha,1,'latest replacement native alpha restored exactly')
 ok(type(private.GetCastTimerDiagnostics)=='function','cast diagnostic remains available')
 ok(private.GetCastTimerDiagnostics():find('cast=native-bindings',1,true)~=nil,'native binding strategy reported')
 fire('UNIT_SPELLCAST_START','party1')

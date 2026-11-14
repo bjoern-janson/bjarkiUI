@@ -45,7 +45,7 @@ local function getFormatter()
     local rounding = enums and enums.NumericRuleFormatRounding
     if type(util) ~= "table" or type(util.CreateNumericRuleFormatter) ~= "function"
         or not rounding or type(rounding.Down) ~= "number"
-        or type(rounding.Up) ~= "number" then return nil end
+        or type(rounding.Up) ~= "number" or type(rounding.Nearest) ~= "number" then return nil end
 
     local ok, formatter = pcall(util.CreateNumericRuleFormatter)
     if not ok or not formatter or isSecret(formatter) then return nil end
@@ -54,7 +54,7 @@ local function getFormatter()
 
     -- The native formatter chooses the rule even when the cooldown is secret.
     local rules = {
-        { threshold = 0, format = "%.1f" },
+        { threshold = 0, step = 0.1, rounding = rounding.Nearest, max = 9.9, format = "%.1f" },
         { threshold = DECIMAL_CUTOFF, step = 1, rounding = rounding.Down,
             format = "%.0f" },
         { threshold = MINUTES_START, step = 60, rounding = rounding.Up,

@@ -263,7 +263,7 @@ local function measureGlyphs(file,size,flags,scale,textScale,attempt)
     return glyphs,broad,tolerance,natural,width,lineWidth
 end
 
-local function build(base,source,file,size,flags,scale,textScale,smoothScaling,attempt)
+local function build(base,source,file,size,flags,scale,textScale,smoothScaling,attempt,secondsFormat)
     local probeWidth,probeHeight=prepareActionProbe(file,size,flags,scale,textScale,smoothScaling,attempt)
     local tolerance=.01/scale -- one hundredth of a screen pixel, in local UI units
     local function sample(text)
@@ -376,15 +376,30 @@ local function build(base,source,file,size,flags,scale,textScale,smoothScaling,a
         end
     end
 
+    local decimalPrefix,decimalSuffix
+    if secondsFormat then
+        decimalPrefix,decimalSuffix=secondsFormat:match("^(.*)%%%.1f(.*)$")
+        assert(decimalPrefix and decimalSuffix,"unsupported verified decimal format")
+    end
     local encoded,families={[""]=""},{}
     local requiredWidth=0
     local function encode(raw)
         if encoded[raw] then return encoded[raw] end
+        -- Reuse the buff profile's compact geometry only for its proven
+        -- single-digit decimal family. Whole seconds and unit labels retain
+        -- their individual guards, even when their numerals are tabular.
+        local compact=decimalPrefix and raw:match("^%d[.,]%d$")
         local pieces,spans,length={},{},0
         for i=1,#raw do
             local char=raw:sub(i,i)
             local piece=glyphs[char] or char
-            spans[i]=length+(guards[char] or 0)+1
+            local leading=guards[char] or 0
+            if compact then
+                piece=char;leading=0
+                if i==1 then piece=decimalPrefix..piece;leading=#decimalPrefix end
+                if i==#raw then piece=piece..decimalSuffix end
+            end
+            spans[i]=length+leading+1
             pieces[i]=piece
             length=length+#piece
         end
@@ -402,8 +417,13 @@ local function build(base,source,file,size,flags,scale,textScale,smoothScaling,a
         local positions={}
         if widthOnly then
             for i=1,#pieces do
-                local prefix=widthContexts(table.concat(pieces,"",1,i))
-                local suffix=widthContexts(table.concat(pieces,"",i,#pieces))
+                local prefix=table.concat(pieces,"",1,i)
+                local suffix=table.concat(pieces,"",i,#pieces)
+                -- Guard sampled substring edges too; otherwise a bare
+                -- numeral's end bearing can falsify a stable interior span.
+                if compact and i<#pieces then prefix=prefix..decimalSuffix end
+                if compact and i>1 then suffix=decimalPrefix..suffix end
+                prefix,suffix=widthContexts(prefix),widthContexts(suffix)
                 positions[#positions+1]=prefix[1]
                 positions[#positions+1]=prefix[2]
                 positions[#positions+1]=suffix[1]
@@ -701,14 +721,7 @@ local function buildBuffSeconds(file,size,flags,scale,textScale,smooth,attempt)
     return format,required,not haveAreas
 end
 
-function private.GetFixedBuffSecondsFormat(label)
-    local attempt={}
-    local key,file,size,flags,scale,textScale=readableStyle(label,attempt)
-    if not key then lastBuffSecondsStage=attempt.stage;return nil end
-    attempt.stage="smooth-scaling"
-    local got,smooth=pcall(function()return accessible(label:GetSmoothScaling())end)
-    if not got or type(smooth)~="boolean" then lastBuffSecondsStage=attempt.stage;return nil end
-    key=key.."\031"..(smooth and "1" or "0")
+local function getBuffSecondsProfile(key,file,size,flags,scale,textScale,smooth,attempt)
     local entry=buffSecondsProfiles[key]
     if not entry then
         if buffSecondsKeys[buffSecondsSlot] then buffSecondsProfiles[buffSecondsKeys[buffSecondsSlot]]=nil end
@@ -729,6 +742,18 @@ function private.GetFixedBuffSecondsFormat(label)
         entry.stage=built and (widthOnly and "fixed-widths" or "fixed") or attempt.stage
         entry.format,entry.required=built and format or nil,required
     end
+    return entry
+end
+
+function private.GetFixedBuffSecondsFormat(label)
+    local attempt={}
+    local key,file,size,flags,scale,textScale=readableStyle(label,attempt)
+    if not key then lastBuffSecondsStage=attempt.stage;return nil end
+    attempt.stage="smooth-scaling"
+    local got,smooth=pcall(function()return accessible(label:GetSmoothScaling())end)
+    if not got or type(smooth)~="boolean" then lastBuffSecondsStage=attempt.stage;return nil end
+    key=key.."\031"..(smooth and "1" or "0")
+    local entry=getBuffSecondsProfile(key,file,size,flags,scale,textScale,smooth,attempt)
     lastBuffSecondsStage=entry.stage
     if not entry.format then return end
     local fits=pcall(function()
@@ -780,7 +805,10 @@ function private.GetFixedActionFormatter(label,base,widget)
     if not entry.formatter then
         if entry.epoch==retryEpoch then lastFormatterStage=entry.stage;return nil end
         entry.epoch=retryEpoch
-        local built,formatter,required,widthOnly=pcall(build,base,source,file,size,flags,scale,textScale,smoothScaling,attempt)
+        -- Share the bounded font proof, not a label's temporary width. The
+        -- action widget still applies its own final fitting check below.
+        local seconds=getBuffSecondsProfile(key,file,size,flags,scale,textScale,smoothScaling,{})
+        local built,formatter,required,widthOnly=pcall(build,base,source,file,size,flags,scale,textScale,smoothScaling,attempt,seconds.format)
         local cleaned=pcall(function()
             if actionProbe then
                 accepted(actionProbe:Hide())

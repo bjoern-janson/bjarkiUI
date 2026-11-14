@@ -49,7 +49,7 @@ local function makeEnv()
             function formatter:SetBreakpoints(rules) self.rules=rules end
             return formatter
         end},
-        Enum={NumericRuleFormatRounding={Down=2,Up=1}},
+        Enum={NumericRuleFormatRounding={Nearest=0,Down=2,Up=1}},
         CreateFrame=function()
             local frame={}
             function frame:RegisterEvent(name) events[name]=true end
@@ -81,6 +81,8 @@ local function render(formatter,seconds)
         else ratio=math.floor(ratio+0.5) end
         value=ratio*chosen.step
     end
+    if chosen.min then value=math.max(chosen.min,value) end
+    if chosen.max then value=math.min(chosen.max,value) end
     local component=chosen.components and chosen.components[1]
     if component and component.div then value=value/component.div end
     return string.format(chosen.format,value)
@@ -130,8 +132,10 @@ do
     eq(rules[4].threshold,3600,"hour breakpoint unchanged")
     eq(rules[5].threshold,86400,"day breakpoint unchanged")
     for _,pair in ipairs({
-        {0.1,"0.1"},{1.9,"1.9"},{4.9,"4.9"},{5,"5.0"},
-        {5.1,"5.1"},{5.9,"5.9"},{9.9,"9.9"},{10,"10"},{10.1,"10"},{59.9,"59"},{60,"60"},
+        {0.1,"0.1"},{0.25,"0.3"},{1.25,"1.3"},{9.25,"9.3"},
+        {1.9,"1.9"},{4.9,"4.9"},{5,"5.0"},
+        {5.1,"5.1"},{5.9,"5.9"},{9.9,"9.9"},{9.95,"9.9"},{9.999,"9.9"},{9.999999,"9.9"},
+        {10,"10"},{10.1,"10"},{59.9,"59"},{60,"60"},
         {86,"86"},{89.99,"89"},{90,"90"},{90.99,"90"},{91,"2m"},
         {99,"2m"},{100,"2m"},{105,"2m"},{120,"2m"},{120.01,"3m"},{321,"6m"},{359.9,"6m"},
         {360,"6m"},{361,"7m"},{900,"15m"},
@@ -286,6 +290,15 @@ do
     env.ActionButton1={cooldown=cd}
     loadWith(env)
     eq(cd.setterCalls,0,"missing numeric rounding enum no-ops")
+end
+
+do
+    local env=makeEnv()
+    env.Enum.NumericRuleFormatRounding.Nearest=nil
+    local cd=makeCooldown()
+    env.ActionButton1={cooldown=cd}
+    loadWith(env)
+    eq(cd.setterCalls,0,"missing native nearest-tenth rounding retains the stock countdown")
 end
 
 do
