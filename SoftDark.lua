@@ -155,9 +155,18 @@ local function inCombat()
     return result ~= false
 end
 
+-- Keep each current native read protected without a new closure per lookup.
+local function readMember(node, key)
+    return node[key]
+end
+
+local function readObjectType(region)
+    return region:GetObjectType()
+end
+
 local function child(node, key)
     if not readable(node) then return nil end
-    local ok, value = pcall(function() return node[key] end)
+    local ok, value = pcall(readMember, node, key)
     return ok and readable(value) and value or nil
 end
 
@@ -172,7 +181,7 @@ end
 
 local function isTexture(region)
     if not readable(region) then return false end
-    local ok, kind = pcall(function() return region:GetObjectType() end)
+    local ok, kind = pcall(readObjectType, region)
     return ok and readable(kind) and kind == "Texture"
 end
 

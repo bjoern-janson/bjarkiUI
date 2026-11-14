@@ -1,6 +1,6 @@
 # bjarkiUI code map
 
-Current test branch: **0.2.365-default-level-badges-test**. Start with the physical region that displays the symptom, then follow its native writer, addon observer, ownership record and cleanup. [Timer lifecycle detail](TIMER_LIFECYCLE.md) · [Verification commands and suite map](TESTING.md)
+Current test branch: **0.2.366-lifecycle-work-test**. Start with the physical region that displays the symptom, then follow its native writer, addon observer, ownership record and cleanup. [Timer lifecycle detail](TIMER_LIFECYCLE.md) · [Verification commands and suite map](TESTING.md)
 
 ## Runtime load order
 
@@ -43,6 +43,7 @@ The [default manifest](../bjarkiUI.toc) and [Camelot manifest](../bjarkiUI_Camel
 | Compact party colors/status | Native compact name and health-color updates → `PartyPresentation` class colors; existing `bjarkiUI.InstallCompactStatusFont` routine only on party numeric text. Changes must not affect raid/nameplate frames or native power colors. | [party-presentation.lua](../tests/party-presentation.lua) |
 | Level ring/text, combat-icon and bag-count geometry | `FrameLabelTweaks.apply` → `moveLevel/mirroredCombatAnchor/moveCombatIcon/enlargeCount`. `recordReceipt` stores native-confirmed geometry/font state; do not mistake an addon request for an accepted write. | [frame-label-tweaks.lua](../tests/frame-label-tweaks.lua), [leader-crown-nudge.lua](../tests/leader-crown-nudge.lua), [combat-icon-level-mirror.lua](../tests/combat-icon-level-mirror.lua), [combat-icon-portrait-anchor.lua](../tests/combat-icon-portrait-anchor.lua) |
 | Soft Dark stale tint or restoration | `applyTheme/tintTexture` and `restore`; inspect original values, native float precision, later writers and failed restoration retries. Edit Mode callback registration is a separate recovery path. | [softdark-restore.lua](../tests/softdark-restore.lua), [softdark-discovery-handoff.lua](../tests/softdark-discovery-handoff.lua), [softdark-callback-recovery.lua](../tests/softdark-callback-recovery.lua) |
+| Nameplate CC/LoC layout | `observeNameplateControlLayout` → per-physical-frame queue → current public LEFT-anchor comparison. A weak native-writer revision invalidates reentrant reads, including refused scheduling. Full discovery and both mixin/instance observers remain. | [nameplate-control-layout.lua](../tests/nameplate-control-layout.lua), [hardening.lua](../tests/hardening.lua) |
 | Failed initialization or later native UI availability | Main `installHooks/installNativeUpdateHooks` and each module's setup/event handler. A failed install must remain retryable without duplicating successful hooks. | [initialization-recovery.lua](../tests/initialization-recovery.lua), [hardening.lua](../tests/hardening.lua), [lifecycle.lua](../tests/lifecycle.lua) |
 | Restricted target/focus aura behavior | Native aura rows remain authoritative. `bjarkiUIUnitAuraRows.GetStatus` reports retirement; do not revive the old custom renderer from historical notes. | [unit-aura-retirement.lua](../tests/unit-aura-retirement.lua) |
 

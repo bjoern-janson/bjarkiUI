@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.365-default-level-badges-test"
+local BJARKI_UI_VERSION = "0.2.366-lifecycle-work-test"
 -- Standalone PRD treatment is retained. Unit-frame resource bars stay native.
 local PRD_MANA_R, PRD_MANA_G, PRD_MANA_B = 0.10, 0.25, 1.00
 local WORLD_TEXT_SCREEN_Y = "0.0430"
@@ -2742,7 +2742,35 @@ end
 -- HealthBarsContainer. Native CC anchoring uses the container edge. Anchor the
 -- two existing control lists to the actual classic artwork edge instead.
 local nameplateControlLayout = { hooked = false, pending = setmetatable({}, { __mode = "k" }),
-    frames = setmetatable({}, { __mode = "k" }) }
+    frames = setmetatable({}, { __mode = "k" }), revisions = setmetatable({}, { __mode = "k" }) }
+function nameplateControlLayout.Matches(list, edge)
+    if type(list.GetNumPoints) ~= "function" or type(list.GetPoint) ~= "function" then return false end
+    local counted, count = pcall(list.GetNumPoints, list)
+    if not counted or isSecret(count) or type(count) ~= "number"
+        or count < 1 or count > 9 or count % 1 ~= 0 then return false end
+    for index = 1, count do
+        local ok, point, relative, relativePoint, x, y = pcall(list.GetPoint, list, index)
+        if not ok or isSecret(point) or isSecret(relative) or isSecret(relativePoint)
+            or isSecret(x) or isSecret(y) then return false end
+        if point == "LEFT" then
+            return relative == edge and relativePoint == "RIGHT" and x == 5 and y == 0
+        end
+    end
+    return false
+end
+function nameplateControlLayout.IsCurrent(frame, container, health, edge, auras, key, list)
+    local options = _G.NamePlateSetupOptions
+    if not options or isSecret(options) or isSecret(options.useClassicHealthBar)
+        or options.useClassicHealthBar ~= true then return false end
+    local currentContainer, currentAuras = frame.HealthBarsContainer, frame.AurasFrame
+    if isSecret(currentContainer) or isSecret(currentAuras)
+        or currentContainer ~= container or currentAuras ~= auras then return false end
+    local currentHealth, currentList = container.healthBar, auras[key]
+    if isSecret(currentHealth) or isSecret(currentList)
+        or currentHealth ~= health or currentList ~= list then return false end
+    local currentEdge = health.bgTexture
+    return not isSecret(currentEdge) and currentEdge == edge
+end
 local function repairNameplateControlLayout(frame)
     if not frame or isSecret(frame) then return end
     local options = _G.NamePlateSetupOptions
@@ -2751,13 +2779,16 @@ local function repairNameplateControlLayout(frame)
     -- Unknown or unavailable permission is not permission.
     if readableBool(frame.IsForbidden, frame) ~= false then return end
     local container = frame.HealthBarsContainer
-    local health = container and container.healthBar
-    local edge = health and health.bgTexture
+    if not container or isSecret(container) then return end
+    local health = container.healthBar
+    if not health or isSecret(health) then return end
+    local edge = health.bgTexture
     local auras = frame.AurasFrame
     if not edge or isSecret(edge) or not auras or isSecret(auras)
         or readableBool(edge.IsForbidden, edge) ~= false then return end
     for _, key in ipairs({"CrowdControlListFrame", "LossOfControlFrame"}) do
         local list = auras[key]
+        local revision = nameplateControlLayout.revisions[frame]
         if list and not isSecret(list) and type(list.SetPoint) == "function"
             and readableBool(list.IsForbidden, list) == false then
             local protected = readableBool(list.IsProtected, list)
@@ -2765,16 +2796,45 @@ local function repairNameplateControlLayout(frame)
             -- frames outside combat, may receive this visual anchor.
             if protected == false or
                 (protected == true and readableBool(InCombatLockdown) == false) then
+                local matches = nameplateControlLayout.Matches(list, edge)
+                local setter = list.SetPoint
+                -- Introduced getters may reenter native layout, replace a
+                -- recipient, or change permission. Check after all reads.
+                if type(setter) ~= "function"
+                    or readableBool(frame.IsForbidden, frame) ~= false
+                    or readableBool(edge.IsForbidden, edge) ~= false
+                    or readableBool(list.IsForbidden, list) ~= false then return end
+                protected = readableBool(list.IsProtected, list)
+                if protected ~= false and not
+                    (protected == true and readableBool(InCombatLockdown) == false) then return end
+                local checked, current = pcall(nameplateControlLayout.IsCurrent,
+                    frame, container, health, edge, auras, key, list)
+                if not checked or current ~= true then return end
+                if nameplateControlLayout.revisions[frame] ~= revision then
+                    -- A queued newer writer owns the next repair. If its
+                    -- scheduling failed, reject the stale equality result
+                    -- and retain the existing safe native write below.
+                    if nameplateControlLayout.pending[frame] then return end
+                    matches = false
+                end
                 -- Replace only Blizzard's LEFT anchor, without clearing the
                 -- rest of the native list layout or touching aura values.
-                pcall(list.SetPoint, list, "LEFT", edge, "RIGHT", 5, 0)
+                -- No remembered write can substitute for current geometry.
+                if not matches then pcall(setter, list, "LEFT", edge, "RIGHT", 5, 0) end
             end
         end
     end
 end
 
 local function queueNameplateControlLayout(frame)
-    if not frame or isSecret(frame) or nameplateControlLayout.pending[frame]
+    if not frame or isSecret(frame) then return end
+    local options = _G.NamePlateSetupOptions
+    if options and not isSecret(options) and not isSecret(options.useClassicHealthBar)
+        and options.useClassicHealthBar == false then return end
+    -- This is a writer revision, not an anchor cache. Keep it even if the
+    -- next-tick scheduler refuses, so a reentrant getter cannot look settled.
+    nameplateControlLayout.revisions[frame] = (nameplateControlLayout.revisions[frame] or 0) + 1
+    if nameplateControlLayout.pending[frame]
         or not C_Timer or type(C_Timer.After) ~= "function" then return end
     nameplateControlLayout.pending[frame] = true
     local scheduled = pcall(C_Timer.After, 0, function()

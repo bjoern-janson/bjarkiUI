@@ -54,6 +54,7 @@ local invalidMarkup,ignoreFont,tallMarkup,outlined=false,false,false,false
 local modernBounds,quantizeSpacers,spanFailure=false,false,nil
 local widthFailure,oversizedHeight
 local rejectUnusedArgument,formattedSamples=false,0
+local formattedValues
 local rejectAlpha,rejectShow,unreadableAlpha,rejectSmooth=false,false,false,false
 local quantizeBounds=false
 local sideBearings={["1"]={2,.5},["7"]={.75,.25}}
@@ -120,6 +121,7 @@ function UIParent:CreateFontString()
     function f:SetText(text)assert(self.hidden or self.alpha==0);self.text=text end
     function f:SetFormattedText(format,value,writeToken)
         formattedSamples=formattedSamples+1
+        if formattedValues then formattedValues[value]=(formattedValues[value] or 0)+1 end
         if writeToken and rejectUnusedArgument then return false end
         assert(not issecretvalue(value),"public calibration received opaque time")
         self:SetText((string.format(format,value):gsub("%.",localePoint)))
@@ -546,23 +548,42 @@ do
     modernBounds,quantizeSpacers,kern=true,true,{};localePoint="."
     local function check(format)
         assert(format:find("%.1f",1,true) and not format:find(" s",1,true))
-        for _,value in ipairs({0,0.1,1.1,1.8,7.1,8.1,8.8,9.9})do
+        for tenth=0,99 do
+            local value=tenth/10
             local _,raw,positions=layout(string.format(format,value))
             assert(raw==string.format("%.1f",value),"buff spelling changed")
             for i,want in ipairs({-4.875,0,4.875})do
                 assert(math.abs(positions[i]-want)<.001,"guarded buff column moved")
             end
         end
-        for _,value in ipairs({10,11.1,17.8,71.1,81.8,88.8,89.9,90})do
-            local _,_,positions=layout(string.format(format,value))
-            for i,want in ipairs({-8.5,-1.25,3.625,8.5})do
-                assert(math.abs(positions[i]-want)<.001,"two-digit buff column moved")
-            end
-        end
     end
     local beforeProbes,beforeFormatters=probeCount,formatterCount
-    spanFailure=nil;check(assert(buff(label(80))))
-    spanFailure="nil";local f=label(81);local fixed=assert(buff(f));check(fixed)
+    local f,fixed
+    for index,route in ipairs({"characters","widths"})do
+        spanFailure=route=="widths" and "nil" or nil
+        -- Adjacent numeral kerning affects only an unused two-digit family.
+        -- Both consumers clamp short decimals at 9.9; ten seconds stays native.
+        kern={["11"]=-.5}
+        local current=label(79+index)
+        formattedValues={}
+        local guarded=assert(buff(current),"unused two-digit kerning rejected supported short buff columns: "..route)
+        local sampled=0
+        for value,count in pairs(formattedValues)do
+            assert(value>=0 and value<10,"buff preparation sampled an unused decimal family")
+            assert(count==2,"each short decimal needs plain and guarded native printf validation")
+            sampled=sampled+1
+        end
+        assert(sampled==100,"buff preparation omitted an emitted short decimal")
+        for tenth=0,99 do assert(formattedValues[tenth/10],"missing short buff calibration value: "..tenth)end
+        formattedValues=nil
+        check(guarded)
+        local measured,samples=measures,formattedSamples
+        private.RetryFixedActionFormatters()
+        assert(buff(current)==guarded and measures==measured and formattedSamples==samples,
+            "successful short buff profile recalibrated at a safe epoch: "..route)
+        if route=="widths" then f,fixed=current,guarded end
+    end
+    kern={}
     local before=measures
     for _=1,50 do assert(buff(f)==fixed)end
     assert(measures==before and probeCount==beforeProbes and formatterCount==beforeFormatters,
