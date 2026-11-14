@@ -2,7 +2,7 @@
 -- Do not alter FontString text,
 -- visibility, button behavior, shared Font objects, or surrounding frame layout.
 local _, uiPrivate = ...
-local LEVEL_SIDE_GAP, BAG_FONT_INCREASE = 10, 3
+local LEVEL_SIDE_GAP, BAG_FONT_INCREASE = 16, 3
 -- Keep the combat glyph at the prior lower-corner mirror, using the native
 -- level-circle center plus the old label offset instead of the moved text.
 local COMBAT_LEVEL_OUTWARD, COMBAT_LEVEL_DOWN = 4, 1.5
@@ -13,7 +13,10 @@ local levels = setmetatable({}, { __mode = "k" })
 local combatIcons = setmetatable({}, { __mode = "k" })
 local leaderIcons = setmetatable({}, { __mode = "k" })
 local counts = setmetatable({}, { __mode = "k" })
+local levelBadges = {}
+local LEVEL_VISIBILITY_METHODS = { "Show", "Hide", "SetShown", "SetAlpha" }
 local refreshCombatIcon
+local prepareLevelBadge, syncLevelBadge
 
 local function readable(value)
     if type(issecretvalue) ~= "function" then return true end
@@ -72,7 +75,8 @@ end
 local function hookOnce(object, state, method, callback)
     if state[method] or type(hooksecurefunc) ~= "function"
         or type(field(object, method)) ~= "function" then return end
-    state[method] = pcall(hooksecurefunc, object, method, callback)
+    local ok, result = pcall(hooksecurefunc, object, method, callback)
+    state[method] = ok and readable(result) and result ~= false
 end
 
 local function pointOf(text)
@@ -153,7 +157,13 @@ local function moveLevel(text, state)
     end
 end
 
-local function installLevel(text, portrait, nativeRelative, side)
+local function installLevel(text, portrait, nativeRelative, side, role, owner)
+    local badge = levelBadges[role]
+    if badge and (badge.text ~= text or badge.owner ~= owner) then
+        badge.ready = false
+        if badge.background then pcall(badge.background.Hide, badge.background) end
+        if badge.border then pcall(badge.border.Hide, badge.border) end
+    end
     if not outsideCombat() or not accessible(text) then return end
     local state = levels[text]
     if not state then state = {}; levels[text] = state end
@@ -169,11 +179,207 @@ local function installLevel(text, portrait, nativeRelative, side)
                 state.requested = nil
             end
             moveLevel(self, state)
+            syncLevelBadge(self)
             if state.side == "LEFT" and refreshCombatIcon then
                 refreshCombatIcon()
             end
         end)
     end
+    prepareLevelBadge(text, state, role, owner)
+end
+
+-- The nameplate's standalone level artwork, without its unit-data mixin.
+-- One reusable pair per role shares the native text's parent and sits below it.
+-- Parent visibility/fades are inherited; only local numeric visibility is mirrored.
+local function acceptedCall(object, method, ...)
+    local fn = field(object, method)
+    if type(fn) ~= "function" then return false end
+    local ok, result = pcall(fn, object, ...)
+    return ok and readable(result) and result ~= false
+end
+
+local function currentLevel(role)
+    local frame = _G[role]
+    local player = role == "PlayerFrame"
+    local content = field(frame, player and "PlayerFrameContent" or "TargetFrameContent")
+    local owner = field(content, player and "PlayerFrameContentMain" or "TargetFrameContentMain")
+    local container = field(frame, player and "PlayerFrameContainer" or "TargetFrameContainer")
+    return player and _G.PlayerLevelText or field(owner, "LevelText"), owner,
+        field(container, player and "PlayerPortrait" or "Portrait")
+end
+
+local function sameBadgeBinding(badge, text, binding)
+    return badge.text == text and badge.binding == binding
+end
+
+local function hideLevelBadge(badge, text, binding)
+    if not sameBadgeBinding(badge, text, binding) then return end
+    badge.visibilityPublic = nil
+    if badge.background then acceptedCall(badge.background, "Hide") end
+    if sameBadgeBinding(badge, text, binding) and badge.border then
+        acceptedCall(badge.border, "Hide")
+    end
+end
+
+local function currentBadge(badge, text, state, binding)
+    if not sameBadgeBinding(badge, text, binding) or not accessible(text) then return false end
+    local current, owner, portrait = currentLevel(badge.role)
+    if current ~= text or owner ~= badge.owner or portrait ~= state.portrait then return false end
+    local getParent = field(text, "GetParent")
+    if type(getParent) ~= "function" then return false end
+    local ok, parent = pcall(getParent, text)
+    return ok and readable(parent) and parent == owner and regionScale(owner) ~= nil
+        and sameBadgeBinding(badge, text, binding)
+end
+
+local function badgePlacement(text, state, badge)
+    local point = pointOf(text)
+    if not point or not ((state.applied and samePoint(point, state.applied))
+        or (state.requested and samePoint(point, state.requested, true))) then return false end
+    local ps, ts, os = regionScale(state.portrait), regionScale(text), regionScale(badge.owner)
+    if not ps or not ts or not os or ps / os ~= badge.scale then return false end
+    return point[1] == "CENTER" and point[2] == state.portrait and point[3] == state.side
+        and matchesNumber(point[4], state.dx * ps / ts, true) and point[5] == 0
+end
+
+syncLevelBadge = function(text)
+    local state = levels[text]
+    local badge = state and state.badge
+    if not badge or state.badgeSyncing then return end
+    local binding = badge.binding
+    if not sameBadgeBinding(badge, text, binding) then return end
+    state.badgeSyncing = true
+    -- A nested native visibility writer supersedes the older read. Bound the
+    -- retry; an unavailable read leaves only our decoration hidden.
+    for _ = 1, 2 do
+        local revision = state.badgeRevision
+        if not badge.ready or not currentBadge(badge, text, state, binding)
+            or not badgePlacement(text, state, badge) then
+            hideLevelBadge(badge, text, binding)
+            break
+        end
+        local getter = field(text, "IsShown")
+        local ok, shown = false, nil
+        if type(getter) == "function" then ok, shown = pcall(getter, text) end
+        local alphaGetter, alpha = field(text, "GetAlpha"), 1
+        if type(alphaGetter) == "function" then
+            local alphaOK
+            alphaOK, alpha = pcall(alphaGetter, text)
+            ok = ok and alphaOK and finite(alpha) and alpha >= 0 and alpha <= 1
+        end
+        local public = ok and readable(shown)
+        if public and type(shown) ~= "boolean" then ok = false end
+        if not ok or not currentBadge(badge, text, state, binding) then
+            hideLevelBadge(badge, text, binding)
+            break
+        end
+        if revision == state.badgeRevision then
+            if public and badge.visibilityPublic and badge.shown == shown and badge.alpha == alpha then break end
+            local displayed = true
+            for i = 1, 2 do
+                local texture = i == 1 and badge.background or badge.border
+                if not sameBadgeBinding(badge, text, binding) or revision ~= state.badgeRevision then
+                    displayed = false; break
+                end
+                if public then
+                    displayed = acceptedCall(texture, "SetAlpha", alpha)
+                        and acceptedCall(texture, "SetShown", shown)
+                else
+                    -- IsShown can be opaque. This native sink explicitly permits
+                    -- opaque booleans from addons; SetShown does not.
+                    displayed = acceptedCall(texture, "SetAlphaFromBoolean", shown, alpha, 0)
+                        and acceptedCall(texture, "Show")
+                end
+                if not displayed then break end
+            end
+            if revision == state.badgeRevision then
+                if not displayed then hideLevelBadge(badge, text, binding)
+                elseif sameBadgeBinding(badge, text, binding) then
+                    badge.visibilityPublic, badge.shown, badge.alpha = public, public and shown, alpha
+                end
+                break
+            end
+        end
+        hideLevelBadge(badge, text, binding)
+    end
+    state.badgeSyncing = false
+end
+
+local function levelVisibilityChanged(text)
+    local state = levels[text]
+    if not state then return end
+    state.badgeRevision = (state.badgeRevision or 0) + 1
+    syncLevelBadge(text)
+end
+
+local function configureBadgeTexture(texture, owner, text, atlas, layer, sublevel, width, height, y)
+    return acceptedCall(texture, "Hide")
+        and acceptedCall(texture, "SetParent", owner)
+        and acceptedCall(texture, "SetAtlas", atlas)
+        and acceptedCall(texture, "SetDrawLayer", layer, sublevel)
+        and acceptedCall(texture, "SetSize", width, height)
+        and acceptedCall(texture, "SetPoint", "CENTER", text, "CENTER", 0, y)
+end
+
+prepareLevelBadge = function(text, state, role, owner)
+    if not outsideCombat() then return end
+    local badge = levelBadges[role]
+    if not badge then
+        badge = { role = role, binding = 0 }; levelBadges[role] = badge
+    end
+    if badge.text ~= text or badge.owner ~= owner then
+        hideLevelBadge(badge, badge.text, badge.binding)
+        badge.text, badge.owner, badge.configured = text, owner, false
+        badge.binding = badge.binding + 1
+    end
+    badge.ready = false
+    state.badge = badge
+    local binding = badge.binding
+    if not currentBadge(badge, text, state, binding) then
+        hideLevelBadge(badge, text, binding); return
+    end
+    local ps, os = regionScale(state.portrait), regionScale(owner)
+    local getLayer = field(text, "GetDrawLayer")
+    if not ps or not os or type(getLayer) ~= "function" then
+        hideLevelBadge(badge, text, binding); return
+    end
+    local ok, layer, sublevel = pcall(getLayer, text)
+    if not ok or not readable(layer) or not (layer == "ARTWORK" or layer == "OVERLAY")
+        or not finite(sublevel) or sublevel % 1 ~= 0 or sublevel < -6 or sublevel > 7 then
+        hideLevelBadge(badge, text, binding); return
+    end
+    local scale = ps / os
+    if not finite(scale) or not currentBadge(badge, text, state, binding) or not outsideCombat() then return end
+    if not badge.configured or badge.scale ~= scale or badge.layer ~= layer or badge.sublevel ~= sublevel then
+        badge.configured = false
+        hideLevelBadge(badge, text, binding)
+        local create = field(owner, "CreateTexture")
+        if type(create) ~= "function" then return end
+        for _, key in ipairs({ "background", "border" }) do
+            if not badge[key] then
+                local made, texture = pcall(create, owner, nil, layer, nil, sublevel - 2)
+                if not made or not readable(texture) or not texture then return end
+                badge[key] = texture -- Retain partial setup for the next safe retry.
+                acceptedCall(texture, "Hide")
+            end
+        end
+        if not configureBadgeTexture(badge.background, owner, text,
+            "ui-hud-nameplates-levelindicator", layer, sublevel - 2, 28 * scale, 16 * scale, 0)
+            or not configureBadgeTexture(badge.border, owner, text,
+            "ui-hud-nameplates-levelindicator-rectangle-selected", layer, sublevel - 1,
+            34 * scale, 23 * scale, -0.5 * scale) then return end
+        if not currentBadge(badge, text, state, binding) or not outsideCombat() then return end
+        badge.scale, badge.layer, badge.sublevel, badge.configured = scale, layer, sublevel, true
+    end
+    for _, method in ipairs(LEVEL_VISIBILITY_METHODS) do
+        hookOnce(text, state, method, levelVisibilityChanged)
+    end
+    if not state.SetPoint or not state.Show or not state.Hide or not state.SetShown
+        or (type(field(text, "SetAlpha")) == "function" and not state.SetAlpha) then
+        hideLevelBadge(badge, text, binding); return
+    end
+    badge.ready = true
+    syncLevelBadge(text)
 end
 
 -- Convert the native level-circle/portrait positions to the icon's anchor units.
@@ -450,7 +656,7 @@ local function apply()
     local frameContainer = field(_G.PlayerFrame, "PlayerFrameContainer")
     local playerPortrait = field(frameContainer, "PlayerPortrait")
     local playerLevelCircle = field(playerMain, "LevelBackgroundCircle")
-    installLevel(_G.PlayerLevelText, playerPortrait, playerLevelCircle, "LEFT")
+    installLevel(_G.PlayerLevelText, playerPortrait, playerLevelCircle, "LEFT", "PlayerFrame", playerMain)
     installCombatIcon(field(playerContext, "AttackIcon"), field(frameContainer, "PlayerPortrait"),
         _G.PlayerLevelText, playerLevelCircle)
     installLeaderIcon(field(playerContext, "LeaderIcon"), PLAYER_CROWN_GAP,
@@ -461,7 +667,7 @@ local function apply()
         local contextual = field(content, "TargetFrameContentContextual")
         local container = field(_G[name], "TargetFrameContainer")
         installLevel(field(main, "LevelText"), field(container, "Portrait"),
-            field(main, "LevelBackgroundCircle"), "RIGHT")
+            field(main, "LevelBackgroundCircle"), "RIGHT", name, main)
         installLeaderIcon(field(contextual, "LeaderIcon"), -TARGET_CROWN_GAP,
             "TOPRIGHT", contextual, field(container, "Portrait"))
     end

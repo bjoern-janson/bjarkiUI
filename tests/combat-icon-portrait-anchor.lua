@@ -74,7 +74,7 @@ end
 
 test("combat glyph preserves the original ring mirror relative to the portrait after text moves left",function()
  local e=fixture();e:event("PLAYER_LOGIN");e:expectAnchored();eq(e.icon.writes,1,"one move")
- local x,y=e.level:GetCenter();eq(x,60,"level center moved left");eq(y,120,"level center moved to portrait height")
+ local x,y=e.level:GetCenter();eq(x,54,"level center moved left");eq(y,120,"level center moved to portrait height")
 end)
 test("layout refresh does not drift or stack anchor writes",function()
  local e=fixture();e:event("PLAYER_LOGIN");for i=1,15 do e:event("PLAYER_ENTERING_WORLD");e:event("UI_SCALE_CHANGED") end

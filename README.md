@@ -1,14 +1,14 @@
 # bjarkiUI
 
-**0.2.367-target-refresh-allocation-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
+**0.2.368-nameplate-level-badges-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
 
 ## Latest test build
 
-**.367:** Reduces temporary allocation during target refreshes. The main frame, label and icon paths reuse protected reader functions; label rediscovery no longer constructs callbacks for hooks already installed. Native calls, class-color lookup order, visual state and recovery remain unchanged in paired fixtures. This establishes an allocation reduction, while the reported self-target microstutter remains open. [Changes](CHANGELOG.md) · [Verification](docs/VERIFICATION_0.2.367.md)
+**.368:** Moves Player, Target and Focus numeric levels six portrait units farther outward and adds the native nameplate level background and gold outline behind them. The native numbers, difficulty colors, skulls and lower level circles retain their behavior. Six reusable textures follow native numeric visibility; no polling or timer change is added. [Changes](CHANGELOG.md) · [Verification](docs/VERIFICATION_0.2.368.md)
 
 ## Install
 
-1. Download the supplied `bjarkiUI-0.2.367-Target-Refresh.zip` test package. The stacked development PR does not trigger the workflow restricted to `main`.
+1. Download the supplied `bjarkiUI-0.2.368-Nameplate-Level-Badges.zip` test package. The stacked development PR does not trigger the workflow restricted to `main`.
 2. Extract its `bjarkiUI` folder into the Forever client's `Interface/AddOns/` directory. Check that `Interface/AddOns/bjarkiUI/bjarkiUI.toc` exists.
 3. Enable the addon and reload the interface. Use `/bui help` for the main commands and `/bdark` for Soft Dark controls.
 
@@ -70,11 +70,11 @@ For action/cast reports, capture while the affected cooldown or cast is active. 
 
 The description **“Ultralight unit-frame presentation”** refers to the addon's narrow presentation role, native clock ownership and event-driven updates. It is not an FPS, startup-time or in-client memory guarantee. The [.366 comparison](docs/VERIFICATION_0.2.366.md) records reduced native requests and cold preparation samples; the [.367 comparison](docs/VERIFICATION_0.2.367.md) records lower temporary allocation in target-refresh fixtures. Live rendering, native formatter cost and client garbage collection remain separate checks. Full safe lifecycle discovery still recovers late-created or replaced native artwork.
 
-Start with [AGENTS.md](AGENTS.md), then the [code map](docs/CODE_MAP.md). The two manifests load **16 runtime modules**. Current verification runs **37 top-level Lua scripts** (36 behavioral suites plus the manifest syntax script) under Lua 5.1 and Lua 5.4; the aura suite contains 271 cases. See [testing and packaging](docs/TESTING.md) for commands and the boundary between offline and live evidence.
+Start with [AGENTS.md](AGENTS.md), then the [code map](docs/CODE_MAP.md). The two manifests load **16 runtime modules**. Current verification runs **38 top-level Lua scripts** (37 behavioral suites plus the manifest syntax script) under Lua 5.1 and Lua 5.4; the aura suite contains 271 cases. See [testing and packaging](docs/TESTING.md) for commands and the boundary between offline and live evidence.
 
 - [Timer sources, native writers, hooks and cleanup](docs/TIMER_LIFECYCLE.md)
 - [Default manifest](bjarkiUI.toc) · [Camelot manifest](bjarkiUI_Camelot.toc)
 - [Package workflow](.github/workflows/package-addon.yml) · [Changelog](CHANGELOG.md)
-- [Current verification and live evidence](docs/VERIFICATION_0.2.367.md)
+- [Current verification and live evidence](docs/VERIFICATION_0.2.368.md)
 
 `ARCHITECTURE.md` records implementation history, including retired experiments. The 0.2.309 audit documents, `tests/snapshot-0.2.309/` and `tools/audit/` are historical reproduction material, not the current test or packaging entry point. Reproduce that audit at its [pinned revision](https://github.com/bjoern-janson/bjarkiUI/tree/d1797e392e0eb466906632e4dc047eb830b2ac78). Current source and top-level tests take precedence over historical descriptions. [Architecture history](ARCHITECTURE.md) · [Audit baseline](docs/AUDIT_BASELINE.md)

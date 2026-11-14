@@ -96,7 +96,7 @@ end
 case('combat icon retains the original level-ring mirror after the visible text moves left',function()
     local e=fixture();e:event('PLAYER_LOGIN')
     e:expectMirror(30,-20)
-    local x,y=e.level:GetCenter();eq(x,60,'visible text moved outside the left portrait edge');eq(y,120,'visible text vertically centered')
+    local x,y=e.level:GetCenter();eq(x,54,'visible text moved outside the left portrait edge');eq(y,120,'visible text vertically centered')
     eq(e.icon.writes,1,'one positioning write')
 end)
 case('different readable scales are converted to the combat icon anchor space',function()
@@ -108,14 +108,14 @@ case('different readable scales are converted to the combat icon anchor space',f
     e.portrait.centerX=100;e.portrait.centerY=110;e.portrait.scale=1
     e.icon.scale=1;e:event('UI_SCALE_CHANGED')
     e:expectMirror(37.5,-43.625)
-    eq(e.level.anchor[4],-20,'side gap uses current portrait and label scales')
+    eq(e.level.anchor[4],-32,'side gap uses current portrait and label scales')
 end)
 case('live native ring movement updates the mirror without following the moved text',function()
     local e=fixture();e:event('PLAYER_LOGIN')
     e.circle.centerX=69;e.circle.centerY=93.5
     e.level:SetPoint('CENTER',e.circle,'CENTER',0,-0.5)
     e:expectMirror(35,-28)
-    local x,y=e.level:GetCenter();eq(x,60,'visible label stays left');eq(y,120,'visible label stays centered')
+    local x,y=e.level:GetCenter();eq(x,54,'visible label stays left');eq(y,120,'visible label stays centered')
     local count=e.icon.writes
     for _=1,6 do e:event('PLAYER_ENTERING_WORLD') end
     eq(e.icon.writes,count,'no redundant writes')
