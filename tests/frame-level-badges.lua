@@ -90,10 +90,7 @@ local function fixture()
         local o=common({scale=1,shown=true,alpha=1},'Frame')
         function o:CreateTexture(_,layer,_,sub)
             assert(not e.combat,'texture allocation in combat')
-            if e.rejectSecondFor==self then
-                local n=0;for _,t in ipairs(e.textures)do if t.parent==self then n=n+1 end end
-                if n>=1 then return nil end
-            end
+            if e.rejectCreateFor==self then return nil end
             return texture(self,layer,sub)
         end
         return o
@@ -143,37 +140,37 @@ local function fixture()
     function e:native(t,method,...)
         self.nativeCall=true;local ok,err=pcall(t[method],t,...);self.nativeCall=false;assert(ok,err)
     end
-    function e:pair(role)
-        local r=self.roles[role];local a,b
+    function e:badge(role)
+        local r=self.roles[role];local a
         for _,t in ipairs(self.textures)do
-            if t.parent==r.owner then if t.atlas==BASE then assert(not a,'duplicate base');a=t
-                elseif t.atlas==BORDER then assert(not b,'duplicate border');b=t end end
+            assert(t.atlas~=BORDER,'selected highlight must not be created')
+            if t.parent==r.owner and t.atlas==BASE then assert(not a,'duplicate base');a=t end
         end
-        assert(a and b,'missing complete '..role..' badge');return a,b
+        assert(a,'missing '..role..' badge');return a
     end
     function e:visible(role,wanted)
-        local a,b=self:pair(role);eq(a:IsVisible(),wanted,'base visibility');eq(b:IsVisible(),wanted,'border visibility')
+        eq(self:badge(role):IsVisible(),wanted,'base visibility')
     end
     local private={};assert(loadfile(root..'/NativePrecision.lua'))('bjarkiUI',private)
     assert(loadfile(source,'t',e))('bjarkiUI',private)
     return e
 end
 
-case('six native-nameplate textures surround unchanged original level labels',function()
-    local e=fixture();e:event('PLAYER_LOGIN');eq(#e.textures,6,'bounded resource count')
+case('three plain native-nameplate textures surround unchanged original level labels',function()
+    local e=fixture();e:event('PLAYER_LOGIN');eq(#e.textures,3,'bounded resource count')
     for _,role in ipairs({'player','target','focus'})do
-        local r=e.roles[role];local t=r.text;local a,b=e:pair(role);local side=role=='player' and -1 or 1
+        local r=e.roles[role];local t=r.text;local a=e:badge(role);local side=role=='player' and -1 or 1
         eq(t.anchor[2],r.portrait);eq(t.anchor[3],side<0 and 'LEFT' or 'RIGHT');eq(t.anchor[4],side*16)
         eq(t.anchor[5],0);eq(t:GetParent(),r.owner);eq(t.text,'27');eq(t.nativeWrites,0)
-        eq(a.width,28);eq(a.height,16);eq(b.width,34);eq(b.height,23)
-        eq(a.layer,'OVERLAY');eq(b.layer,'OVERLAY');eq(a.sub,t.sub-2);eq(b.sub,t.sub-1)
-        local x,y=t:GetCenter();local ax,ay=a:GetCenter();local bx,by=b:GetCenter()
-        near(ax,x);near(ay,y);near(bx,ax);near(by,ay-.5)
+        eq(a.width,28);eq(a.height,16)
+        eq(a.layer,'OVERLAY');eq(a.sub,t.sub-2)
+        local x,y=t:GetCenter();local ax,ay=a:GetCenter()
+        near(ax,x);near(ay,y)
         e:visible(role,true);eq(r.circle.alpha,1);eq(r.circle.shown,true)
     end
 end)
 
-case('native show hide and setshown control the pair while parent visibility inherits',function()
+case('native show hide and setshown control the badge while parent visibility inherits',function()
     local e=fixture();e:event('PLAYER_LOGIN');local r=e.roles.target;local t=r.text
     e:native(t,'Hide');e:visible('target',false)
     e:native(t,'Show');e:visible('target',true)
@@ -186,22 +183,22 @@ end)
 case('prepared badges follow visibility and local alpha in combat without geometry',function()
     local e=fixture();e:event('PLAYER_LOGIN');e.combat=true;local writes=e.artWrites;local t=e.roles.player.text
     e:native(t,'Hide');e:visible('player',false);e:native(t,'Show');e:visible('player',true)
-    e:native(t,'SetAlpha',.4);local a,b=e:pair('player');eq(a.alpha,.4);eq(b.alpha,.4)
+    e:native(t,'SetAlpha',.4);local a=e:badge('player');eq(a.alpha,.4)
     e:native(t,'SetAlpha',0);e:visible('player',false);e:native(t,'SetAlpha',1);e:visible('player',true)
-    eq(e.artWrites,writes);eq(#e.textures,6);eq(t.nativeWrites,5)
+    eq(e.artWrites,writes);eq(#e.textures,3);eq(t.nativeWrites,5)
 end)
 
 case('combat startup waits for the existing safe recovery event',function()
     local e=fixture();e.combat=true;e:event('PLAYER_LOGIN');eq(#e.textures,0);eq(e.hookCalls,0)
-    e.combat=false;e:event('PLAYER_REGEN_ENABLED');eq(#e.textures,6);e:visible('focus',true)
+    e.combat=false;e:event('PLAYER_REGEN_ENABLED');eq(#e.textures,3);e:visible('focus',true)
 end)
 
 case('opaque native visibility uses the supported boolean-alpha sink',function()
     local e=fixture();e:event('PLAYER_LOGIN');e.combat=true;local t=e.roles.target.text
     local hidden={secret=true,value=false};e:native(t,'SetShown',hidden);e:visible('target',false)
     local shown={secret=true,value=true};e:native(t,'SetShown',shown);e:visible('target',true)
-    local a,b=e:pair('target');assert(e.sinkCalls>=2,'opaque visibility was not forwarded')
-    assert(rawequal(a.opaqueInput,shown) and rawequal(b.opaqueInput,shown),'exact opaque selector retained by native sinks')
+    local a=e:badge('target');assert(e.sinkCalls>=2,'opaque visibility was not forwarded')
+    assert(rawequal(a.opaqueInput,shown),'exact opaque selector retained by native sink')
 end)
 
 case('unavailable visibility hides cosmetic art and safely recovers',function()
@@ -218,51 +215,50 @@ case('a combat native anchor reset hides the badge until side placement recovers
 end)
 
 case('replacement labels reuse artwork and old callbacks cannot affect the new label',function()
-    local e=fixture();e:event('PLAYER_LOGIN');local old=e.roles.target.text;local a,b=e:pair('target')
+    local e=fixture();e:event('PLAYER_LOGIN');local old=e.roles.target.text;local a=e:badge('target')
     local current=e:bind('target',false);current.shown=false;e:event('PLAYER_TARGET_CHANGED')
-    local aa,bb=e:pair('target');eq(a,aa);eq(b,bb);eq(#e.textures,6);e:visible('target',false)
+    local aa=e:badge('target');eq(a,aa);eq(#e.textures,3);e:visible('target',false)
     e:native(old,'Show');e:visible('target',false)
     e:native(current,'Show');e:visible('target',true)
 end)
 
-case('replacement physical owners reparent only the same addon-owned pair',function()
-    local e=fixture();e:event('PLAYER_LOGIN');local old=e.roles.focus.text;local a,b=e:pair('focus')
+case('replacement physical owners reparent only the same addon-owned badge',function()
+    local e=fixture();e:event('PLAYER_LOGIN');local old=e.roles.focus.text;local a=e:badge('focus')
     local current=e:bind('focus',true);current.shown=false;e:event('PLAYER_FOCUS_CHANGED')
-    local aa,bb=e:pair('focus');eq(a,aa);eq(b,bb);eq(#e.textures,6);eq(current.parent,e.roles.focus.owner)
+    local aa=e:badge('focus');eq(a,aa);eq(#e.textures,3);eq(current.parent,e.roles.focus.owner)
     e:native(old,'Show');e:visible('focus',false);e:native(current,'Show');e:visible('focus',true)
 end)
 
-case('partial creation and failed configuration retry without allocating replacements',function()
-    local e=fixture();e.rejectSecondFor=e.roles.player.owner;e:event('PLAYER_LOGIN');local n=#e.textures
-    assert(n>0 and n<=6,'partial resources retained');e:event('PLAYER_ENTERING_WORLD');eq(#e.textures,n)
-    e.rejectSecondFor=nil;e:event('PLAYER_ENTERING_WORLD');eq(#e.textures,6);e:visible('player',true)
+case('failed creation and configuration retry without allocating replacements',function()
+    local e=fixture();e.rejectCreateFor=e.roles.player.owner;e:event('PLAYER_LOGIN');local n=#e.textures
+    eq(n,2,'other roles prepared');e:event('PLAYER_ENTERING_WORLD');eq(#e.textures,n)
+    e.rejectCreateFor=nil;e:event('PLAYER_ENTERING_WORLD');eq(#e.textures,3);e:visible('player',true)
     local f=fixture();f.failAtlas=true;f:event('PLAYER_LOGIN');local count=#f.textures
     f:event('PLAYER_ENTERING_WORLD');eq(#f.textures,count,'configuration retry reused partial resources')
     for _,t in ipairs(f.textures)do eq(t:IsVisible(),false,'partial badge stayed hidden')end
-    f.failAtlas=false;f:event('PLAYER_ENTERING_WORLD');eq(#f.textures,6);f:visible('target',true)
+    f.failAtlas=false;f:event('PLAYER_ENTERING_WORLD');eq(#f.textures,3);f:visible('target',true)
 end)
 
 case('refused visibility hooks stay hidden and successful warm refreshes do not allocate',function()
-    local e=fixture();e.rejectHook='Show';e:event('PLAYER_LOGIN');eq(#e.textures,6)
+    local e=fixture();e.rejectHook='Show';e:event('PLAYER_LOGIN');eq(#e.textures,3)
     for _,t in ipairs(e.textures)do eq(t:IsVisible(),false,'incomplete observer preparation')end
     e.rejectHook=nil;e:event('PLAYER_ENTERING_WORLD');e:visible('target',true)
     local hooks,writes=e.hookCalls,e.artWrites
     for i=1,4 do e:event('PLAYER_TARGET_CHANGED');e:event('PLAYER_FOCUS_CHANGED')end
-    eq(#e.textures,6);eq(e.hookCalls,hooks,'duplicate native observer');eq(e.artWrites,writes,'unchanged artwork rewritten')
+    eq(#e.textures,3);eq(e.hookCalls,hooks,'duplicate native observer');eq(e.artWrites,writes,'unchanged artwork rewritten')
 end)
 
 case('portrait-relative badge dimensions follow scale without changing native label size',function()
     local e=fixture();local r=e.roles.target;r.portrait.scale=.75;r.owner.scale=.5;r.text.scale=.5
-    e:event('PLAYER_LOGIN');local a,b=e:pair('target')
+    e:event('PLAYER_LOGIN');local a=e:badge('target')
     near(a.width*a:GetEffectiveScale(),28*.75);near(a.height*a:GetEffectiveScale(),16*.75)
-    near(b.width*b:GetEffectiveScale(),34*.75);near(b.height*b:GetEffectiveScale(),23*.75)
-    local _,ay=a:GetCenter();local _,by=b:GetCenter();near((by-ay)*b:GetEffectiveScale(),-.5*.75)
+    local x,y=r.text:GetCenter();local ax,ay=a:GetCenter();near(ax,x);near(ay,y)
     eq(r.text.anchor[4],24);eq(r.text.nativeWrites,0)
 end)
 
-case('forbidden native owners defer only their own pair until safe recovery',function()
-    local e=fixture();e.roles.target.owner.forbidden=true;e:event('PLAYER_LOGIN');eq(#e.textures,4)
-    e.roles.target.owner.forbidden=false;e:event('PLAYER_ENTERING_WORLD');eq(#e.textures,6);e:visible('target',true)
+case('forbidden native owners defer only their own badge until safe recovery',function()
+    local e=fixture();e.roles.target.owner.forbidden=true;e:event('PLAYER_LOGIN');eq(#e.textures,2)
+    e.roles.target.owner.forbidden=false;e:event('PLAYER_ENTERING_WORLD');eq(#e.textures,3);e:visible('target',true)
 end)
 
 print(string.format('Frame level badges: %d passed, %d failed',pass,fail))

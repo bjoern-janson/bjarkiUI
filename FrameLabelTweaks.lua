@@ -162,7 +162,6 @@ local function installLevel(text, portrait, nativeRelative, side, role, owner)
     if badge and (badge.text ~= text or badge.owner ~= owner) then
         badge.ready = false
         if badge.background then pcall(badge.background.Hide, badge.background) end
-        if badge.border then pcall(badge.border.Hide, badge.border) end
     end
     if not outsideCombat() or not accessible(text) then return end
     local state = levels[text]
@@ -189,7 +188,8 @@ local function installLevel(text, portrait, nativeRelative, side, role, owner)
 end
 
 -- The nameplate's standalone level artwork, without its unit-data mixin.
--- One reusable pair per role shares the native text's parent and sits below it.
+-- The base includes its normal border; the bright selection overlay is omitted.
+-- One reusable texture per role shares the native text's parent and sits below it.
 -- Parent visibility/fades are inherited; only local numeric visibility is mirrored.
 local function acceptedCall(object, method, ...)
     local fn = field(object, method)
@@ -216,9 +216,6 @@ local function hideLevelBadge(badge, text, binding)
     if not sameBadgeBinding(badge, text, binding) then return end
     badge.visibilityPublic = nil
     if badge.background then acceptedCall(badge.background, "Hide") end
-    if sameBadgeBinding(badge, text, binding) and badge.border then
-        acceptedCall(badge.border, "Hide")
-    end
 end
 
 local function currentBadge(badge, text, state, binding)
@@ -275,22 +272,16 @@ syncLevelBadge = function(text)
         end
         if revision == state.badgeRevision then
             if public and badge.visibilityPublic and badge.shown == shown and badge.alpha == alpha then break end
-            local displayed = true
-            for i = 1, 2 do
-                local texture = i == 1 and badge.background or badge.border
-                if not sameBadgeBinding(badge, text, binding) or revision ~= state.badgeRevision then
-                    displayed = false; break
-                end
-                if public then
-                    displayed = acceptedCall(texture, "SetAlpha", alpha)
-                        and acceptedCall(texture, "SetShown", shown)
-                else
-                    -- IsShown can be opaque. This native sink explicitly permits
-                    -- opaque booleans from addons; SetShown does not.
-                    displayed = acceptedCall(texture, "SetAlphaFromBoolean", shown, alpha, 0)
-                        and acceptedCall(texture, "Show")
-                end
-                if not displayed then break end
+            if not sameBadgeBinding(badge, text, binding) then break end
+            local texture, displayed = badge.background
+            if public then
+                displayed = acceptedCall(texture, "SetAlpha", alpha)
+                    and acceptedCall(texture, "SetShown", shown)
+            else
+                -- IsShown can be opaque. This native sink explicitly permits
+                -- opaque booleans from addons; SetShown does not.
+                displayed = acceptedCall(texture, "SetAlphaFromBoolean", shown, alpha, 0)
+                    and acceptedCall(texture, "Show")
             end
             if revision == state.badgeRevision then
                 if not displayed then hideLevelBadge(badge, text, binding)
@@ -355,19 +346,14 @@ prepareLevelBadge = function(text, state, role, owner)
         hideLevelBadge(badge, text, binding)
         local create = field(owner, "CreateTexture")
         if type(create) ~= "function" then return end
-        for _, key in ipairs({ "background", "border" }) do
-            if not badge[key] then
-                local made, texture = pcall(create, owner, nil, layer, nil, sublevel - 2)
-                if not made or not readable(texture) or not texture then return end
-                badge[key] = texture -- Retain partial setup for the next safe retry.
-                acceptedCall(texture, "Hide")
-            end
+        if not badge.background then
+            local made, texture = pcall(create, owner, nil, layer, nil, sublevel - 2)
+            if not made or not readable(texture) or not texture then return end
+            badge.background = texture -- Retain failed setup for the next safe retry.
+            acceptedCall(texture, "Hide")
         end
         if not configureBadgeTexture(badge.background, owner, text,
-            "ui-hud-nameplates-levelindicator", layer, sublevel - 2, 28 * scale, 16 * scale, 0)
-            or not configureBadgeTexture(badge.border, owner, text,
-            "ui-hud-nameplates-levelindicator-rectangle-selected", layer, sublevel - 1,
-            34 * scale, 23 * scale, -0.5 * scale) then return end
+            "ui-hud-nameplates-levelindicator", layer, sublevel - 2, 28 * scale, 16 * scale, 0) then return end
         if not currentBadge(badge, text, state, binding) or not outsideCombat() then return end
         badge.scale, badge.layer, badge.sublevel, badge.configured = scale, layer, sublevel, true
     end

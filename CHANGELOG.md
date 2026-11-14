@@ -2,6 +2,12 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.369-plain-level-badges-test — remove level-badge highlighting
+
+- Follow the user's first requested option: remove the bright selected-outline layer from Player, Target and Focus level badges. Retain the native nameplate base atlas, which supplies the dark background and normal border.
+- Reduce owned artwork from two textures per role to one (three total). Keep the 28 × 16 base, sixteen-unit side gap, effective-scale handling, visibility observers, native fonts/colors, lower circles and skulls.
+- Retain safe setup/retry and physical replacement recovery. Add no combat-state query, new event, polling, runtime module or option. Update the existing 13-case badge fixture for the single-texture contract. [Verification](docs/VERIFICATION_0.2.369.md).
+
 ## 0.2.368-nameplate-level-badges-test — framed side levels
 
 - Move Player numeric level left and Target/Focus numeric levels right by six additional portrait units: gap 10 → 16. Keep the existing effective-scale conversion and accepted native anchor receipts.
