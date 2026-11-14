@@ -1,5 +1,9 @@
 # Known issues and bugs
 
+## 0.2.365 — native level-background preview
+
+The user explicitly restored the Player/Target/Focus level backgrounds and borders at their original native positions to inspect them as possible future secondary-portrait locations. The .364 side-centered level numbers remain; no secondary portrait is moved. The previous request to suppress these backgrounds is superseded. No .365 live observation is recorded yet.
+
 ## 0.2.364 — portrait-side level placement
 
 The requested level positions are now relative to the native portrait midpoints: Player outside left, Target and Focus outside right. The Player combat glyph retains its original lower-corner reference. Offline geometry and lifecycle checks do not establish optical clearance at the user's live UI scale; no .364 in-game observation is recorded yet.
@@ -154,10 +158,10 @@ A live screenshot showed the upper-left native ZZZ animation too far from the po
 
 A new live screenshot showed the native resting ZZZ indicator still at the upper-right of PlayerPortrait. Root cause: prior 0.2.336 ZIP never packaged the standalone ZZZ PR #4 implementation. The .337 package integrates that module, its manifest entries and original tests, without touching the already repaired cast timer or level rings. Verify the Z's move to the upper-left during rest, while the secondary circle retains its upper-right position.
 
-## 0.2.336 level-background clearance (live validation pending)
+## 0.2.336 level-background clearance (historical; superseded by .365)
 
 - A screenshot after 0.2.335 shows the round black/gold level background and border visible again on target. The source only hooked `LevelBackgroundCircle.Show`, while native Camelot may update `SetShown` and `SetAlpha` independently. This build observes all three and retries narrowly when the target/focus frame refreshes.
-- Verify player, target and focus numbers remain visible while only their level badge/rim disappears, including repeated target changes, zoning and combat. This source-level repair does not establish actual client rendering or protected-call safety.
+- That build requested hidden badges while keeping numbers visible. In .365 the user reversed that request: native backgrounds/borders are restored at their default positions. The historical suppression checks are no longer current acceptance criteria.
 
 ## New cast timer recovery test
 
