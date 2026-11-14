@@ -21,9 +21,14 @@ local function readable(value)
     return ok and secret == false
 end
 
+-- Keep each lookup current and protected without a new capturing closure.
+local function readMember(object, key)
+    return object[key]
+end
+
 local function field(object, key)
     if not readable(object) or object == nil then return nil end
-    local ok, value = pcall(function() return object[key] end)
+    local ok, value = pcall(readMember, object, key)
     if ok and readable(value) then return value end
     return nil
 end
@@ -155,17 +160,20 @@ local function installLevel(text, portrait, nativeRelative, side)
     state.portrait, state.nativeRelative, state.side = portrait, nativeRelative, side
     state.dx = side == "LEFT" and -LEVEL_SIDE_GAP or LEVEL_SIDE_GAP
     moveLevel(text, state)
-    hookOnce(text, state, "SetPoint", function(self, p, relative, rp, x, y)
-        if state.applying then return end
-        if state.requested and not (readable(p) and readable(relative) and readable(rp)
-            and finite(x) and finite(y) and samePoint({p, relative, rp, x, y}, state.requested)) then
-            state.requested = nil
-        end
-        moveLevel(self, state)
-        if state.side == "LEFT" and refreshCombatIcon then
-            refreshCombatIcon()
-        end
-    end)
+    -- An installed observer needs no newly allocated callback on rediscovery.
+    if not state.SetPoint then
+        hookOnce(text, state, "SetPoint", function(self, p, relative, rp, x, y)
+            if state.applying then return end
+            if state.requested and not (readable(p) and readable(relative) and readable(rp)
+                and finite(x) and finite(y) and samePoint({p, relative, rp, x, y}, state.requested)) then
+                state.requested = nil
+            end
+            moveLevel(self, state)
+            if state.side == "LEFT" and refreshCombatIcon then
+                refreshCombatIcon()
+            end
+        end)
+    end
 end
 
 -- Convert the native level-circle/portrait positions to the icon's anchor units.
@@ -286,11 +294,13 @@ local function installCombatIcon(texture, portrait, level, levelCircle)
     state.level = level
     state.levelCircle = levelCircle
     moveCombatIcon(texture, state)
-    hookOnce(texture, state, "SetPoint", function(self)
-        if state.applying then return end
-        state.fallbackApplied = false
-        moveCombatIcon(self, state)
-    end)
+    if not state.SetPoint then
+        hookOnce(texture, state, "SetPoint", function(self)
+            if state.applying then return end
+            state.fallbackApplied = false
+            moveCombatIcon(self, state)
+        end)
+    end
 end
 
 refreshCombatIcon = function()
@@ -365,9 +375,11 @@ local function installLeaderIcon(texture, dx, nativePoint, nativeRelative, portr
     state.nativeRelative, state.portrait = nativeRelative, portrait
     state.owner, state.memberUnit = owner, memberUnit
     moveLeaderIcon(texture, state)
-    hookOnce(texture, state, "SetPoint", function(self)
-        if not state.applying then moveLeaderIcon(self, state) end
-    end)
+    if not state.SetPoint then
+        hookOnce(texture, state, "SetPoint", function(self)
+            if not state.applying then moveLeaderIcon(self, state) end
+        end)
+    end
 end
 
 -- ClassicPartyPresentation owns active-pool discovery. Retain its validator
@@ -409,21 +421,25 @@ local function installCount(text)
     local state = counts[text]
     if not state then state = {}; counts[text] = state end
     enlargeCount(text, state)
-    hookOnce(text, state, "SetFont", function(self, face, size, flags)
-        if state.applying then return end
-        if state.requested and not (readable(face) and finite(size) and readable(flags)
-            and sameFont({face, size, flags or ""}, state.requested)) then
-            state.requested = nil
-        end
-        enlargeCount(self, state)
-    end)
-    hookOnce(text, state, "SetFontObject", function(self)
-        if state.applying then return end
-        -- Rebinding a shared native template installs a fresh baseline even
-        -- when its face, flags and size match the previous local override.
-        state.applied, state.requested = nil, nil
-        enlargeCount(self, state)
-    end)
+    if not state.SetFont then
+        hookOnce(text, state, "SetFont", function(self, face, size, flags)
+            if state.applying then return end
+            if state.requested and not (readable(face) and finite(size) and readable(flags)
+                and sameFont({face, size, flags or ""}, state.requested)) then
+                state.requested = nil
+            end
+            enlargeCount(self, state)
+        end)
+    end
+    if not state.SetFontObject then
+        hookOnce(text, state, "SetFontObject", function(self)
+            if state.applying then return end
+            -- Rebinding a shared native template installs a fresh baseline even
+            -- when its face, flags and size match the previous local override.
+            state.applied, state.requested = nil, nil
+            enlargeCount(self, state)
+        end)
+    end
 end
 
 local function apply()

@@ -1,0 +1,126 @@
+{
+  "baseline_tree": "546ee7ea64be8f2ff5a2f2955c4de7e1bbf34b5f",
+  "measurement": "GC-stopped bounded heap growth in native Lua fixtures; not client CPU/frame time",
+  "main": {
+    "5.1": [
+      {
+        "case": "target_event",
+        "before_bytes_per_call": 5184.672,
+        "after_bytes_per_call": 736.672,
+        "saved_bytes_per_call": 4448.0
+      },
+      {
+        "case": "native_target",
+        "before_bytes_per_call": 3768.672,
+        "after_bytes_per_call": 1680.672,
+        "saved_bytes_per_call": 2088.0
+      },
+      {
+        "case": "native_tot",
+        "before_bytes_per_call": 3048.672,
+        "after_bytes_per_call": 960.672,
+        "saved_bytes_per_call": 2088.0
+      },
+      {
+        "case": "native_pair_and_event",
+        "before_bytes_per_call": 12000.672,
+        "after_bytes_per_call": 3376.672,
+        "saved_bytes_per_call": 8624.0
+      }
+    ],
+    "5.4": [
+      {
+        "case": "target_event",
+        "before_bytes_per_call": 4776.448,
+        "after_bytes_per_call": 680.448,
+        "saved_bytes_per_call": 4096.0
+      },
+      {
+        "case": "native_target",
+        "before_bytes_per_call": 3496.448,
+        "after_bytes_per_call": 1576.448,
+        "saved_bytes_per_call": 1920.0
+      },
+      {
+        "case": "native_tot",
+        "before_bytes_per_call": 2816.512,
+        "after_bytes_per_call": 896.512,
+        "saved_bytes_per_call": 1920.0
+      },
+      {
+        "case": "native_pair_and_event",
+        "before_bytes_per_call": 11088.512,
+        "after_bytes_per_call": 3152.512,
+        "saved_bytes_per_call": 7936.0
+      }
+    ]
+  },
+  "labels": {
+    "5.1": [
+      {
+        "events": 25,
+        "before_KiB": 724.054688,
+        "after_KiB": 71.90625,
+        "reduction_percent": 90.068948
+      },
+      {
+        "events": 50,
+        "before_KiB": 1448.078125,
+        "after_KiB": 143.78125,
+        "reduction_percent": 90.070891
+      }
+    ],
+    "5.4": [
+      {
+        "events": 25,
+        "before_KiB": 683.054688,
+        "after_KiB": 70.359375,
+        "reduction_percent": 89.699306
+      },
+      {
+        "events": 50,
+        "before_KiB": 1363.328125,
+        "after_KiB": 137.9375,
+        "reduction_percent": 89.882296
+      }
+    ]
+  },
+  "icons": {
+    "5.1": [
+      {
+        "order": "deferred-first",
+        "before_bytes_per_refresh": 37061.406,
+        "after_bytes_per_refresh": 13397.406,
+        "saved_bytes_per_refresh": 23664.0,
+        "reduction_percent": 63.851,
+        "repetitions": 128
+      },
+      {
+        "order": "deferred-last",
+        "before_bytes_per_refresh": 37061.406,
+        "after_bytes_per_refresh": 13397.406,
+        "saved_bytes_per_refresh": 23664.0,
+        "reduction_percent": 63.851,
+        "repetitions": 128
+      }
+    ],
+    "5.4": [
+      {
+        "order": "deferred-first",
+        "before_bytes_per_refresh": 34164.156,
+        "after_bytes_per_refresh": 11892.406,
+        "saved_bytes_per_refresh": 22271.75,
+        "reduction_percent": 65.19,
+        "repetitions": 128
+      },
+      {
+        "order": "deferred-last",
+        "before_bytes_per_refresh": 34164.156,
+        "after_bytes_per_refresh": 11892.406,
+        "saved_bytes_per_refresh": 22271.75,
+        "reduction_percent": 65.19,
+        "repetitions": 128
+      }
+    ]
+  }
+}

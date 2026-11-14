@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.366-lifecycle-work-test"
+local BJARKI_UI_VERSION = "0.2.367-target-refresh-allocation-test"
 -- Standalone PRD treatment is retained. Unit-frame resource bars stay native.
 local PRD_MANA_R, PRD_MANA_G, PRD_MANA_B = 0.10, 0.25, 1.00
 local WORLD_TEXT_SCREEN_Y = "0.0430"
@@ -105,6 +105,23 @@ local STATUS_SHADOW_ALPHA = 0.78
 local statusTextFonts = setmetatable({}, { __mode = "k" })
 local statusTextFields = { "TextString", "LeftText", "RightText", "leftText", "rightText" }
 
+-- Reuse protected readers on target refreshes; never cache their results.
+local targetReaders = {}
+function targetReaders.statusMethods(text)
+    if text.IsForbidden and readableBool(text.IsForbidden, text) ~= false then return end
+    return text.GetFont, text.SetShadowColor, text.SetShadowOffset
+end
+function targetReaders.member(bar, field)
+    return bar[field]
+end
+function targetReaders.power(frame)
+    return frame.manabar or frame.ManaBar or frame.PowerBar or frame.powerbar
+end
+function targetReaders.portraits(parent, frame)
+    local art = parent.TargetFrameContainer
+    return art and (art.PortraitMask or art.Portrait), frame.PortraitMask or frame.Portrait
+end
+
 local function statusFontWithoutOutline(flags)
     local remaining = {}
     for token in flags:gmatch("[^,%s]+") do
@@ -156,10 +173,7 @@ end
 
 local function installStatusFont(text)
     if not text or isSecret(text) then return end
-    local ok, font, shadowColor, shadowOffset = pcall(function()
-        if text.IsForbidden and readableBool(text.IsForbidden, text) ~= false then return end
-        return text.GetFont, text.SetShadowColor, text.SetShadowOffset
-    end)
+    local ok, font, shadowColor, shadowOffset = pcall(targetReaders.statusMethods, text)
     if not ok or type(font) ~= "function"
         or type(shadowColor) ~= "function" or type(shadowOffset) ~= "function"
         or type(text.SetFont) ~= "function" then return end
@@ -184,7 +198,7 @@ end
 local function installStatusBarFonts(bar)
     if not bar or isSecret(bar) then return end
     for _, field in ipairs(statusTextFields) do
-        local ok, text = pcall(function() return bar[field] end)
+        local ok, text = pcall(targetReaders.member, bar, field)
         if ok and text and not isSecret(text) then installStatusFont(text) end
     end
 end
@@ -205,9 +219,7 @@ local function installUnitStatusFonts(unit)
         end
     end
     if isSecret(frame) or not frame then return end
-    local ok, power = pcall(function()
-        return frame.manabar or frame.ManaBar or frame.PowerBar or frame.powerbar
-    end)
+    local ok, power = pcall(targetReaders.power, frame)
     if ok then installStatusBarFonts(power) end
 end
 
@@ -2131,10 +2143,7 @@ local function alignDerivedFrame(frame)
         or not readableGeometryNumber(x) or not readableGeometryNumber(y) then return end
     local readable, scale = pcall(frame.GetEffectiveScale, frame)
     if not readable or not readableGeometryNumber(scale) or scale <= 0 then return end
-    local found, upper, lower = pcall(function()
-        local art = parent.TargetFrameContainer
-        return art and (art.PortraitMask or art.Portrait), frame.PortraitMask or frame.Portrait
-    end)
+    local found, upper, lower = pcall(targetReaders.portraits, parent, frame)
     if not found then return end
     -- Align the visible ring centers, not the invisible aperture rectangles.
     -- The ordinary native anchor, Y offset, sizes and scale remain untouched.
