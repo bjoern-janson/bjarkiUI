@@ -29,9 +29,14 @@ local function public(value)
     return true -- nil is public, but not an object or a colour
 end
 
+-- Keep current member access protected without allocating a capture per read.
+local function readMember(object, key)
+    return object[key]
+end
+
 local function field(object, key)
     if not public(object) or object == nil then return nil end
-    local ok, value = pcall(function() return object[key] end)
+    local ok, value = pcall(readMember, object, key)
     if ok and public(value) then return value end
     return nil
 end

@@ -1,10 +1,18 @@
 # Known issues and bugs
 
+## 0.2.367 — self-target microstutter remains open
+
+After receiving .366, the user was uncertain it helped and specifically reported microstutters when targeting their own character. They declined a manual trace workflow. No successful in-client .366 or .367 stutter fix is established.
+
+The .367 change removes reproduced temporary allocation in existing main, frame-label and icon paths. Paired fixtures preserve native call order and presentation, and the existing regression gate remains the behavioral check. This does not measure client frame time or prove the removed allocations caused the hitch. [Allocation evidence](docs/VERIFICATION_0.2.367.md).
+
+The ordinary readable self-target path did not reproduce an unbounded update loop. Missing target class values can still trigger repeated group/nameplate class discovery; that branch's live frequency is unknown. A self-first alias shortcut was rejected because it changes class-witness priority. No Portraits source, aura-container behavior, timer policy or user setting changes in this release.
+
 ## 0.2.366 — microstutters under investigation
 
 The user supplied a first bjarkiPerf recording with 11 rendered intervals at least 25 ms, four at least 50 ms, a worst interval of 69 ms and 22 bjarkiUI native profiler ticks above 5 ms. These are different measurements: the threshold-counter deltas identify an addon CPU candidate but do not attribute particular rendered frames or establish that all stutters are caused by bjarkiUI. The exact installed bjarkiUI version and a completed matched UI-off comparison were not supplied with this report.
 
-The .366 patch reduces reproduced redundant work from current .365 source: settled nameplate anchor requests, irrelevant nonclassic callbacks, Soft Dark lookup closures and unused long-decimal buff preparation. [Verification and work counts](docs/VERIFICATION_0.2.366.md) document the source, fixtures and limits. No .366 in-client observation is recorded yet; the microstutter report remains open.
+The .366 patch reduces reproduced redundant work from current .365 source: settled nameplate anchor requests, irrelevant nonclassic callbacks, Soft Dark lookup closures and unused long-decimal buff preparation. [Verification and work counts](docs/VERIFICATION_0.2.366.md) document the source, fixtures and limits. The later user report above leaves its effect uncertain and supplies self-targeting as a specific hitch trigger.
 
 Inspection of the supplied bjarkiPerf 0.1.0 source also reproduced a measurement issue: stopping during the final 1.35-second event window can save that partial exit as complete. Allow the final exit at least two seconds before `/bperf stop` during comparisons. This does not cause the reported stutter, and bjarkiPerf itself is not modified by this release. The four-versus-five entry-count discrepancy is not established from a single stopped recording; completion between commands is one source-backed possibility.
 

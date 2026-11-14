@@ -1,6 +1,6 @@
 # bjarkiUI code map
 
-Current test branch: **0.2.366-lifecycle-work-test**. Start with the physical region that displays the symptom, then follow its native writer, addon observer, ownership record and cleanup. [Timer lifecycle detail](TIMER_LIFECYCLE.md) · [Verification commands and suite map](TESTING.md)
+Current test branch: **0.2.367-target-refresh-allocation-test**. Start with the physical region that displays the symptom, then follow its native writer, addon observer, ownership record and cleanup. [Timer lifecycle detail](TIMER_LIFECYCLE.md) · [Verification commands and suite map](TESTING.md)
 
 ## Runtime load order
 

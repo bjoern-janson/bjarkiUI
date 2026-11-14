@@ -2,6 +2,14 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.367-target-refresh-allocation-test — reduce temporary target-refresh allocation
+
+- Reuse four protected main-frame readers for current status methods, label fields, power bars and derived portrait geometry. Keep each complete protected expression and class/identity lookup order.
+- Reuse protected member readers in FrameLabelTweaks and IconSkin. Preserve current permission checks and every existing native write; do not cache their results.
+- Construct label, crown, combat-icon and bag-count observer callbacks only when the corresponding native hook still needs installation. Retain failed-hook retry and replacement recovery.
+- Pair full-source .366/.367 fixtures for native-call order, visible state and GC-stopped heap growth. The label pass allocates about 90% less in the modeled warm target event; other target paths also allocate less. No client CPU/frame-time improvement is established.
+- Keep the 16 runtime modules, all visuals/timers/settings and the ultralight description. Add no runtime polling or diagnostics. The user's self-target microstutter remains open. [Evidence](docs/VERIFICATION_0.2.367.md).
+
 ## 0.2.366-lifecycle-work-test — reduce avoidable preparation and layout work
 
 - Compare current classic nameplate LEFT anchors before writing. Settled 20-plate fixtures now make zero repeat CC/LoC anchor writes instead of 40. Preserve current physical ownership, native resets, combat permission, native-writer reentry and refused-scheduling recovery.
