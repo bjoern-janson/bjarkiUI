@@ -2,6 +2,14 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.370-combat-level-highlights-test — meaningful target/focus highlights
+
+- Implement the user's requested richer behavior after they rejected the assistant's blanket-removal choice: Player remains plain; Target and Focus each highlight only while their own current unit is in combat and its native number is displayed.
+- Reuse native nameplate outline artwork on two prepared textures (five total with the bases). The native nameplate mixin keys this artwork to selection; bjarkiUI deliberately gives these unit-frame outlines the requested combat meaning.
+- Observe unit-filtered UNIT_FLAGS for target/focus and refresh both prepared roles to handle aliases. Target/focus switches refresh visibility during combat; artwork setup/rebinding stays outside combat. Add no polling, clock, option or runtime module.
+- Compose opaque numeric visibility and combat through supported native alpha sinks without branching on or caching hidden values. Public accepted state skips unchanged artwork writes. Refused combat reads/highlight setup preserve a usable base; physical ownership/geometry loss hides both. Newer unit/anchor writes invalidate older queries.
+- Retain the 28 × 16 bases, sixteen-unit gap, native fonts/colors, lower circles and skulls. Extend the badge fixture to 18 focused cases. [Verification](docs/VERIFICATION_0.2.370.md).
+
 ## 0.2.369-plain-level-badges-test — remove level-badge highlighting
 
 - Follow the user's first requested option: remove the bright selected-outline layer from Player, Target and Focus level badges. Retain the native nameplate base atlas, which supplies the dark background and normal border.

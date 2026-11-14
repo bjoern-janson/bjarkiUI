@@ -2,7 +2,7 @@
 ## Title: bjarkiUI
 ## Notes: Ultralight unit-frame presentation for WoW: Forever
 ## Author: Bjarki / OpenAI
-## Version: 0.2.369-plain-level-badges-test
+## Version: 0.2.370-combat-level-highlights-test
 ## SavedVariablesPerCharacter: bjarkiUISettings
 
 NativePrecision.lua

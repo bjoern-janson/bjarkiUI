@@ -1,5 +1,11 @@
 # Known issues and bugs
 
+## 0.2.370 — combat-aware level highlight live behavior
+
+Player is intentionally plain; Target/Focus use their own current combat state for highlighting. The native artwork is reused, while its unit-frame activation policy is the user's combat condition rather than the native nameplate mixin's selection condition. Native source and fixtures establish the API/sink contracts and modeled event behavior. Live enter/exit delivery, optical fit and client taint/frame-time behavior have not yet been observed for this build. [Verification](docs/VERIFICATION_0.2.370.md).
+
+The earlier microstutter and timer reports remain open.
+
 ## 0.2.369 — plain side-level badges
 
 The user supplied live .368 captures and rejected the permanent bright highlight. .369 follows the explicitly offered remove-highlighting option on all three frames, retaining the normal base artwork and its border. Source/fixture checks verify the selected-outline atlas is no longer created; this revised build has not yet been observed in the live client. [Verification](docs/VERIFICATION_0.2.369.md).
