@@ -1,6 +1,6 @@
 # Testing and packaging bjarkiUI
 
-Current test target: **0.2.368-nameplate-level-badges-test**, **16 manifest-loaded runtime modules**, and **38 top-level Lua scripts**: 37 behavioral suites plus `tests/syntax.lua`. Run both Lua 5.1 and Lua 5.4. The current aura suite reports **271 cases**; suite/assertion counts describe fixture coverage, not a percentage of live-client behavior covered.
+Current test target: **0.2.369-plain-level-badges-test**, **16 manifest-loaded runtime modules**, and **38 top-level Lua scripts**: 37 behavioral suites plus `tests/syntax.lua`. Run both Lua 5.1 and Lua 5.4. The current aura suite reports **271 cases**; suite/assertion counts describe fixture coverage, not a percentage of live-client behavior covered.
 
 ## Portable verification
 
@@ -8,7 +8,7 @@ Run from the repository root with Python 3.10 or newer and native Lua/luac execu
 
 ```sh
 python tools/verify.py
-python tools/verify.py --output ../bjarkiUI-0.2.368-Nameplate-Level-Badges.zip
+python tools/verify.py --output ../bjarkiUI-0.2.369-Plain-Level-Badges.zip
 ```
 
 The default uses Lua 5.1 and 5.4 with their matching compilers. `--output` is an optional ZIP filename **outside the checkout**, not a report path. Its parent directory must already exist and the file must be new. Packaging occurs only after verification succeeds. The [CI workflow](../.github/workflows/package-addon.yml) uses native interpreters and the same [verification tool](../tools/verify.py).
@@ -77,7 +77,7 @@ The fixture cites the native source revision used to model that sequence. A sour
 
 ## Package and evidence checks
 
-The package contains both matching manifests, exactly their runtime Lua files and `Media/TimerSpacer.tga`. The verifier checks archive integrity, membership and byte equality against its input payloads. Tests, documentation, historical audit tools, settings files and bundled Edit Mode presets are excluded. No packaging step should overwrite a user's live `WTF`/SavedVariables or Edit Mode layouts. Current source hashes and recorded verification evidence are in [VERIFICATION_0.2.368.md](VERIFICATION_0.2.368.md). The older [BUILD_VERIFICATION.md](BUILD_VERIFICATION.md) records the historical .334 package.
+The package contains both matching manifests, exactly their runtime Lua files and `Media/TimerSpacer.tga`. The verifier checks archive integrity, membership and byte equality against its input payloads. Tests, documentation, historical audit tools, settings files and bundled Edit Mode presets are excluded. No packaging step should overwrite a user's live `WTF`/SavedVariables or Edit Mode layouts. Current source hashes and recorded verification evidence are in [VERIFICATION_0.2.369.md](VERIFICATION_0.2.369.md). The older [BUILD_VERIFICATION.md](BUILD_VERIFICATION.md) records the historical .334 package.
 
 The [.367 allocation reproduction](performance/0.2.367/README.md) is a separate developer-only comparison against exact .366 source. It checks unchanged native calls/visible state and lower GC-stopped heap growth in both interpreters. It does not add a user command, runtime profiler or live-performance assertion.
 

@@ -1,5 +1,9 @@
 # Known issues and bugs
 
+## 0.2.369 — plain side-level badges
+
+The user supplied live .368 captures and rejected the permanent bright highlight. .369 follows the explicitly offered remove-highlighting option on all three frames, retaining the normal base artwork and its border. Source/fixture checks verify the selected-outline atlas is no longer created; this revised build has not yet been observed in the live client. [Verification](docs/VERIFICATION_0.2.369.md).
+
 ## 0.2.368 — side-level badge live appearance
 
 The side numbers now use native nameplate background/outline artwork and a sixteen-unit portrait gap. Source inspection establishes the atlas names and proportions; Lua fixtures establish modeled geometry, visibility and resource reuse. Optical fit, atlas rendering and taint behavior have not been observed in the live client for this build. The native lower level circles and skulls remain native. [Verification](docs/VERIFICATION_0.2.368.md).
