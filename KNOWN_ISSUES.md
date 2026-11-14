@@ -1,5 +1,11 @@
 # Known issues and bugs
 
+## 0.2.364 — portrait-side level placement
+
+The requested level positions are now relative to the native portrait midpoints: Player outside left, Target and Focus outside right. The Player combat glyph retains its original lower-corner reference. Offline geometry and lifecycle checks do not establish optical clearance at the user's live UI scale; no .364 in-game observation is recorded yet.
+
+This cosmetic release retains the .363 buff threshold policy and all open timer/spacing and performance observations below. It does not close those reports.
+
 Current test branch is **0.2.363-buff-ten-second-threshold-test**, based on main 0.2.335-cast-recovery-test. The evidence below distinguishes source inspection, offline fixtures and the user's live observations. [Current verification evidence](docs/VERIFICATION_0.2.363.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
 
 ## .363 strict buff threshold — supported precision, native fallback

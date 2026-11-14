@@ -22,18 +22,28 @@ local function fixture()
   e.hooks[t]=(e.hooks[t] or 0)+1
   local old=assert(t[key]);t[key]=function(...)local result=old(...);cb(...);return result end
  end
- local context,portrait={kind="context"},{kind="portrait",x=100,y=120,scale=1}
+ local context,portrait={kind="context"},{kind="portrait",x=100,y=120,scale=1,width=60}
  function portrait:GetCenter()return self.x,self.y end
  function portrait:GetEffectiveScale()return self.scale end
- local level={x=70,y=100,scale=1,anchor={"CENTER",portrait,"CENTER",0,-0.5}}
+ local circle={x=74,y=101.5,scale=1}
+ function circle:GetCenter()return self.x,self.y end
+ function circle:GetEffectiveScale()return self.scale end
+ local level={scale=1,anchor={"CENTER",circle,"CENTER",0,-0.5}}
  function level:IsForbidden()return false end
  function level:GetFont()return "Fonts/FRIZQT__.TTF",12,"OUTLINE" end
  function level:GetNumPoints()return 1 end
  function level:GetPoint()return table.unpack(self.anchor) end
  function level:SetPoint(a,b,c,d,f)self.anchor={a,b,c,d,f}end
- function level:GetCenter()return self.x,self.y end
+ function level:GetCenter()
+  local p=self.anchor;local relative=p[2];local x,y=relative:GetCenter()
+  if p[3]=="LEFT" then x=x-relative.width/2
+  elseif p[3]=="RIGHT" then x=x+relative.width/2 end
+  local scale=relative:GetEffectiveScale()/self.scale
+  return x*scale+p[4],y*scale+p[5]
+ end
+ function level:ClearAllPoints()error("level anchor must be reused")end
  function level:GetEffectiveScale()return self.scale end
- e.context,e.portrait,e.level=context,portrait,level
+ e.context,e.portrait,e.level,e.circle=context,portrait,level,circle
  local icon={point={"TOPLEFT",context,"TOPLEFT",64,-62},writes=0,numPoints=1,width=16,height=16,scale=1}
  function icon:GetObjectType()return "Texture" end
  function icon:IsForbidden()return self.forbidden==true end
@@ -47,7 +57,8 @@ local function fixture()
   self.point={a,b,c,d,f};self.writes=self.writes+1;return true
  end
  e.icon=icon
- e.PlayerFrame={PlayerFrameContent={PlayerFrameContentContextual={AttackIcon=icon}},PlayerFrameContainer={PlayerPortrait=portrait}}
+ e.PlayerFrame={PlayerFrameContent={PlayerFrameContentMain={LevelBackgroundCircle=circle},
+  PlayerFrameContentContextual={AttackIcon=icon}},PlayerFrameContainer={PlayerPortrait=portrait}}
  e.PlayerLevelText=level
  local chunk=assert(loadfile(addon.."/FrameLabelTweaks.lua","t",e));chunk("bjarkiUI", addonPrivate)
  function e:event(name)
@@ -61,8 +72,9 @@ local function fixture()
  return e
 end
 
-test("combat glyph mirrors level from the actual portrait, not the mutable frame origin",function()
+test("combat glyph preserves the original ring mirror relative to the portrait after text moves left",function()
  local e=fixture();e:event("PLAYER_LOGIN");e:expectAnchored();eq(e.icon.writes,1,"one move")
+ local x,y=e.level:GetCenter();eq(x,60,"level center moved left");eq(y,120,"level center moved to portrait height")
 end)
 test("layout refresh does not drift or stack anchor writes",function()
  local e=fixture();e:event("PLAYER_LOGIN");for i=1,15 do e:event("PLAYER_ENTERING_WORLD");e:event("UI_SCALE_CHANGED") end

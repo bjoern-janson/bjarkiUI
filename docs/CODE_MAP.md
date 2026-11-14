@@ -1,6 +1,6 @@
 # bjarkiUI code map
 
-Current test branch: **0.2.363-buff-ten-second-threshold-test**. Start with the physical region that displays the symptom, then follow its native writer, addon observer, ownership record and cleanup. [Timer lifecycle detail](TIMER_LIFECYCLE.md) · [Verification commands and suite map](TESTING.md)
+Current test branch: **0.2.364-portrait-level-centers-test**. Start with the physical region that displays the symptom, then follow its native writer, addon observer, ownership record and cleanup. [Timer lifecycle detail](TIMER_LIFECYCLE.md) · [Verification commands and suite map](TESTING.md)
 
 ## Runtime load order
 
@@ -22,7 +22,7 @@ The [default manifest](../bjarkiUI.toc) and [Camelot manifest](../bjarkiUI_Camel
 | 12 | [IconSkin.lua](../IconSkin.lua) | Native icon masks/rims, donor visibility restoration and `/buiborders`. |
 | 13 | [UnitAuraStyling.lua](../UnitAuraStyling.lua) | Inert compatibility stub reporting retirement of the custom target/focus aura route. |
 | 14 | [BuffPresentation.lua](../BuffPresentation.lua) | Accessible aura/cast/icon discovery; ordinary native seconds-sink forwarding, player duration post-hooks and prepared fixed-width native decimal formatting; `/buitimers` and `/buiicons`. |
-| 15 | [FrameLabelTweaks.lua](../FrameLabelTweaks.lua) | Level offsets, combat-icon mirror, portrait-relative leader crowns with per-side optical spacing, guarded classic-party crown X+4, bag/ammunition count fonts and `/buicombat`. |
+| 15 | [FrameLabelTweaks.lua](../FrameLabelTweaks.lua) | Portrait-side level centers, combat-icon mirror of the native level circle, portrait-relative leader crowns with per-side optical spacing, guarded classic-party crown X+4, bag/ammunition count fonts and `/buicombat`. |
 | 16 | [RestIndicatorPlacement.lua](../RestIndicatorPlacement.lua) | Hide only the original player rested-Z texture; observe native Show/SetShown and retry safe lifecycle discovery. Historical filename retained; no placement writes. |
 
 ## Find a symptom
