@@ -1,5 +1,5 @@
 -- Regression for mirroring the combat glyph across the player portrait
--- to the actual rendered position of PlayerLevelText.
+-- from the original level-ring position after PlayerLevelText moves to the side.
 local addon = assert(arg[1], 'addon folder required')
 local passed, failed = 0,0
 local addonPrivate = {}
@@ -34,20 +34,31 @@ local function fixture()
             return result
         end
     end
-    local portrait={centerX=100,centerY=120,scale=1}
+    local portrait={centerX=100,centerY=120,scale=1,width=60}
     function portrait:IsForbidden()return self.forbidden or false end
     function portrait:GetCenter()return self.centerX,self.centerY end
     function portrait:GetEffectiveScale()return self.scale end
-    local level={centerX=70,centerY=100,scale=1,anchor={'CENTER',portrait,'CENTER',0,-0.5}}
+    local circle={centerX=74,centerY=101.5,scale=1}
+    function circle:IsForbidden()return self.forbidden or false end
+    function circle:GetCenter()return self.centerX,self.centerY end
+    function circle:GetEffectiveScale()return self.scale end
+    local level={scale=1,writes=0,anchor={'CENTER',circle,'CENTER',0,-0.5}}
     function level:IsForbidden()return self.forbidden or false end
     function level:GetFont()return 'Fonts/FRIZQT__.TTF',12,'OUTLINE' end
-    function level:GetCenter()return self.centerX,self.centerY end
+    function level:GetCenter()
+        local p=self.anchor;local relative=p[2];local x,y=relative:GetCenter()
+        if p[3]=='LEFT' then x=x-relative.width/2
+        elseif p[3]=='RIGHT' then x=x+relative.width/2 end
+        local scale=relative:GetEffectiveScale()/self.scale
+        return x*scale+p[4],y*scale+p[5]
+    end
     function level:GetEffectiveScale()return self.scale end
     function level:GetNumPoints()return 1 end
     function level:GetPoint()return table.unpack(self.anchor) end
     function level:SetPoint(a,b,c,d,f)
-        self.anchor={a,b,c,d,f};self.writes=(self.writes or 0)+1
+        self.anchor={a,b,c,d,f};self.writes=self.writes+1
     end
+    function level:ClearAllPoints()error('level anchor must be reused')end
     local icon={point={'TOPLEFT',{},'TOPLEFT',64,-62},scale=1,writes=0,width=16,height=16}
     function icon:IsForbidden()return self.forbidden or false end
     function icon:GetObjectType()return 'Texture' end
@@ -62,8 +73,9 @@ local function fixture()
     end
     env.PlayerLevelText=level
     env.PlayerFrame={PlayerFrameContainer={PlayerPortrait=portrait},
-        PlayerFrameContent={PlayerFrameContentContextual={AttackIcon=icon}}}
-    env.icon,env.level,env.portrait=icon,level,portrait
+        PlayerFrameContent={PlayerFrameContentMain={LevelBackgroundCircle=circle},
+            PlayerFrameContentContextual={AttackIcon=icon}}}
+    env.icon,env.level,env.portrait,env.circle=icon,level,portrait,circle
     function env:event(event)
         for _,frame in ipairs(self.frames) do
             local f=frame.scripts.OnEvent
@@ -81,26 +93,29 @@ local function fixture()
     local loader=assert(loadfile(addon..'/FrameLabelTweaks.lua','t',env));loader("bjarkiUI", addonPrivate)
     return env
 end
-case('combat icon matches the horizontal reflection of the player level center',function()
+case('combat icon retains the original level-ring mirror after the visible text moves left',function()
     local e=fixture();e:event('PLAYER_LOGIN')
     e:expectMirror(30,-20)
+    local x,y=e.level:GetCenter();eq(x,60,'visible text moved outside the left portrait edge');eq(y,120,'visible text vertically centered')
     eq(e.icon.writes,1,'one positioning write')
 end)
 case('different readable scales are converted to the combat icon anchor space',function()
-    local e=fixture();e.level.centerX=70;e.level.centerY=100;e.level.scale=.5
+    local e=fixture();e.level.scale=.5;e.circle.scale=.5
     e.portrait.centerX=100;e.portrait.centerY=120;e.portrait.scale=.5
     e.icon.scale=.5;e:event('PLAYER_LOGIN')
     e:expectMirror(30,-20)
-    e.level.centerX=82;e.level.centerY=88;e.level.scale=.75
+    e.circle.centerX=86;e.circle.centerY=89.5;e.circle.scale=.75
     e.portrait.centerX=100;e.portrait.centerY=110;e.portrait.scale=1
     e.icon.scale=1;e:event('UI_SCALE_CHANGED')
-    e:expectMirror(38.5,-44)
+    e:expectMirror(37.5,-43.625)
+    eq(e.level.anchor[4],-20,'side gap uses current portrait and label scales')
 end)
-case('level reanchoring updates the mirror without accumulating offsets',function()
+case('live native ring movement updates the mirror without following the moved text',function()
     local e=fixture();e:event('PLAYER_LOGIN')
-    e.level.centerX=65;e.level.centerY=92
-    e.level:SetPoint('CENTER',{},'CENTER',1,-2)
+    e.circle.centerX=69;e.circle.centerY=93.5
+    e.level:SetPoint('CENTER',e.circle,'CENTER',0,-0.5)
     e:expectMirror(35,-28)
+    local x,y=e.level:GetCenter();eq(x,60,'visible label stays left');eq(y,120,'visible label stays centered')
     local count=e.icon.writes
     for _=1,6 do e:event('PLAYER_ENTERING_WORLD') end
     eq(e.icon.writes,count,'no redundant writes')
@@ -112,22 +127,37 @@ case('native icon reset gets restored and combat defers geometry changes',functi
     eq(e.icon.point[2],distant,'no reanchor during combat')
     e.combat=false;e:event('PLAYER_REGEN_ENABLED');e:expectMirror(30,-20)
 end)
-case('inaccessible level geometry does not trigger speculative writes',function()
-    local e=fixture();e.level.GetCenter=function()return {secret=true},100 end
+case('inaccessible native ring geometry does not fall back to the moved visible label',function()
+    local e=fixture();e.circle.GetCenter=function()return {secret=true},101.5 end
     e:event('PLAYER_LOGIN')
     eq(e.icon.writes,0,'no coordinates guessed')
 end)
-case('missing level or forbidden combat icon remains untouched',function()
+case('missing level or lost ring and forbidden combat icon remain untouched until safe recovery',function()
     local e=fixture();e.PlayerLevelText=nil;e:event('PLAYER_LOGIN')
     eq(e.icon.writes,0,'no level to mirror')
     local f=fixture();f.icon.forbidden=true;f:event('PLAYER_LOGIN')
     eq(f.icon.writes,0,'forbidden untouched')
+    local lost=fixture();lost:event('PLAYER_LOGIN')
+    local main=lost.PlayerFrame.PlayerFrameContent.PlayerFrameContentMain
+    main.LevelBackgroundCircle=nil;lost:event('PLAYER_ENTERING_WORLD')
+    lost:expectMirror(30,-20);eq(lost.icon.writes,1,'lost ring must not mirror the moved text')
+    local native={};lost.icon:SetPoint('TOPLEFT',native,'TOPLEFT',64,-62)
+    eq(lost.icon.point[2],native,'no speculative repair without the original reference')
+    eq(lost.icon.writes,2,'only native icon reset occurred')
+    main.LevelBackgroundCircle=lost.circle;lost:event('PLAYER_ENTERING_WORLD')
+    lost:expectMirror(30,-20);eq(lost.icon.writes,3,'restored ring permits recovery')
 end)
-case('the icon is not moved when independent visual state changes',function()
+case('external text placement leaves the ring mirror intact and missing rings retain the compatibility mirror',function()
     local e=fixture();e:event('PLAYER_LOGIN')
-    e.level.centerX=66;e.level.centerY=88
+    e.level:SetPoint('CENTER',e.portrait,'LEFT',-18,4)
     e:event('EDIT_MODE_LAYOUTS_UPDATED')
-    e:expectMirror(34,-32)
+    local x,y=e.level:GetCenter();eq(x,52,'external label center');eq(y,124,'external label height')
+    e:expectMirror(30,-20);eq(e.icon.writes,1,'visible text movement does not move the combat icon')
+    local fallback=fixture();fallback.PlayerFrame.PlayerFrameContent.PlayerFrameContentMain.LevelBackgroundCircle=nil
+    fallback:event('PLAYER_LOGIN');fallback:expectMirror(26,-19)
+    eq(fallback.level.writes,0,'without the native ring the side placement cannot activate')
+    fallback.level:SetPoint('CENTER',fallback.portrait,'CENTER',-20,-10)
+    fallback:expectMirror(20,-10)
 end)
 print(('LEVEL MIRROR TESTS: %d passed, %d failed'):format(passed,failed))
 if failed>0 then os.exit(1) end

@@ -2,8 +2,10 @@
 -- Do not alter FontString text,
 -- visibility, button behavior, shared Font objects, or surrounding frame layout.
 local _, uiPrivate = ...
-local LEVEL_OUTWARD, LEVEL_DOWN, BAG_FONT_INCREASE = 4, 1, 3
--- Mirror the combat glyph's *center* across the portrait from PlayerLevelText.
+local LEVEL_SIDE_GAP, BAG_FONT_INCREASE = 10, 3
+-- Keep the combat glyph at the prior lower-corner mirror, using the native
+-- level-circle center plus the old label offset instead of the moved text.
+local COMBAT_LEVEL_OUTWARD, COMBAT_LEVEL_DOWN = 4, 1.5
 -- Keep the icon's native TOPLEFT anchor type: changing it to CENTER would
 -- require clearing the original anchor and risk disrupting native layout.
 -- No independent visual-offset guesses or anchor stacking.
@@ -109,14 +111,35 @@ local function recordReceipt(state, requested, stored, matches)
     elseif matches(stored, requested, true) then state.applied = stored end
 end
 
+local function regionScale(region)
+    if not readable(region) or not region then return end
+    local forbidden = field(region, "IsForbidden")
+    if type(forbidden) == "function" then
+        local ok, value = pcall(forbidden, region)
+        if not ok or not readable(value) or value ~= false then return end
+    end
+    local getter = field(region, "GetEffectiveScale")
+    if type(getter) ~= "function" then return end
+    local ok, value = pcall(getter, region)
+    if ok and finite(value) and value > 0 then return value end
+end
+
 local function moveLevel(text, state)
     if state.applying or not outsideCombat() or not accessible(text) then return end
     local point = pointOf(text)
     local setter = field(text, "SetPoint")
-    if not point or type(setter) ~= "function" or ownsReceipt(state, point, samePoint) then return end
-    -- A new native anchor becomes the baseline. A lifecycle refresh that sees
-    -- our last applied anchor is a no-op, so the offset never accumulates.
-    local shifted = { point[1], point[2], point[3], point[4] + state.dx, point[5] - LEVEL_DOWN }
+    if not point or type(setter) ~= "function" then return end
+    local owned = ownsReceipt(state, point, samePoint)
+    -- Camelot centers each level on its native circle. Reuse that single
+    -- CENTER anchor, so no clearing or additional constraint is necessary.
+    if not owned and (point[1] ~= "CENTER" or point[2] ~= state.nativeRelative
+        or point[3] ~= "CENTER") then return end
+    local ps, ts = regionScale(state.portrait), regionScale(text)
+    if not ps or not ts or not regionScale(state.nativeRelative) then return end
+    local x = state.dx * ps / ts
+    if not finite(x) then return end
+    local shifted = { "CENTER", state.portrait, state.side, x, 0 }
+    if owned and samePoint(point, shifted, true) then return end
     state.applying = true
     local ok, result = pcall(setter, text, shifted[1], shifted[2], shifted[3], shifted[4], shifted[5])
     state.applying = false
@@ -125,10 +148,12 @@ local function moveLevel(text, state)
     end
 end
 
-local function installLevel(text, dx)
+local function installLevel(text, portrait, nativeRelative, side)
     if not outsideCombat() or not accessible(text) then return end
     local state = levels[text]
-    if not state then state = { dx = dx }; levels[text] = state end
+    if not state then state = {}; levels[text] = state end
+    state.portrait, state.nativeRelative, state.side = portrait, nativeRelative, side
+    state.dx = side == "LEFT" and -LEVEL_SIDE_GAP or LEVEL_SIDE_GAP
     moveLevel(text, state)
     hookOnce(text, state, "SetPoint", function(self, p, relative, rp, x, y)
         if state.applying then return end
@@ -137,43 +162,53 @@ local function installLevel(text, dx)
             state.requested = nil
         end
         moveLevel(self, state)
-        -- The mirrored icon must follow a later native level-label reanchor,
-        -- including the additional outward level adjustment above.
-        if state.dx == -LEVEL_OUTWARD and refreshCombatIcon then
+        if state.side == "LEFT" and refreshCombatIcon then
             refreshCombatIcon()
         end
     end)
 end
 
--- Convert readable level/portrait positions to the icon's own anchor units.
+-- Convert the native level-circle/portrait positions to the icon's anchor units.
 -- GetCenter() values are in each region's UI space; multiply by that region's
 -- effective scale before reflecting. Icon width/height are needed to convert
 -- the desired icon center to its existing TOPLEFT point.
-local function mirroredCombatAnchor(level, portrait, icon)
+local function mirroredCombatAnchor(level, portrait, icon, levelCircle)
     if not accessible(level) then return nil end
-    local centerGetter = field(level, "GetCenter")
-    local levelScaleGetter = field(level, "GetEffectiveScale")
+    local placement = levels[level]
+    if not levelCircle and placement and (placement.applied or placement.requested) then
+        -- A temporarily unavailable circle must not make the moved side label
+        -- become the lower-corner reference on a later lifecycle refresh.
+        return nil
+    end
+    local reference = levelCircle or level
+    local centerGetter = field(reference, "GetCenter")
+    local ls = regionScale(reference)
+    local labelScale = levelCircle and regionScale(level) or ls
     local portraitCenterGetter = field(portrait, "GetCenter")
     local portraitScaleGetter = field(portrait, "GetEffectiveScale")
     local iconScaleGetter = field(icon, "GetEffectiveScale")
     local widthGetter, heightGetter = field(icon, "GetWidth"), field(icon, "GetHeight")
-    if type(centerGetter) ~= "function" or type(levelScaleGetter) ~= "function"
+    if type(centerGetter) ~= "function" or not ls or not labelScale
         or type(portraitCenterGetter) ~= "function" or type(portraitScaleGetter) ~= "function"
         or type(iconScaleGetter) ~= "function"
         or type(widthGetter) ~= "function" or type(heightGetter) ~= "function" then return nil end
-    local lok, lx, ly = pcall(centerGetter, level)
+    local lok, lx, ly = pcall(centerGetter, reference)
     local pok, px, py = pcall(portraitCenterGetter, portrait)
-    local lsok, ls = pcall(levelScaleGetter, level)
     local psok, ps = pcall(portraitScaleGetter, portrait)
     local tsok, ts = pcall(iconScaleGetter, icon)
     local wok, width = pcall(widthGetter, icon)
     local hok, height = pcall(heightGetter, icon)
-    if not (lok and pok and lsok and psok and tsok and wok and hok
+    if not (lok and pok and psok and tsok and wok and hok
         and finite(lx) and finite(ly) and finite(px) and finite(py)
         and finite(ls) and finite(ps) and finite(ts) and finite(width) and finite(height)
         and ls > 0 and ps > 0 and ts > 0 and width > 0 and height > 0) then return nil end
-    local x = (px * ps - lx * ls) / ts - width * 0.5
-    local y = (ly * ls - py * ps) / ts + height * 0.5
+    local levelX, levelY = lx * ls, ly * ls
+    if levelCircle then
+        levelX = levelX - COMBAT_LEVEL_OUTWARD * labelScale
+        levelY = levelY - COMBAT_LEVEL_DOWN * labelScale
+    end
+    local x = (px * ps - levelX) / ts - width * 0.5
+    local y = (levelY - py * ps) / ts + height * 0.5
     if not finite(x) or not finite(y) then return nil end
     -- The native renderer can report microscopic rounding differences after
     -- scale transitions. Quantize to a hundredth of a UI unit to avoid churn.
@@ -219,7 +254,7 @@ local function moveCombatIcon(texture, state)
         if state.fallbackApplied and state.SetPoint then return end
     end
 
-    local x, y = mirroredCombatAnchor(state.level, portrait, texture)
+    local x, y = mirroredCombatAnchor(state.level, portrait, texture, state.levelCircle)
     if not x then state.lastResult = "level geometry unreadable"; return end
     local desired = { "TOPLEFT", portrait, "CENTER", x, y }
     if point and (samePoint(point, desired) or
@@ -242,13 +277,14 @@ local function moveCombatIcon(texture, state)
     end
 end
 
-local function installCombatIcon(texture, portrait, level)
+local function installCombatIcon(texture, portrait, level, levelCircle)
     if not outsideCombat() or not accessibleCombatIcon(texture)
         or not readable(portrait) or not portrait or not accessible(level) then return end
     local state = combatIcons[texture]
     if not state then state = {}; combatIcons[texture] = state end
     state.portrait = portrait
     state.level = level
+    state.levelCircle = levelCircle
     moveCombatIcon(texture, state)
     hookOnce(texture, state, "SetPoint", function(self)
         if state.applying then return end
@@ -272,19 +308,6 @@ end
 -- smaller secondary rim (the original +2 still touched it in the live capture).
 local PLAYER_CROWN_GAP, TARGET_CROWN_GAP = 5, 7
 local LEADER_CROWN_HEIGHT, PARTY_CROWN_NUDGE = 11, 4
-
-local function regionScale(region)
-    if not readable(region) or not region then return end
-    local forbidden = field(region, "IsForbidden")
-    if type(forbidden) == "function" then
-        local ok, value = pcall(forbidden, region)
-        if not ok or not readable(value) or value ~= false then return end
-    end
-    local getter = field(region, "GetEffectiveScale")
-    if type(getter) ~= "function" then return end
-    local ok, value = pcall(getter, region)
-    if ok and finite(value) and value > 0 then return value end
-end
 
 local function partyCrownAllowed(state)
     if type(IsInRaid) ~= "function" or type(state.memberUnit) ~= "function" then return false end
@@ -405,20 +428,24 @@ end
 
 local function apply()
     if not outsideCombat() then return end
-    installLevel(_G.PlayerLevelText, -LEVEL_OUTWARD)
     local playerContent = field(_G.PlayerFrame, "PlayerFrameContent")
+    local playerMain = field(playerContent, "PlayerFrameContentMain")
     local playerContext = field(playerContent, "PlayerFrameContentContextual")
     local frameContainer = field(_G.PlayerFrame, "PlayerFrameContainer")
+    local playerPortrait = field(frameContainer, "PlayerPortrait")
+    local playerLevelCircle = field(playerMain, "LevelBackgroundCircle")
+    installLevel(_G.PlayerLevelText, playerPortrait, playerLevelCircle, "LEFT")
     installCombatIcon(field(playerContext, "AttackIcon"), field(frameContainer, "PlayerPortrait"),
-        _G.PlayerLevelText)
+        _G.PlayerLevelText, playerLevelCircle)
     installLeaderIcon(field(playerContext, "LeaderIcon"), PLAYER_CROWN_GAP,
         "TOPLEFT", playerContext, field(frameContainer, "PlayerPortrait"))
     for _, name in ipairs({ "TargetFrame", "FocusFrame" }) do
         local content = field(_G[name], "TargetFrameContent")
         local main = field(content, "TargetFrameContentMain")
-        installLevel(field(main, "LevelText"), LEVEL_OUTWARD)
         local contextual = field(content, "TargetFrameContentContextual")
         local container = field(_G[name], "TargetFrameContainer")
+        installLevel(field(main, "LevelText"), field(container, "Portrait"),
+            field(main, "LevelBackgroundCircle"), "RIGHT")
         installLeaderIcon(field(contextual, "LeaderIcon"), -TARGET_CROWN_GAP,
             "TOPRIGHT", contextual, field(container, "Portrait"))
     end
@@ -462,7 +489,8 @@ SlashCmdList.BJARKIUI_COMBATICON = function()
     local relative = point and (point[2] == portrait and point[3] == "CENTER" and "portrait center" or "other") or "unreadable"
     local result = state and state.lastResult or (icon and "not installed" or "icon inaccessible")
     local x, y
-    if icon and portrait then x, y = mirroredCombatAnchor(_G.PlayerLevelText, portrait, icon) end
+    local levelCircle = field(field(player, "PlayerFrameContentMain"), "LevelBackgroundCircle")
+    if icon and portrait then x, y = mirroredCombatAnchor(_G.PlayerLevelText, portrait, icon, levelCircle) end
     print("bjarkiUI combat-icon: " .. tostring(result)
         .. " | point=" .. where .. " | relative=" .. relative .. " | mirrored="
         .. (x and tostring(x) .. "," .. tostring(y) or "unreadable"))

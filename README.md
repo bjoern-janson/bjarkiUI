@@ -1,14 +1,14 @@
 # bjarkiUI
 
-**0.2.363-buff-ten-second-threshold-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
+**0.2.364-portrait-level-centers-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
 
 ## Latest test build
 
-**.363:** Enforces the requested buff decimal threshold. The previous opaque seconds-only fallback could print `66.2`; that unconditional decimal write is removed. Public short timers and genuine native duration objects retain decimals below ten and their existing spacing. If neither supported source is available, the current native countdown stays visible, including whole seconds below ten. Existing action formatting and all other frame presentation remain. This corrects the over-ten decimal defect without claiming complete restricted-buff coverage. [Changes](CHANGELOG.md) · [Verification and limits](docs/VERIFICATION_0.2.363.md)
+**.364:** Centers the Player level on the outside left of its portrait and Target/Focus levels on the outside right. The placement follows the portrait through frame scaling and native resets. The player combat glyph keeps its previous lower-corner position through a separate native level-circle reference. Level text, fonts, colors and native visibility remain unchanged. The .363 timer behavior and its unresolved restricted-buff/action-bar limits remain. [Changes](CHANGELOG.md) · [Verification and limits](docs/VERIFICATION_0.2.364.md)
 
 ## Install
 
-1. Download the supplied `bjarkiUI-0.2.363-Buff-Ten-Second-Threshold.zip` test package. The stacked development PR does not trigger the workflow restricted to `main`.
+1. Download the supplied `bjarkiUI-0.2.364-Portrait-Level-Centers.zip` test package. The stacked development PR does not trigger the workflow restricted to `main`.
 2. Extract its `bjarkiUI` folder into the Forever client's `Interface/AddOns/` directory. Check that `Interface/AddOns/bjarkiUI/bjarkiUI.toc` exists.
 3. Enable the addon and reload the interface. Use `/bui help` for the main commands and `/bdark` for Soft Dark controls.
 
@@ -75,6 +75,6 @@ Start with [AGENTS.md](AGENTS.md), then the [code map](docs/CODE_MAP.md). The tw
 - [Timer sources, native writers, hooks and cleanup](docs/TIMER_LIFECYCLE.md)
 - [Default manifest](bjarkiUI.toc) · [Camelot manifest](bjarkiUI_Camelot.toc)
 - [Package workflow](.github/workflows/package-addon.yml) · [Changelog](CHANGELOG.md)
-- [Current verification and live evidence](docs/VERIFICATION_0.2.363.md)
+- [Current verification and live evidence](docs/VERIFICATION_0.2.364.md)
 
 `ARCHITECTURE.md` records implementation history, including retired experiments. The 0.2.309 audit documents, `tests/snapshot-0.2.309/` and `tools/audit/` are historical reproduction material, not the current test or packaging entry point. Reproduce that audit at its [pinned revision](https://github.com/bjoern-janson/bjarkiUI/tree/d1797e392e0eb466906632e4dc047eb830b2ac78). Current source and top-level tests take precedence over historical descriptions. [Architecture history](ARCHITECTURE.md) · [Audit baseline](docs/AUDIT_BASELINE.md)

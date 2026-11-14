@@ -2,6 +2,13 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.364-portrait-level-centers-test — center levels beside portraits
+
+- Center Player level text vertically outside the left portrait edge; mirror Target/Focus levels outside their right edges.
+- Reuse the native single CENTER anchor with a ten-unit portrait-relative gap and effective-scale conversion. Native resets reapply the placement; current accepted geometry does not accumulate offsets or repeated writes. Unrelated anchors, inaccessible geometry and combat remain guarded.
+- Preserve the Player combat glyph at its previous lower corner by referencing the live native level-circle center plus the prior label offset, independently of the moved level text.
+- Keep level fonts, colors, contents and visibility native. Current crowns, PvP icons, native high-level skulls and timer paths retain their behavior.
+
 ## 0.2.363-buff-ten-second-threshold-test — enforce the requested threshold
 
 - The user screenshot shows `66.2`. The .360–.362 seconds-only fallback deliberately applied tenths throughout the native below-90-second band; that compromise did not satisfy the decimals-below-ten requirement.

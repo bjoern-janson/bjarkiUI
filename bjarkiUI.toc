@@ -2,7 +2,7 @@
 ## Title: bjarkiUI
 ## Notes: Ultralight unit-frame presentation for WoW: Forever
 ## Author: Bjarki / OpenAI
-## Version: 0.2.363-buff-ten-second-threshold-test
+## Version: 0.2.364-portrait-level-centers-test
 ## SavedVariablesPerCharacter: bjarkiUISettings
 
 NativePrecision.lua
