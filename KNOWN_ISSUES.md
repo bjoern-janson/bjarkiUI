@@ -1,5 +1,13 @@
 # Known issues and bugs
 
+## 0.2.371 — decimal consistency and remaining renderer boundaries
+
+The user reports that decimals look different across UI elements, without a new screenshot. Source audit confirms distinct native action/buff spacing and asymmetric cast cells, plus cast carry/style defects. .371 shares compact decimal geometry where the current native font permits it and repairs the confirmed bjarkiUI defects. Passing public-metric and Lua fixture checks is not proof of matching live glyph ink, absence of taint, or improved frame pacing.
+
+Unsupported opaque buffs still retain the native text and may show a seconds suffix or whole seconds below ten. A native below-90 selector cannot safely authorize a below-ten rule. Proportional or kerned fonts that reject compact whole-number proof retain the proven guarded action fallback. Intentional native font sizes differ between small buff labels and larger cooldown text.
+
+The authoritative Portraits .269 package retains a separate fixed-cell/native-secondary implementation and can round to `10.0` just below ten. CC 0.4.17.51 uses a separate whole-string timer with tenths below five. Those addons are not rewritten by this bjarkiUI release. Their differing policies cannot be described as solved by a shared bjarkiUI helper. The existing stutter reports remain open. [Verification](docs/VERIFICATION_0.2.371.md).
+
 ## 0.2.370 — combat-aware level highlight live behavior
 
 Player is intentionally plain; Target/Focus use their own current combat state for highlighting. The native artwork is reused, while its unit-frame activation policy is the user's combat condition rather than the native nameplate mixin's selection condition. Native source and fixtures establish the API/sink contracts and modeled event behavior. Live enter/exit delivery, optical fit and client taint/frame-time behavior have not yet been observed for this build. [Verification](docs/VERIFICATION_0.2.370.md).

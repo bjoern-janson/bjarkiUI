@@ -39,9 +39,14 @@ C_StringUtil={CreateNumericRuleFormatter=function()
             for _,r in ipairs(self.rules)do if value>=r.threshold then active=r else break end end
             if not active then return "" end
             if active.step then
-                local round=active.rounding==Enum.NumericRuleFormatRounding.Up and math.ceil or math.floor
-                value=round(value/active.step)*active.step
+                local quotient=value/active.step
+                if active.rounding==Enum.NumericRuleFormatRounding.Up then quotient=math.ceil(quotient)
+                elseif active.rounding==Enum.NumericRuleFormatRounding.Down then quotient=math.floor(quotient)
+                else quotient=math.floor(quotient+0.5) end
+                value=quotient*active.step
             end
+            if active.min then value=math.max(active.min,value) end
+            if active.max then value=math.min(active.max,value) end
             if active.components then value=value/active.components[1].div end
             if not active.format:find("%%") then return active.format end
             return (string.format(active.format,value):gsub("%.",localePoint))
@@ -422,7 +427,9 @@ do
     local fixed=assert(get(font,base),"nullable character areas block valid tabular native countdowns")
     assert(private.IsFixedActionFormatter(fixed) and fixed~=base,"width fallback did not earn native ownership")
     for _,family in ipairs({
-        {values={.1,1.1,1.8,7.1,8.1,8.8,9.9},positions={-5.875,0,5.875}},
+        -- This localized comma has no interior kerning in the fixture, so
+        -- its decimal family shares the proven compact buff geometry.
+        {values={.1,1.1,1.8,7.1,8.1,8.8,9.9},positions={-4.875,0,4.875}},
         {values={11,17,18,71,78,81,88},positions={-4.625,4.625}},
         {values={120,180,240,480},positions={-3,4.625}},
     })do
@@ -607,6 +614,88 @@ do
     combat=true;before=measures;assert(buff(label(90))==nil and measures==before);combat=false
     kern=savedKern;modernBounds,quantizeSpacers,spanFailure=false,false,nil
     for d,w in pairs(savedWidths)do widths[d]=w end
+end
+-- The same native profile must give actions and buffs the same compact
+-- decimal columns, while whole seconds retain their proven per-digit guards.
+do
+    local savedWidths,savedKern={},kern
+    for i=0,9 do local d=tostring(i);savedWidths[d]=widths[d];widths[d]=7.25 end
+    modernBounds,quantizeSpacers,kern=true,true,{["11"]=-.5}
+    local buff=private.GetFixedBuffSecondsFormat
+    local function columns(text,expected,message)
+        local _,raw,positions=layout(text)
+        assert(#positions==#expected,message..": wrong character count in "..raw)
+        for i,want in ipairs(expected)do
+            assert(math.abs(positions[i]-want)<.001,message..": moved column "..i.." in "..raw)
+        end
+        return raw
+    end
+    for index,route in ipairs({"characters","widths"})do
+        spanFailure=route=="widths" and "nil" or nil
+        local font=label(110+index)
+        local action=assert(get(font,original),"compact action profile unavailable: "..route)
+        local measured,samples=measures,formattedSamples
+        local format=assert(buff(font),"matching buff profile unavailable: "..route)
+        assert(measures==measured and formattedSamples==samples,"action and buff did not share their native decimal proof")
+        for tenth=0,99 do
+            local value=tenth/10
+            local text=action:FormatNumber(value)
+            local raw=columns(text,{-4.875,0,4.875},"action/buff compact decimal")
+            assert(raw==string.format("%.1f",value),"shared decimal spelling changed")
+            local other=string.format(format,value)
+            columns(other,{-4.875,0,4.875},"buff compact decimal")
+            assert(text==other,"the same native profile uses different decimal guards")
+        end
+        assert(columns(action:FormatNumber(9.999),{-4.875,0,4.875},"near-ten decimal")=="9.9",
+            "sub-ten countdown expanded to 10.0")
+        for _,case in ipairs({{0.25,"0.3"},{1.25,"1.3"},{9.25,"9.3"}})do
+            assert(columns(action:FormatNumber(case[1]),{-4.875,0,4.875},"native nearest-tenth midpoint")==case[2],
+                "action midpoint did not use the shared native nearest-tenth policy")
+        end
+        for _,value in ipairs({11,17,88})do
+            columns(action:FormatNumber(value),{-4.625,4.625},"whole seconds lost per-digit guards")
+        end
+        local allocated=formatterCount
+        private.RetryFixedActionFormatters()
+        for _=1,20 do assert(get(font,original)==action and buff(font)==format)end
+        assert(measures==measured and formattedSamples==samples and formatterCount==allocated,
+            "successful compact profile recalibrated or allocated on reuse")
+    end
+    spanFailure=nil
+    -- A temporary label constraint is not evidence against the font profile.
+    -- Restoring its width must recover the compact cached formatter.
+    local font=label(113)
+    local labelWidth=10
+    font.GetWidth=function()return labelWidth end
+    local widget={GetWidth=function()return 100 end,GetEffectiveScale=function()return 1 end}
+    assert(get(font,original,widget)==original,"a constrained label accepted padded output")
+    labelWidth=100
+    columns(assert(get(font,original,widget)):FormatNumber(1.8),{-4.875,0,4.875},"resized compact action")
+    -- Equal total widths alone do not prove internal positions. The old
+    -- guarded action path must survive rejection of compact decimal kerning.
+    for index,pairs in ipairs({savedKern,{["1."]=-.5,[".8"]=.5}})do
+        kern=pairs
+        local font=label(120+index)
+        local action=assert(get(font,original),"rejected compact profile lost guarded action fallback")
+        assert(buff(font)==nil,"moving compact columns were accepted")
+        for _,value in ipairs({1.8,8.1,8.8})do
+            columns(action:FormatNumber(value),{-5.875,0,5.875},"guarded action fallback")
+        end
+        local measured,allocated=measures,formatterCount
+        private.RetryFixedActionFormatters()
+        for _=1,20 do assert(get(font,original)==action)end
+        assert(measures==measured and formatterCount==allocated,"successful guarded fallback retried compact calibration")
+    end
+    -- Proportional fonts retain their current calibrated digit guards.
+    for d,w in pairs(savedWidths)do widths[d]=w end
+    kern,quantizeSpacers=savedKern,false
+    local proportional=label(123)
+    local action=assert(get(proportional,original),"proportional action fallback unavailable")
+    assert(buff(proportional)==nil,"proportional whole-number printf was certified")
+    for _,value in ipairs({1.8,8.1,8.8})do
+        columns(action:FormatNumber(value),{-5.875,0,5.875},"proportional action fallback")
+    end
+    modernBounds,spanFailure=false,nil
 end
 for _,probe in ipairs(probes)do assert(probe.hidden,"calibration leaked a shown sample region")end
 assert(probeCount==2 and preparationCost.formatters==1,"action calibration allocated more than one shared probe/formatter per profile")

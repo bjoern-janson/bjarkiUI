@@ -2,6 +2,14 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.371-consistent-decimals-test — compact decimal presentation
+
+- Share the already validated buff decimal layout with native action short strings when the same font profile supports stable compact columns. Retain full action validation, per-digit guards for other formats and unsupported compact profiles, bounded caches and current-widget fitting.
+- Use the same native nearest-tenth rule for supported action and cast output as genuine-duration buffs. All cast digits derive from that one rounding operation, including midpoint/carry cases. Cap action tenths at 9.9 immediately below ten; whole seconds below 91 and higher units retain their existing boundaries.
+- Use one symmetric decimal-spacing helper for action/buff compatibility cells and cast cells, removing box-padding drift and applying native text scale once. Preserve each element's native font role and size.
+- Repair cast rounding carry, native font/style/scale refresh and empty localized suffix support. Retain native duration bindings and the original source label; provide native formatted overflow beyond the fixed two-digit range.
+- Retain .370 combat-aware level badges. Unsupported opaque buffs, separate Portraits/CC presentation and live rendering/performance limits remain explicit. [Verification](docs/VERIFICATION_0.2.371.md).
+
 ## 0.2.370-combat-level-highlights-test — meaningful target/focus highlights
 
 - Implement the user's requested richer behavior after they rejected the assistant's blanket-removal choice: Player remains plain; Target and Focus each highlight only while their own current unit is in combat and its native number is displayed.

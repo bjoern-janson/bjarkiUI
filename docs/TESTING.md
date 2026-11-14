@@ -1,6 +1,6 @@
 # Testing and packaging bjarkiUI
 
-Current test target: **0.2.370-combat-level-highlights-test**, **16 manifest-loaded runtime modules**, and **38 top-level Lua scripts**: 37 behavioral suites plus `tests/syntax.lua`. Run both Lua 5.1 and Lua 5.4. The current aura suite reports **271 cases**; suite/assertion counts describe fixture coverage, not a percentage of live-client behavior covered.
+Current test target: **0.2.371-consistent-decimals-test**, **16 manifest-loaded runtime modules**, and **38 top-level Lua scripts**: 37 behavioral suites plus `tests/syntax.lua`. Run both Lua 5.1 and Lua 5.4. The current aura suite reports **271 cases**; suite/assertion counts describe fixture coverage, not a percentage of live-client behavior covered.
 
 ## Portable verification
 
@@ -8,7 +8,7 @@ Run from the repository root with Python 3.10 or newer and native Lua/luac execu
 
 ```sh
 python tools/verify.py
-python tools/verify.py --output ../bjarkiUI-0.2.370-Combat-Level-Highlights.zip
+python tools/verify.py --output ../bjarkiUI-0.2.371-Consistent-Decimals.zip
 ```
 
 The default uses Lua 5.1 and 5.4 with their matching compilers. `--output` is an optional ZIP filename **outside the checkout**, not a report path. Its parent directory must already exist and the file must be new. Packaging occurs only after verification succeeds. The [CI workflow](../.github/workflows/package-addon.yml) uses native interpreters and the same [verification tool](../tools/verify.py).
@@ -49,7 +49,7 @@ Substitute another top-level script for a focused regression. `tests/syntax.lua`
 | --- | --- | --- |
 | Action timers | [cooldown-seconds.lua](../tests/cooldown-seconds.lua), [action-timer-spacing.lua](../tests/action-timer-spacing.lua), [native-digit-cells.lua](../tests/native-digit-cells.lua), [static-action-glyphs.lua](../tests/static-action-glyphs.lua) | Standalone public character geometry, exact formatter setter/getter receipts, native preference and owned handoff, compatibility cells, exact thresholds, minimum/GCD policy, font/style refresh, later writers and preference transitions. |
 | Player aura timers | [aura-presentation.lua](../tests/aura-presentation.lua) | Public/opaque timing, assignment and expiry, native update order, font/layout changes, combat, physical owner changes, nested writes and fallback text. |
-| Player cast timers | [castbar-digit-cells.lua](../tests/castbar-digit-cells.lua) | Frozen 0.2.309 native duration-to-text bindings, unmodified Blizzard source text, fixed positions and thresholds, casts/channels, permission refusals, and rejected alpha handoffs returning native text. |
+| Player cast timers | [castbar-digit-cells.lua](../tests/castbar-digit-cells.lua) | Native duration-to-text bindings, coherent carry and range handoffs, shared decimal centers, current native font/style/scales, empty/localized suffixes, unmodified source text, casts/channels, and refused setup/restoration. |
 | Tracked buffs and decoration | [presentation.lua](../tests/presentation.lua), [icon-skin.lua](../tests/icon-skin.lua) | Active pool iteration, item/widget reuse, threshold resets, masks/rims, external writes and restoration. |
 | Health/name ownership | [health-color-observer.lua](../tests/health-color-observer.lua), [nameplate-color-discovery.lua](../tests/nameplate-color-discovery.lua), [name-color-ownership.lua](../tests/name-color-ownership.lua) | Native color observation, first-witness ordering, verified nameplate callback context, reentrant lookup/identity fallback, recipient changes, partial restoration and combat-exit reconciliation. |
 | Unit status typography | [status-style.lua](../tests/status-style.lua), [status-scale.lua](../tests/status-scale.lua), [status-combat.lua](../tests/status-combat.lua), [pet-status-text.lua](../tests/pet-status-text.lua) | Current native font, shadow/style, scale refresh and pet presentation. |
@@ -77,7 +77,7 @@ The fixture cites the native source revision used to model that sequence. A sour
 
 ## Package and evidence checks
 
-The package contains both matching manifests, exactly their runtime Lua files and `Media/TimerSpacer.tga`. The verifier checks archive integrity, membership and byte equality against its input payloads. Tests, documentation, historical audit tools, settings files and bundled Edit Mode presets are excluded. No packaging step should overwrite a user's live `WTF`/SavedVariables or Edit Mode layouts. Current source hashes and recorded verification evidence are in [VERIFICATION_0.2.370.md](VERIFICATION_0.2.370.md). The older [BUILD_VERIFICATION.md](BUILD_VERIFICATION.md) records the historical .334 package.
+The package contains both matching manifests, exactly their runtime Lua files and `Media/TimerSpacer.tga`. The verifier checks archive integrity, membership and byte equality against its input payloads. Tests, documentation, historical audit tools, settings files and bundled Edit Mode presets are excluded. No packaging step should overwrite a user's live `WTF`/SavedVariables or Edit Mode layouts. Current source hashes and recorded verification evidence are in [VERIFICATION_0.2.371.md](VERIFICATION_0.2.371.md). The older [BUILD_VERIFICATION.md](BUILD_VERIFICATION.md) records the historical .334 package.
 
 The [.367 allocation reproduction](performance/0.2.367/README.md) is a separate developer-only comparison against exact .366 source. It checks unchanged native calls/visible state and lower GC-stopped heap growth in both interpreters. It does not add a user command, runtime profiler or live-performance assertion.
 
