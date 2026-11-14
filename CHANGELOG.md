@@ -2,6 +2,13 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.365-default-level-badges-test — restore native level artwork
+
+- Restore the Player, Target and Focus level backgrounds/borders at their default lower-corner positions, as requested for inspecting potential future secondary-portrait locations.
+- Remove the old native level-ring Hide/zero-alpha policy, its Show/SetShown/SetAlpha observers and seven lifecycle calls. Native initialization owns the artwork and visibility again after reload.
+- Keep the .364 side-centered level numbers and existing combat/crown positioning. No bjarkiPortraits secondary portrait is moved.
+- Retire the 13-case suppression-only suite because its required behavior was explicitly reversed. Remove its unused isolated-fixture stub. The current package gate now runs 36 suites per interpreter; no runtime module or dependency is added.
+
 ## 0.2.364-portrait-level-centers-test — center levels beside portraits
 
 - Center Player level text vertically outside the left portrait edge; mirror Target/Focus levels outside their right edges.
