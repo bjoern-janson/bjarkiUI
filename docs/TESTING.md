@@ -1,6 +1,6 @@
 # Testing and packaging bjarkiUI
 
-Current test target: **0.2.367-target-refresh-allocation-test**, **16 manifest-loaded runtime modules**, and **37 top-level Lua scripts**: 36 behavioral suites plus `tests/syntax.lua`. Run both Lua 5.1 and Lua 5.4. The current aura suite reports **271 cases**; suite/assertion counts describe fixture coverage, not a percentage of live-client behavior covered.
+Current test target: **0.2.368-nameplate-level-badges-test**, **16 manifest-loaded runtime modules**, and **38 top-level Lua scripts**: 37 behavioral suites plus `tests/syntax.lua`. Run both Lua 5.1 and Lua 5.4. The current aura suite reports **271 cases**; suite/assertion counts describe fixture coverage, not a percentage of live-client behavior covered.
 
 ## Portable verification
 
@@ -8,7 +8,7 @@ Run from the repository root with Python 3.10 or newer and native Lua/luac execu
 
 ```sh
 python tools/verify.py
-python tools/verify.py --output ../bjarkiUI-0.2.367-Target-Refresh.zip
+python tools/verify.py --output ../bjarkiUI-0.2.368-Nameplate-Level-Badges.zip
 ```
 
 The default uses Lua 5.1 and 5.4 with their matching compilers. `--output` is an optional ZIP filename **outside the checkout**, not a report path. Its parent directory must already exist and the file must be new. Packaging occurs only after verification succeeds. The [CI workflow](../.github/workflows/package-addon.yml) uses native interpreters and the same [verification tool](../tools/verify.py).
@@ -55,7 +55,7 @@ Substitute another top-level script for a focused regression. `tests/syntax.lua`
 | Unit status typography | [status-style.lua](../tests/status-style.lua), [status-scale.lua](../tests/status-scale.lua), [status-combat.lua](../tests/status-combat.lua), [pet-status-text.lua](../tests/pet-status-text.lua) | Current native font, shadow/style, scale refresh and pet presentation. |
 | Hit-text placement | [hit-text-lifecycle.lua](../tests/hit-text-lifecycle.lua), [hit-text-write-recovery.lua](../tests/hit-text-write-recovery.lua) | Geometry, lifecycle refresh and refused setter recovery. |
 | Party order | [party-order-recovery.lua](../tests/party-order-recovery.lua), [party-presentation.lua](../tests/party-presentation.lua) | Changed anchors only, dependent-anchor rollback, denied permission, roster/pet changes and later repair. |
-| Cosmetic frame labels | [frame-label-tweaks.lua](../tests/frame-label-tweaks.lua), [leader-crown-nudge.lua](../tests/leader-crown-nudge.lua), [rested-indicator-mirror.lua](../tests/rested-indicator-mirror.lua), [combat-icon-level-mirror.lua](../tests/combat-icon-level-mirror.lua), [combat-icon-portrait-anchor.lua](../tests/combat-icon-portrait-anchor.lua) | Native geometry, write receipts, float precision, combat-icon alignment and count-font changes. |
+| Cosmetic frame labels | [frame-label-tweaks.lua](../tests/frame-label-tweaks.lua), [frame-level-badges.lua](../tests/frame-level-badges.lua), [leader-crown-nudge.lua](../tests/leader-crown-nudge.lua), [rested-indicator-mirror.lua](../tests/rested-indicator-mirror.lua), [combat-icon-level-mirror.lua](../tests/combat-icon-level-mirror.lua), [combat-icon-portrait-anchor.lua](../tests/combat-icon-portrait-anchor.lua) | Native geometry, write receipts, float precision, combat-icon alignment, count-font changes and reusable side-badge ownership/visibility. |
 | Soft Dark | [softdark-restore.lua](../tests/softdark-restore.lua), [softdark-discovery-handoff.lua](../tests/softdark-discovery-handoff.lua), [softdark-callback-recovery.lua](../tests/softdark-callback-recovery.lua) | Discovery, ownership transfer, native precision, refused restoration and incomplete callback registration. |
 | Nameplate control layout | [nameplate-control-layout.lua](../tests/nameplate-control-layout.lua), [hardening.lua](../tests/hardening.lua) | Current LEFT anchor equality, native resets, physical replacement, getter reentry with refused scheduling, current role/permission and retained style-change observers. |
 | Common lifecycle | [lifecycle.lua](../tests/lifecycle.lua), [hardening.lua](../tests/hardening.lua), [initialization-recovery.lua](../tests/initialization-recovery.lua) | Native hook retry, failed initialization, inaccessible/protected paths and broader module integration. |
@@ -77,7 +77,7 @@ The fixture cites the native source revision used to model that sequence. A sour
 
 ## Package and evidence checks
 
-The package contains both matching manifests, exactly their runtime Lua files and `Media/TimerSpacer.tga`. The verifier checks archive integrity, membership and byte equality against its input payloads. Tests, documentation, historical audit tools, settings files and bundled Edit Mode presets are excluded. No packaging step should overwrite a user's live `WTF`/SavedVariables or Edit Mode layouts. Current source hashes and recorded verification evidence are in [VERIFICATION_0.2.367.md](VERIFICATION_0.2.367.md). The older [BUILD_VERIFICATION.md](BUILD_VERIFICATION.md) records the historical .334 package.
+The package contains both matching manifests, exactly their runtime Lua files and `Media/TimerSpacer.tga`. The verifier checks archive integrity, membership and byte equality against its input payloads. Tests, documentation, historical audit tools, settings files and bundled Edit Mode presets are excluded. No packaging step should overwrite a user's live `WTF`/SavedVariables or Edit Mode layouts. Current source hashes and recorded verification evidence are in [VERIFICATION_0.2.368.md](VERIFICATION_0.2.368.md). The older [BUILD_VERIFICATION.md](BUILD_VERIFICATION.md) records the historical .334 package.
 
 The [.367 allocation reproduction](performance/0.2.367/README.md) is a separate developer-only comparison against exact .366 source. It checks unchanged native calls/visible state and lower GC-stopped heap growth in both interpreters. It does not add a user command, runtime profiler or live-performance assertion.
 

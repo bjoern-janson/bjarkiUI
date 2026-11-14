@@ -1,5 +1,11 @@
 # Known issues and bugs
 
+## 0.2.368 — side-level badge live appearance
+
+The side numbers now use native nameplate background/outline artwork and a sixteen-unit portrait gap. Source inspection establishes the atlas names and proportions; Lua fixtures establish modeled geometry, visibility and resource reuse. Optical fit, atlas rendering and taint behavior have not been observed in the live client for this build. The native lower level circles and skulls remain native. [Verification](docs/VERIFICATION_0.2.368.md).
+
+The previously reported self-target microstutter and timer limitations below remain open; this cosmetic change does not close those reports.
+
 ## 0.2.367 — self-target microstutter remains open
 
 After receiving .366, the user was uncertain it helped and specifically reported microstutters when targeting their own character. They declined a manual trace workflow. No successful in-client .366 or .367 stutter fix is established.

@@ -149,9 +149,9 @@ local function scenario(empty)
             local label,portrait,side,direction=v[1],v[2],v[3],v[4]
             eq(label.clearCalls,0,'existing anchor is never cleared')
             eq(label.anchor[1],'CENTER');eq(label.anchor[2],portrait);eq(label.anchor[3],side)
-            eq(label.anchor[4],direction*10*portrait.scale/label.scale,'outward gap');eq(label.anchor[5],0,'centered y')
+            eq(label.anchor[4],direction*16*portrait.scale/label.scale,'outward gap');eq(label.anchor[5],0,'centered y')
             local x,y=label:GetCenter()
-            near(x*label.scale,(portrait.centerX+direction*(portrait.width/2+10))*portrait.scale,'physical side position')
+            near(x*label.scale,(portrait.centerX+direction*(portrait.width/2+16))*portrait.scale,'physical side position')
             near(y*label.scale,portrait.centerY*portrait.scale,'physical vertical center')
         end
     end
@@ -197,7 +197,7 @@ end)
 test('a rounded native level anchor does not drift on target events',function()
  local e=scenario();local label=e.targetLevel
  local set=label.SetPoint
- e.targetPortrait.scale=.41
+ e.targetPortrait.scale=.25625
  function label:SetPoint(p,rel,r,x,y)
     if rel==e.targetPortrait and x==4.1 then x=4.099999904632568 end
     return set(self,p,rel,r,x,y)
@@ -211,27 +211,27 @@ end)
 test('an adjacent external portrait anchor stays owned by its writer while font size gets a new baseline',function()
  local e=scenario();local t=e.targetLevel;local bag=e.labels[1];bag.size=13
  e.load();e.event('PLAYER_LOGIN')
- local near10=10-2^-20;local near16=16-2^-20
- t:SetPoint(t.anchor[1],t.anchor[2],t.anchor[3],near10,t.anchor[5])
+ local nearLevel=16-2^-20;local near16=16-2^-20
+ t:SetPoint(t.anchor[1],t.anchor[2],t.anchor[3],nearLevel,t.anchor[5])
  bag:SetFont(bag.face,near16,bag.flags)
- eq(t.anchor[4],near10);eq(t.anchor[5],0);eq(bag.size,near16+3)
+ eq(t.anchor[4],nearLevel);eq(t.anchor[5],0);eq(bag.size,near16+3)
  e.event('PLAYER_REGEN_ENABLED');eq(t.pointWrites,2);eq(bag.fontWrites,3)
 end)
 test('once an exact readback exists the alternate float is a new writer',function()
  local e=scenario();local t=e.targetLevel;local bag=e.labels[1]
- e.targetPortrait.scale=.41;bag.size=13.1
+ e.targetPortrait.scale=.25625;bag.size=13.1
  e.load();e.event('PLAYER_LOGIN')
  eq(t.anchor[4],4.1);eq(bag.size,16.1)
  local roundedX=4.099999904632568;local roundedSize=16.100000381469727
  t:SetPoint(t.anchor[1],t.anchor[2],t.anchor[3],roundedX,t.anchor[5])
  bag:SetFont(bag.face,roundedSize,bag.flags)
- e.targetPortrait.scale=.42;e.event('UI_SCALE_CHANGED')
+ e.targetPortrait.scale=.2625;e.event('UI_SCALE_CHANGED')
  eq(t.anchor[4],roundedX);eq(t.pointWrites,2);eq(bag.size,roundedSize+3)
 end)
 test('denied readback is recovered once from exact double or binary32 receipts',function()
  for _,round in ipairs({false,true}) do
   local e=scenario();local t=e.targetLevel;local bag=e.labels[1]
-  e.targetPortrait.scale=.41;bag.size=13.1
+  e.targetPortrait.scale=.25625;bag.size=13.1
   local put,get=t.SetPoint,t.GetPoint
   function t:SetPoint(p,r,rp,x,y)
    if round and x==4.1 then x=4.099999904632568 end
@@ -261,7 +261,7 @@ test('a changed font source with the previous owned size gets its own size incre
 end)
 test('an observed alternate native write after a missing receipt takes ownership',function()
  local e=scenario();local t=e.targetLevel;local bag=e.labels[1]
- e.targetPortrait.scale=.41;bag.size=13.1
+ e.targetPortrait.scale=.25625;bag.size=13.1
  local point,font=t.GetPoint,bag.GetFont
  local positionRead,fontRead=0,0
  function t:GetPoint(...)
@@ -276,7 +276,7 @@ test('an observed alternate native write after a missing receipt takes ownership
  local nearX,nearSize=4.099999904632568,16.100000381469727
  t:SetPoint(t.anchor[1],t.anchor[2],t.anchor[3],nearX,t.anchor[5])
  bag:SetFont(bag.face,nearSize,bag.flags)
- e.targetPortrait.scale=.42;e.event('PLAYER_ENTERING_WORLD')
+ e.targetPortrait.scale=.2625;e.event('PLAYER_ENTERING_WORLD')
  eq(t.anchor[4],nearX);eq(bag.size,nearSize+3)
  eq(t.pointWrites,2);eq(bag.fontWrites,3)
 end)

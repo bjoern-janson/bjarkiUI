@@ -2,6 +2,14 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.368-nameplate-level-badges-test — framed side levels
+
+- Move Player numeric level left and Target/Focus numeric levels right by six additional portrait units: gap 10 → 16. Keep the existing effective-scale conversion and accepted native anchor receipts.
+- Add the standalone native nameplate dark background and gold selected outline behind each native label. Use nominal 28 × 16 base artwork with the native outline expansion, below the text's draw sublevel on its exact main owner.
+- Reuse six owned textures across physical label/owner replacement. Prepare only outside combat; native visibility observers mirror current Show/Hide/SetShown and local alpha, including opaque IsShown through the supported SetAlphaFromBoolean sink. Native anchor reset in combat hides art until safe restoration.
+- Preserve native fonts, numeric text, difficulty colors, skulls, lower level circles and other frame/timer behavior. Add no polling, unit query, runtime module or option. Repeated settled refreshes do not create textures/hooks or rewrite artwork geometry.
+- Add 13 focused real-module badge scenarios and update the existing side-offset expectations. [Verification and live limits](docs/VERIFICATION_0.2.368.md).
+
 ## 0.2.367-target-refresh-allocation-test — reduce temporary target-refresh allocation
 
 - Reuse four protected main-frame readers for current status methods, label fields, power bars and derived portrait geometry. Keep each complete protected expression and class/identity lookup order.
