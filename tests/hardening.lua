@@ -49,7 +49,7 @@ end
 -- 1. Exercise the real nameplate anchor function with positive/negative/
 -- unknown authorization. No mock replacement of the decision tree.
 do
-    local code = between("local function repairNameplateControlLayout(frame)",
+    local code = between("local nameplateControlLayout =",
                          "local function queueNameplateControlLayout(frame)")
     local env = {
         isSecret = secretValue, readableBool = readable,

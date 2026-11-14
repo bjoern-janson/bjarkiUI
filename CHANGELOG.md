@@ -2,6 +2,14 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.366-lifecycle-work-test — reduce avoidable preparation and layout work
+
+- Compare current classic nameplate LEFT anchors before writing. Settled 20-plate fixtures now make zero repeat CC/LoC anchor writes instead of 40. Preserve current physical ownership, native resets, combat permission, native-writer reentry and refused-scheduling recovery.
+- Avoid nameplate repair callbacks only when classic mode is positively false; retain both mixin and copied-instance native observers for later style changes. The fixture's 20 irrelevant callbacks disappear; target health recovery still runs.
+- Replace two capturing Soft Dark lookup functions with shared protected readers. Full discovery, native call order, tint results and late-art recovery are unchanged. The bounded synthetic fixture uses 147,856 fewer temporary bytes per exit on Lua 5.1 and 138,128 fewer on Lua 5.4; these are GC-stopped fixture measurements, not client memory or frame-time results.
+- Validate all 100 emitted short buff decimal strings, 0.0–9.9, instead of 901 strings through 90.0. Preserve all checks for used values, native ten-second transitions and safe cache/retry behavior. Character-route preparation drops from 3,515 to 311 character queries and 1,802 to 200 native printf samples.
+- Add 20 nameplate lifecycle scenarios and strengthen complete short-family calibration coverage. Add no polling, runtime module, widget, setting or dependency. Keep .365 level artwork and the ultralight description. Live microstutters and earlier timer coverage remain open. [Evidence](docs/VERIFICATION_0.2.366.md).
+
 ## 0.2.365-default-level-badges-test — restore native level artwork
 
 - Restore the Player, Target and Focus level backgrounds/borders at their default lower-corner positions, as requested for inspecting potential future secondary-portrait locations.

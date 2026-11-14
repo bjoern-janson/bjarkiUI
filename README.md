@@ -1,14 +1,14 @@
 # bjarkiUI
 
-**0.2.365-default-level-badges-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
+**0.2.366-lifecycle-work-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
 
 ## Latest test build
 
-**.365:** Restores the original Player, Target and Focus level backgrounds/borders in their native lower-corner positions. The .364 side-centered level numbers stay where they are, so the native badge locations can be inspected before any future secondary-portrait move. The old hide/zero-alpha policy and its lifecycle hooks are removed. [Changes](CHANGELOG.md) · [Verification](docs/VERIFICATION_0.2.365.md)
+**.366:** Reduces unnecessary lifecycle work after the reported microstutters: settled classic nameplate anchors are no longer rewritten, nonclassic nameplates skip irrelevant repair callbacks, Soft Dark reuses protected lookup functions, and buff typography validates only the complete short-decimal family it emits. Current .365 visuals and native timer recovery remain. Offline counts establish less work; a matched in-client recording is still needed to establish smoother frame pacing. [Changes](CHANGELOG.md) · [Verification](docs/VERIFICATION_0.2.366.md)
 
 ## Install
 
-1. Download the supplied `bjarkiUI-0.2.365-Default-Level-Badges.zip` test package. The stacked development PR does not trigger the workflow restricted to `main`.
+1. Download the supplied `bjarkiUI-0.2.366-Lifecycle-Work.zip` test package. The stacked development PR does not trigger the workflow restricted to `main`.
 2. Extract its `bjarkiUI` folder into the Forever client's `Interface/AddOns/` directory. Check that `Interface/AddOns/bjarkiUI/bjarkiUI.toc` exists.
 3. Enable the addon and reload the interface. Use `/bui help` for the main commands and `/bdark` for Soft Dark controls.
 
@@ -68,13 +68,13 @@ For action/cast reports, capture while the affected cooldown or cast is active. 
 
 ## Development and verification
 
-The description **“Ultralight unit-frame presentation”** refers to the addon's narrow presentation role, native clock ownership and event-driven updates. It is not an FPS, startup-time or in-client memory guarantee. The .356 comparison measures real Lua presenter code against fixed native-boundary fixtures; live rendering, native formatter cost and client garbage collection remain separate checks. Soft Dark retains safe lifecycle discovery because it also recovers late-created or replaced native artwork.
+The description **“Ultralight unit-frame presentation”** refers to the addon's narrow presentation role, native clock ownership and event-driven updates. It is not an FPS, startup-time or in-client memory guarantee. The [.366 comparison](docs/VERIFICATION_0.2.366.md) records reduced native requests, cold preparation samples and temporary Lua allocation in fixed fixtures; live rendering, native formatter cost and client garbage collection remain separate checks. Soft Dark retains safe lifecycle discovery because it also recovers late-created or replaced native artwork.
 
-Start with [AGENTS.md](AGENTS.md), then the [code map](docs/CODE_MAP.md). The two manifests load **16 runtime modules**. Current verification runs **36 top-level Lua scripts** (35 behavioral suites plus the manifest syntax script) under Lua 5.1 and Lua 5.4; the aura suite contains 271 cases. See [testing and packaging](docs/TESTING.md) for commands and the boundary between offline and live evidence.
+Start with [AGENTS.md](AGENTS.md), then the [code map](docs/CODE_MAP.md). The two manifests load **16 runtime modules**. Current verification runs **37 top-level Lua scripts** (36 behavioral suites plus the manifest syntax script) under Lua 5.1 and Lua 5.4; the aura suite contains 271 cases. See [testing and packaging](docs/TESTING.md) for commands and the boundary between offline and live evidence.
 
 - [Timer sources, native writers, hooks and cleanup](docs/TIMER_LIFECYCLE.md)
 - [Default manifest](bjarkiUI.toc) · [Camelot manifest](bjarkiUI_Camelot.toc)
 - [Package workflow](.github/workflows/package-addon.yml) · [Changelog](CHANGELOG.md)
-- [Current verification and live evidence](docs/VERIFICATION_0.2.365.md)
+- [Current verification and live evidence](docs/VERIFICATION_0.2.366.md)
 
 `ARCHITECTURE.md` records implementation history, including retired experiments. The 0.2.309 audit documents, `tests/snapshot-0.2.309/` and `tools/audit/` are historical reproduction material, not the current test or packaging entry point. Reproduce that audit at its [pinned revision](https://github.com/bjoern-janson/bjarkiUI/tree/d1797e392e0eb466906632e4dc047eb830b2ac78). Current source and top-level tests take precedence over historical descriptions. [Architecture history](ARCHITECTURE.md) · [Audit baseline](docs/AUDIT_BASELINE.md)

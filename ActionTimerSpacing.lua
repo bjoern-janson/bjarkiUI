@@ -655,7 +655,9 @@ local function buildBuffSeconds(file,size,flags,scale,textScale,smooth,attempt)
         end
     end
     local families,required={},0
-    for tenth=0,900 do
+    -- Both consumers clamp short decimals at 9.9; ten seconds and above keep
+    -- native unit formatting. Qualify the complete emitted short family only.
+    for tenth=0,99 do
         local raw=printf("%.1f",tenth/10)
         assert(raw:match("^%d%d?[.,]%d$"),"unsupported native decimal format")
         attempt.stage="height"

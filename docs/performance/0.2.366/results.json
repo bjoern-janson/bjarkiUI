@@ -1,0 +1,404 @@
+{
+  "baseline_tree": "c94adfe014220533026df2099e2a908530431669",
+  "baseline_remote_commit": "f3e3658cf66c7172d155e9d56d7357d682e4ac9b",
+  "limits": "Offline public API doubles; no client CPU/FPS, GC pause, taint or rendering claim. No live .366 run yet.",
+  "softdark": {
+    "method": "GC-stopped temporary Lua heap growth, settled fixture; no CPU timing",
+    "operations_per_sample": 25,
+    "samples_per_version": 3,
+    "versions": {
+      "5.1": {
+        "runtime_sha256": "cc60d123ce70ee015ddc429ec4002f9b941dcc32b5aca8e03e30d03e5922eb3d",
+        "versions": {
+          "before": {
+            "native_counts": {
+              "GetObjectType": 365,
+              "GetVertexColor": 118,
+              "SetVertexColor": 0,
+              "GetDesaturation": 2,
+              "SetDesaturation": 0,
+              "GetAtlas": 7,
+              "GetTexture": 0,
+              "GetName": 34,
+              "GetDrawLayer": 0,
+              "GetNormalTexture": 121,
+              "GetRegions": 9,
+              "GetChildren": 38,
+              "IsObjectType": 14,
+              "GetAlpha": 0,
+              "SetAlpha": 0,
+              "InCombatLockdown": 1,
+              "issecretvalue": 3710,
+              "IsAddOnLoaded": 1
+            },
+            "allocation_samples": [
+              {
+                "sample": 1,
+                "operations": 25,
+                "bytes_total": 5051657.0,
+                "bytes_per_exit": 202066.28
+              },
+              {
+                "sample": 2,
+                "operations": 25,
+                "bytes_total": 5051657.0,
+                "bytes_per_exit": 202066.28
+              },
+              {
+                "sample": 3,
+                "operations": 25,
+                "bytes_total": 5051657.0,
+                "bytes_per_exit": 202066.28
+              }
+            ],
+            "trace_sha256": "fe4275a0d72c4ff47f246bd38615bddacfbbc0ac4e029291e51ec61dd37d0fe6",
+            "trace_entries": 4420,
+            "visual_sha256": "741e6967cb8dc2b076d67e9f14a3419fefe59f1d7d0ce8da0a6f8d84653ce2ac",
+            "visual_entries": 118,
+            "median_bytes_per_exit": 202066.28
+          },
+          "after": {
+            "native_counts": {
+              "GetObjectType": 365,
+              "GetVertexColor": 118,
+              "SetVertexColor": 0,
+              "GetDesaturation": 2,
+              "SetDesaturation": 0,
+              "GetAtlas": 7,
+              "GetTexture": 0,
+              "GetName": 34,
+              "GetDrawLayer": 0,
+              "GetNormalTexture": 121,
+              "GetRegions": 9,
+              "GetChildren": 38,
+              "IsObjectType": 14,
+              "GetAlpha": 0,
+              "SetAlpha": 0,
+              "InCombatLockdown": 1,
+              "issecretvalue": 3710,
+              "IsAddOnLoaded": 1
+            },
+            "allocation_samples": [
+              {
+                "sample": 1,
+                "operations": 25,
+                "bytes_total": 1355257.0,
+                "bytes_per_exit": 54210.28
+              },
+              {
+                "sample": 2,
+                "operations": 25,
+                "bytes_total": 1355257.0,
+                "bytes_per_exit": 54210.28
+              },
+              {
+                "sample": 3,
+                "operations": 25,
+                "bytes_total": 1355257.0,
+                "bytes_per_exit": 54210.28
+              }
+            ],
+            "trace_sha256": "fe4275a0d72c4ff47f246bd38615bddacfbbc0ac4e029291e51ec61dd37d0fe6",
+            "trace_entries": 4420,
+            "visual_sha256": "741e6967cb8dc2b076d67e9f14a3419fefe59f1d7d0ce8da0a6f8d84653ce2ac",
+            "visual_entries": 118,
+            "median_bytes_per_exit": 54210.28
+          }
+        }
+      },
+      "5.4": {
+        "runtime_sha256": "524d7cf3ea821a227998cc57015691b71e4ddcfcb6558234402852783981778d",
+        "versions": {
+          "before": {
+            "native_counts": {
+              "GetObjectType": 365,
+              "GetVertexColor": 118,
+              "SetVertexColor": 0,
+              "GetDesaturation": 2,
+              "SetDesaturation": 0,
+              "GetAtlas": 7,
+              "GetTexture": 0,
+              "GetName": 34,
+              "GetDrawLayer": 0,
+              "GetNormalTexture": 121,
+              "GetRegions": 9,
+              "GetChildren": 38,
+              "IsObjectType": 14,
+              "GetAlpha": 0,
+              "SetAlpha": 0,
+              "InCombatLockdown": 1,
+              "issecretvalue": 3710,
+              "IsAddOnLoaded": 1
+            },
+            "allocation_samples": [
+              {
+                "sample": 1,
+                "operations": 25,
+                "bytes_total": 8266177.0,
+                "bytes_per_exit": 330647.08
+              },
+              {
+                "sample": 2,
+                "operations": 25,
+                "bytes_total": 8268097.0,
+                "bytes_per_exit": 330723.88
+              },
+              {
+                "sample": 3,
+                "operations": 25,
+                "bytes_total": 8268097.0,
+                "bytes_per_exit": 330723.88
+              }
+            ],
+            "trace_sha256": "fe4275a0d72c4ff47f246bd38615bddacfbbc0ac4e029291e51ec61dd37d0fe6",
+            "trace_entries": 4420,
+            "visual_sha256": "741e6967cb8dc2b076d67e9f14a3419fefe59f1d7d0ce8da0a6f8d84653ce2ac",
+            "visual_entries": 118,
+            "median_bytes_per_exit": 330723.88
+          },
+          "after": {
+            "native_counts": {
+              "GetObjectType": 365,
+              "GetVertexColor": 118,
+              "SetVertexColor": 0,
+              "GetDesaturation": 2,
+              "SetDesaturation": 0,
+              "GetAtlas": 7,
+              "GetTexture": 0,
+              "GetName": 34,
+              "GetDrawLayer": 0,
+              "GetNormalTexture": 121,
+              "GetRegions": 9,
+              "GetChildren": 38,
+              "IsObjectType": 14,
+              "GetAlpha": 0,
+              "SetAlpha": 0,
+              "InCombatLockdown": 1,
+              "issecretvalue": 3710,
+              "IsAddOnLoaded": 1
+            },
+            "allocation_samples": [
+              {
+                "sample": 1,
+                "operations": 25,
+                "bytes_total": 4815089.0,
+                "bytes_per_exit": 192603.56
+              },
+              {
+                "sample": 2,
+                "operations": 25,
+                "bytes_total": 4814897.0,
+                "bytes_per_exit": 192595.88
+              },
+              {
+                "sample": 3,
+                "operations": 25,
+                "bytes_total": 4814897.0,
+                "bytes_per_exit": 192595.88
+              }
+            ],
+            "trace_sha256": "fe4275a0d72c4ff47f246bd38615bddacfbbc0ac4e029291e51ec61dd37d0fe6",
+            "trace_entries": 4420,
+            "visual_sha256": "741e6967cb8dc2b076d67e9f14a3419fefe59f1d7d0ce8da0a6f8d84653ce2ac",
+            "visual_entries": 118,
+            "median_bytes_per_exit": 192595.88
+          }
+        }
+      }
+    }
+  },
+  "buff": {
+    "5.1": {
+      "interpreter": "Lua 5.1.5  Copyright (C) 1994-2012 Lua.org, PUC-Rio\n",
+      "before": [
+        {
+          "route": "characters",
+          "phase": "cold",
+          "character_queries": 3515,
+          "line_widths": 951,
+          "printf_calls": 1802,
+          "formatters": 0,
+          "probes": 1
+        },
+        {
+          "route": "characters",
+          "phase": "warm_after_epoch_40_calls",
+          "character_queries": 0,
+          "line_widths": 0,
+          "printf_calls": 0,
+          "formatters": 0,
+          "probes": 0
+        },
+        {
+          "route": "widths",
+          "phase": "cold",
+          "character_queries": 1,
+          "line_widths": 3117,
+          "printf_calls": 1802,
+          "formatters": 0,
+          "probes": 0
+        },
+        {
+          "route": "widths",
+          "phase": "warm_after_epoch_40_calls",
+          "character_queries": 0,
+          "line_widths": 0,
+          "printf_calls": 0,
+          "formatters": 0,
+          "probes": 0
+        }
+      ],
+      "after": [
+        {
+          "route": "characters",
+          "phase": "cold",
+          "character_queries": 311,
+          "line_widths": 150,
+          "printf_calls": 200,
+          "formatters": 0,
+          "probes": 1
+        },
+        {
+          "route": "characters",
+          "phase": "warm_after_epoch_40_calls",
+          "character_queries": 0,
+          "line_widths": 0,
+          "printf_calls": 0,
+          "formatters": 0,
+          "probes": 0
+        },
+        {
+          "route": "widths",
+          "phase": "cold",
+          "character_queries": 1,
+          "line_widths": 390,
+          "printf_calls": 200,
+          "formatters": 0,
+          "probes": 0
+        },
+        {
+          "route": "widths",
+          "phase": "warm_after_epoch_40_calls",
+          "character_queries": 0,
+          "line_widths": 0,
+          "printf_calls": 0,
+          "formatters": 0,
+          "probes": 0
+        }
+      ]
+    },
+    "5.4": {
+      "interpreter": "Lua 5.4.6  Copyright (C) 1994-2023 Lua.org, PUC-Rio\n",
+      "before": [
+        {
+          "route": "characters",
+          "phase": "cold",
+          "character_queries": 3515,
+          "line_widths": 951,
+          "printf_calls": 1802,
+          "formatters": 0,
+          "probes": 1
+        },
+        {
+          "route": "characters",
+          "phase": "warm_after_epoch_40_calls",
+          "character_queries": 0,
+          "line_widths": 0,
+          "printf_calls": 0,
+          "formatters": 0,
+          "probes": 0
+        },
+        {
+          "route": "widths",
+          "phase": "cold",
+          "character_queries": 1,
+          "line_widths": 3117,
+          "printf_calls": 1802,
+          "formatters": 0,
+          "probes": 0
+        },
+        {
+          "route": "widths",
+          "phase": "warm_after_epoch_40_calls",
+          "character_queries": 0,
+          "line_widths": 0,
+          "printf_calls": 0,
+          "formatters": 0,
+          "probes": 0
+        }
+      ],
+      "after": [
+        {
+          "route": "characters",
+          "phase": "cold",
+          "character_queries": 311,
+          "line_widths": 150,
+          "printf_calls": 200,
+          "formatters": 0,
+          "probes": 1
+        },
+        {
+          "route": "characters",
+          "phase": "warm_after_epoch_40_calls",
+          "character_queries": 0,
+          "line_widths": 0,
+          "printf_calls": 0,
+          "formatters": 0,
+          "probes": 0
+        },
+        {
+          "route": "widths",
+          "phase": "cold",
+          "character_queries": 1,
+          "line_widths": 390,
+          "printf_calls": 200,
+          "formatters": 0,
+          "probes": 0
+        },
+        {
+          "route": "widths",
+          "phase": "warm_after_epoch_40_calls",
+          "character_queries": 0,
+          "line_widths": 0,
+          "printf_calls": 0,
+          "formatters": 0,
+          "probes": 0
+        }
+      ]
+    }
+  },
+  "nameplates": {
+    "population": 20,
+    "first_exit": {
+      "before": {
+        "callbacks": 21,
+        "anchor_writes": 40
+      },
+      "after": {
+        "callbacks": 21,
+        "anchor_writes": 40
+      }
+    },
+    "settled_exit": {
+      "before": {
+        "callbacks": 21,
+        "anchor_writes": 40
+      },
+      "after": {
+        "callbacks": 21,
+        "anchor_writes": 0
+      }
+    },
+    "nonclassic_exit": {
+      "before": {
+        "callbacks": 21,
+        "anchor_writes": 0
+      },
+      "after": {
+        "callbacks": 1,
+        "anchor_writes": 0
+      }
+    },
+    "retained_callback": "target health reconciliation"
+  }
+}
