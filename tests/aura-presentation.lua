@@ -2018,16 +2018,62 @@ for _,later in ipairs({'none','lowercase','clear-in-writer','newer-split','newer
         equal(visible(owner)..(x.shown and x.text or ''),expected)
     end)
 end
-test('opaque native seconds sink uses bare decimals without aura lookup',function()
+local function guardedSecondsScene(noAPI)
+    local guard='|TInterface\\AddOns\\bjarkiUI\\Media\\TimerSpacer:1:1:0:0|t'
+    local glyphs={};for i=0,9 do glyphs[tostring(i)]=tostring(i)end
+    local format=guard..'%.1f'..guard
+    local e,a,b,all,visible=realGlyphScene('Small',glyphs,
+        {nativeSecondsSink=true,noAPI=noAPI~=false,fixedSecondsFormat=format})
+    return e,a,b,all,visible,format,guard
+end
+for _,route in ipairs({'public-cells','public-guarded','duration-object','unsupported'})do
+    test(route..' buff timers respect the strict ten-second decimal threshold',function()
+        local e,a,_,visible,format,guard
+        if route=='public-guarded' or route=='duration-object' then
+            e,a,_,_,visible,format,guard=guardedSecondsScene(route~='duration-object')
+        else
+            e,a,_,_,visible=realGlyphScene(nil,nil,{nativeSecondsSink=true,noAPI=true})
+        end
+        if route=='unsupported' then a.buttonInfo.auraInstanceID=e.secret(101) end
+        local put=a.Duration.SetFormattedText;local sinkWrites,nativeWrites=0,0
+        a.Duration.SetFormattedText=function(self,fmt,...)
+            if fmt=='%s' or fmt=='%.1f' or (format and fmt==format) then sinkWrites=sinkWrites+1
+            else nativeWrites=nativeWrites+1 end
+            return put(self,fmt,...)
+        end
+        for _,entry in ipairs({{9.999,'9.9','9 s'},{10,'10 s','10 s'},{66.2,'66 s','66 s'},{90,'2 m','2 m'}})do
+            e.remaining[101]=entry[1];a:UpdateExpirationTime(a.buttonInfo)
+            local before,nativeBefore=sinkWrites,nativeWrites
+            local public=route=='public-cells' or route=='public-guarded'
+            e.tick(a,public and entry[1] or e.secret(entry[1]))
+            local expected=route=='unsupported' and entry[3] or entry[2]
+            if guard and entry[1]<10 then expected=guard..expected..guard end
+            equal(visible(a)..a.Duration.text,expected,route..' at '..entry[1])
+            equal(nativeWrites-nativeBefore,1,'existing native update remains authoritative')
+            local wantedWrites=(route=='duration-object' or (route=='public-guarded' and entry[1]<10)) and 1 or 0
+            equal(sinkWrites-before,wantedWrites,'addon sink calls at '..entry[1])
+        end
+        equal(e.requests,route=='duration-object' and 4 or 0,'only genuine public identity acquires an object')
+    end)
+end
+test('opaque seconds without a threshold source retain native whole seconds',function()
     local e=scenario({nativeSecondsSink=true,noAPI=true});e.buff.buttonInfo.auraInstanceID=e.secret(101);e.load()
-    local opaque=e.secret(2.83);e.tick(e.buff,opaque)
-    equal(e.buff.Duration.text,'2.8');assert(rawequal(e.buff.Duration.lastArgument,opaque),'opaque seconds changed')
-    e.tick(e.buff,e.secret(14.26));equal(e.buff.Duration.text,'14.3','entire native seconds band')
-    e.tick(e.buff,e.secret(89.4));equal(e.buff.Duration.text,'89.4')
+    local put=e.buff.Duration.SetFormattedText;local addonWrites=0
+    e.buff.Duration.SetFormattedText=function(self,format,...)
+        if format=='%.1f' or format=='%s' then addonWrites=addonWrites+1 end
+        return put(self,format,...)
+    end
+    for _,entry in ipairs({{66.2,'66 s'},{2.83,'2 s'},{14.26,'14 s'},{89.4,'89 s'}})do
+        local opaque=e.secret(entry[1]);e.tick(e.buff,opaque)
+        equal(e.buff.Duration.text,entry[2]);equal(e.buff.Duration.lastFormat,e.SECOND_ONELETTER_ABBR)
+        assert(rawequal(e.buff.Duration.lastArgument,opaque),'native seconds changed')
+    end
+    equal(addonWrites,0,'unknown threshold cannot authorize a decimal sink')
     equal(e.requests,0,'no aura ID or new clock required')
-    e.SlashCmdList.BJARKIUITIMERS();assert(e.messages[1]:find('seconds%-sink%-accepted=3'))
+    e.SlashCmdList.BJARKIUITIMERS();assert(e.messages[1]:find('seconds%-sink%-accepted=0'))
+    assert(e.messages[1]:find('threshold%-unavailable'),'unsupported precision must not report success')
 end)
-test('native seconds sink requires a public seconds selector and keeps larger native units',function()
+test('unsupported opaque seconds and larger units retain native formatting',function()
     local e=scenario({nativeSecondsSink=true,noAPI=true});e.load()
     e.secretNativeFormat=true;e.tick(e.buff,e.secret(2.83));equal(e.buff.Duration.text,'2 s')
     e.secretNativeFormat=false
@@ -2036,14 +2082,15 @@ test('native seconds sink requires a public seconds selector and keeps larger na
     e.tick(e.buff,e.secret(172800));equal(e.buff.Duration.text,'2 d')
     e.tick(e.buff,2.83);equal(e.buff.Duration.text,'2.8','existing public short path')
 end)
-test('native seconds sink removes the seconds unit and declines ambiguous conversions',function()
+test('unsupported opaque seconds preserve localized and padded native formats',function()
     local e=scenario({nativeSecondsSink=true,noAPI=true});e.SECOND_ONELETTER_ABBR='%d sek.';e.load()
-    e.tick(e.buff,e.secret(2.83));equal(e.buff.Duration.text,'2.8')
+    e.tick(e.buff,e.secret(2.83));equal(e.buff.Duration.text,'2 sek.')
     local unsupported=scenario({nativeSecondsSink=true,noAPI=true});unsupported.SECOND_ONELETTER_ABBR='%03d s';unsupported.load()
     unsupported.tick(unsupported.buff,unsupported.secret(2.83));equal(unsupported.buff.Duration.text,'002 s')
 end)
 test('native seconds sink respects duration preference examples and no-write updates',function()
-    local e=scenario({nativeSecondsSink=true,noAPI=true});e.load();e.tick(e.buff,e.secret(2.83))
+    local e=scenario({nativeSecondsSink=true});e.load();e.tick(e.buff,e.secret(2.83))
+    equal(e.buff.Duration.text,'2.8');equal(e.buff.Duration.lastFormat,'%s','supported sink exercised')
     local writes=e.buff.Duration.writes;e.durationShown=false;e.tick(e.buff,e.secret(1.7))
     equal(e.buff.Duration.writes,writes);equal(e.buff.Duration.shown,false)
     e.durationShown=true;e.buff.isExample=true;e.buff.Duration.text='preview';e.tick(e.buff,e.secret(1.5))
@@ -2052,22 +2099,26 @@ test('native seconds sink respects duration preference examples and no-write upd
 end)
 test('native seconds sink retires assignment and A to B to A writer receipts',function()
     for _,move in ipairs({'assignment','parent','later-text'})do
-        local e=scenario({nativeSecondsSink=true,noAPI=true});e.load()
+        local e=scenario({nativeSecondsSink=true});e.load();local moves=0
         e.afterNativeWrite=function(button)
-            e.afterNativeWrite=nil
+            e.afterNativeWrite=nil;moves=moves+1
             if move=='assignment' then button:UpdateExpirationTime(button.buttonInfo)
             elseif move=='parent' then button.Duration:SetParent(e.debuff);button.Duration:SetParent(button)
             else button.Duration:SetText('newer writer') end
         end
         e.tick(e.buff,e.secret(2.83));equal(e.buff.Duration.text,move=='later-text' and 'newer writer' or '2 s',move)
+        equal(moves,1,'native assignment/writer callback count')
+        e.remaining[101]=1.7
         e.tick(e.buff,e.secret(1.7));equal(e.buff.Duration.text,'1.7','next native writer recovers')
+        equal(e.buff.Duration.lastFormat,'%s')
     end
 end)
 test('native seconds sink refuses stale physical owners and recovers a replaced label after discovery',function()
-    local e=scenario({nativeSecondsSink=true,noAPI=true});e.load();local old=e.buff.Duration
+    local e=realGlyphScene(nil,nil,{nativeSecondsSink=true});local old=e.buff.Duration
     old:SetParent(e.debuff);e.tick(e.buff,e.secret(2.83));equal(old.text,'2 s','stale caller cannot format foreign label')
     local replacement=e.button(303).Duration;replacement:SetParent(e.buff);e.buff.Duration=replacement
-    e.event('EDIT_MODE_LAYOUTS_UPDATED');e.tick(e.buff,e.secret(1.7));equal(replacement.text,'1.7')
+    e.event('EDIT_MODE_LAYOUTS_UPDATED');e.remaining[101]=1.7
+    e.tick(e.buff,e.secret(1.7));equal(replacement.text,'1.7');equal(replacement.lastFormat,'%s')
     equal(old.text,'2 s','retired label unchanged')
 end)
 test('native seconds selector hook does not inspect a newly forbidden label',function()
@@ -2078,15 +2129,21 @@ test('native seconds selector hook does not inspect a newly forbidden label',fun
     e.tick(e.buff,e.secret(2.83));equal(label.text,'2 s');equal(parentReads,0)
 end)
 test('native seconds sink refusal retains native text and own sink writes do not recurse',function()
-    local e=scenario({nativeSecondsSink=true,noAPI=true});e.refuseSecondsSink=true;e.load()
-    e.tick(e.buff,e.secret(2.83));equal(e.buff.Duration.text,'2 s')
-    e.refuseSecondsSink=false;local before=e.buff.Duration.writes;e.tick(e.buff,e.secret(1.7))
-    equal(e.buff.Duration.text,'1.7');equal(e.buff.Duration.writes-before,2,'one native write and one sink write')
+    local e,a,_,_,visible,format,guard=guardedSecondsScene();local attempts=0
+    local put=a.Duration.SetFormattedText
+    a.Duration.SetFormattedText=function(self,fmt,...)
+        if fmt==format then attempts=attempts+1 end
+        return put(self,fmt,...)
+    end
+    e.refuseSecondsSink=true;e.tick(a,2.83);equal(a.Duration.text,'2 s');equal(attempts,1)
+    e.refuseSecondsSink=false;local before=a.Duration.writes;e.tick(a,1.7)
+    equal(a.Duration.text,guard..'1.7'..guard);equal(visible(a),'');equal(attempts,2)
+    equal(a.Duration.writes-before,2,'one native write and one sink write')
 end)
-test('public split cells hand ownership to the restricted native seconds sink',function()
+test('public split cells retire to stock when an opaque threshold is unavailable',function()
     local e,a,_,_,visible=realGlyphScene(nil,nil,{nativeSecondsSink=true,noAPI=true})
     e.tick(a,4.2);equal(visible(a),'4.2');equal(a.Duration.text,'')
-    e.tick(a,e.secret(2.83));equal(visible(a),'');equal(a.Duration.text,'2.8')
+    e.tick(a,e.secret(2.83));equal(visible(a),'');equal(a.Duration.text,'2 s')
 end)
 test('public enchant expiry keeps fixed cells when the native seconds argument is opaque',function()
     local e,a,_,_,visible=realGlyphScene(nil,nil,{nativeSecondsSink=true,noAPI=true})
@@ -2097,7 +2154,8 @@ test('public enchant expiry keeps fixed cells when the native seconds argument i
 end)
 for _,case in ipairs({'minutes','secret-format','later-text','secret-result'})do
     test('restricted native '..case..' fallback retires former public split cells',function()
-        local e,a,_,_,visible=realGlyphScene(nil,nil,{nativeSecondsSink=true,noAPI=true})
+        local e,a,_,_,visible=realGlyphScene(nil,nil,{nativeSecondsSink=true,noAPI=case~='secret-result'})
+        local refused=0
         e.tick(a,4.2);equal(visible(a),'4.2')
         if case=='secret-format' then e.secretNativeFormat=true
         elseif case=='later-text' then e.afterNativeWrite=function(button)button.Duration:SetText('newer')end
@@ -2105,46 +2163,54 @@ for _,case in ipairs({'minutes','secret-format','later-text','secret-result'})do
             local put=a.Duration.SetFormattedText
             a.Duration.SetFormattedText=function(self,fmt,value,...)
                 local result=put(self,fmt,value,...)
-                if fmt=='%.1f' then return e.secret(false) end
+                if fmt=='%s' then refused=refused+1;return e.secret(false) end
                 return result
             end
         end
         e.tick(a,e.secret(case=='minutes' and 180 or 2.83))
         equal(visible(a),'','prior split presenter retired')
         equal(a.Duration.text,({minutes='3 m',['secret-format']='2 s',['later-text']='newer',['secret-result']='2.8'})[case])
+        if case=='secret-result' then equal(refused,1,'supported sink refusal exercised')end
         e.SlashCmdList.BJARKIUITIMERS();assert(e.messages[1]:find('seconds%-sink%-'))
     end)
 end
 test('a stale native caller cannot replace the current physical owner seconds sink',function()
-    local e,a,b,_,visible=realGlyphScene(nil,nil,{nativeSecondsSink=true,noAPI=true})
+    local e,a,b,_,visible=realGlyphScene(nil,nil,{nativeSecondsSink=true})
     local label=a.Duration;b.Duration=label;label:SetParent(b);e.event('EDIT_MODE_LAYOUTS_UPDATED')
-    e.tick(b,e.secret(1.7));equal(label.text,'1.7')
+    e.remaining[202]=1.7;e.tick(b,e.secret(1.7));equal(label.text,'1.7');equal(label.lastFormat,'%s')
     e.tick(a,e.secret(8.4));equal(label.text,'1.7');equal(visible(b),'')
 end)
 test('newer physical owner survives an older seconds sink returning last',function()
-    local e,a,b,_,visible=realGlyphScene(nil,nil,{nativeSecondsSink=true,noAPI=true})
-    local label=a.Duration;local put=label.SetFormattedText;local once=true
+    local e,a,b,_,visible,format,guard=guardedSecondsScene()
+    local label=a.Duration;local put=label.SetFormattedText;local once,fired=true,0
     label.SetFormattedText=function(self,fmt,value,...)
-        if fmt=='%.1f' and once then
-            once=false;b.Duration=label;label:SetParent(b)
-            e.event('EDIT_MODE_LAYOUTS_UPDATED');e.tick(b,e.secret(7.6))
-            equal(label.text,'7.6','new owner established its current native timer')
+        if fmt==format and once then
+            once=false;fired=fired+1;b.Duration=label;label:SetParent(b)
+            e.event('EDIT_MODE_LAYOUTS_UPDATED');e.tick(b,7.6)
+            equal(label.text,guard..'7.6'..guard,'new owner established its current native timer')
         end
         return put(self,fmt,value,...)
     end
-    e.tick(a,e.secret(2.83))
-    equal(visible(b)..label.text,'7.6','older sink must preserve the latest physical owner timer')
+    e.tick(a,2.83);equal(fired,1,'physical transfer callback count')
+    equal(visible(b)..label.text,guard..'7.6'..guard,'older sink must preserve the latest physical owner timer')
 end)
 test('a later native seconds writer is not overwritten using an older UpdateDuration argument',function()
-    local e=scenario({nativeSecondsSink=true,noAPI=true});e.load()
+    local e=scenario({nativeSecondsSink=true});e.load();local replacements=0
     e.afterNativeWrite=function(button)
-        e.afterNativeWrite=nil;button.Duration:SetFormattedText(e.SECOND_ONELETTER_ABBR,e.secret(7.6))
+        e.afterNativeWrite=nil;replacements=replacements+1;button.Duration:SetFormattedText(e.SECOND_ONELETTER_ABBR,e.secret(7.6))
     end
     e.tick(e.buff,e.secret(2.83));equal(e.buff.Duration.text,'7 s')
+    equal(replacements,1,'later native writer count');e.remaining[101]=1.7
     e.tick(e.buff,e.secret(1.7));equal(e.buff.Duration.text,'1.7','next unambiguous writer recovers')
+    equal(e.buff.Duration.lastFormat,'%s')
 end)
 test('native seconds writes reuse two bounded contexts without retaining opaque samples',function()
-    local e=scenario({nativeSecondsSink=true,noAPI=true});e.load()
+    local e=scenario({nativeSecondsSink=true});e.load();local sinkWrites=0
+    local put=e.buff.Duration.SetFormattedText
+    e.buff.Duration.SetFormattedText=function(self,format,...)
+        if format=='%s' then sinkWrites=sinkWrites+1 end
+        return put(self,format,...)
+    end
     local function captured(fn,key)
         for i=1,40 do local name,value=debug.getupvalue(fn,i);if not name then break end;if name==key then return value end end
     end
@@ -2156,48 +2222,82 @@ test('native seconds writes reuse two bounded contexts without retaining opaque 
         assert(state.secondsContexts==contexts and contexts[1]==first and contexts[2]==second)
         equal(first.text,nil);equal(second.text,nil);equal(state.sharedNativeTime,nil)
     end
+    equal(sinkWrites,50,'supported sink exercised on every native update');equal(e.requests,1)
 end)
-test('newer restricted native seconds survive an older split clear returning last',function()
+test('newer unsupported native seconds survive an older split clear returning last',function()
     local e,a,_,_,visible=realGlyphScene(nil,nil,{nativeSecondsSink=true,noAPI=true});local label=a.Duration
-    local clear=label.SetText;local once=true
+    local clear=label.SetText;local once,fired=true,0
     label.SetText=function(self,text)
-        if text=='' and once then once=false;e.tick(a,e.secret(2.83)) end
+        if text=='' and once then once=false;fired=fired+1;e.tick(a,e.secret(2.83)) end
         return clear(self,text)
     end
-    e.tick(a,4.2);equal(visible(a),'');equal(label.text,'2.8')
+    e.tick(a,4.2);equal(fired,1,'nested clear callback count')
+    equal(visible(a),'');equal(label.text,'2 s')
 end)
 for _,order in ipairs({'before','after'})do
-    test('newer restricted seconds update wins '..order..' an older sink write',function()
-        local e=scenario({nativeSecondsSink=true,noAPI=true});e.load();local label=e.buff.Duration
-        local put=label.SetFormattedText;local once=true
+    test('newer public short update wins '..order..' an older guarded sink write',function()
+        local e,a,_,_,visible,format,guard=guardedSecondsScene();local label=a.Duration
+        local put=label.SetFormattedText;local once,fired=true,0
         label.SetFormattedText=function(self,fmt,value,...)
-            if fmt=='%.1f' and once then
-                once=false
+            if fmt==format and once then
+                once=false;fired=fired+1
                 if order=='after' then put(self,fmt,value,...) end
-                e.tick(e.buff,e.secret(1.7))
+                e.tick(a,1.7)
                 if order=='before' then return put(self,fmt,value,...) end
                 return
             end
             return put(self,fmt,value,...)
         end
-        e.tick(e.buff,e.secret(2.83));equal(label.text,'1.7')
+        e.tick(a,2.83);equal(fired,1,'nested guarded sink callback count')
+        equal(visible(a)..label.text,guard..'1.7'..guard)
     end)
 end
 for _,newer in ipairs({'secret-format','later-text'})do
     test('newer native '..newer..' survives an older seconds sink returning last',function()
-        local e=scenario({nativeSecondsSink=true,noAPI=true});e.load();local label=e.buff.Duration
-        local put=label.SetFormattedText;local once=true
+        local e,a,_,_,visible,format=guardedSecondsScene();local label=a.Duration
+        local put=label.SetFormattedText;local once,fired=true,0
         label.SetFormattedText=function(self,fmt,value,...)
-            if fmt=='%.1f' and once then
-                once=false
+            if fmt==format and once then
+                once=false;fired=fired+1
                 if newer=='secret-format' then e.secretNativeFormat=true
                 else e.afterNativeWrite=function(button)button.Duration:SetText('newer native text')end end
-                e.tick(e.buff,e.secret(1.7))
+                e.tick(a,e.secret(1.7))
             end
             return put(self,fmt,value,...)
         end
-        e.tick(e.buff,e.secret(2.83));equal(label.text,newer=='secret-format' and '1 s' or 'newer native text')
+        e.tick(a,2.83);equal(fired,1,'later native writer callback count')
+        equal(visible(a)..label.text,newer=='secret-format' and '1 s' or 'newer native text')
     end)
+end
+for _,route in ipairs({'public-guarded','duration-object'})do
+    for _,order in ipairs({'before','after'})do
+        test('unsupported 66 seconds wins '..order..' an older '..route..' sink',function()
+            local e,a,_,_,visible,format=guardedSecondsScene(route~='duration-object')
+            if route=='duration-object' then format='%s' end
+            local label=a.Duration;local put=label.SetFormattedText
+            local once,inNewer,newerText=true,false,nil;local newerSinkWrites,fired=0,0
+            label.SetFormattedText=function(self,fmt,value,...)
+                if inNewer and (fmt=='%s' or (type(fmt)=='string' and fmt:find('%.1f',1,true))) then
+                    newerSinkWrites=newerSinkWrites+1
+                end
+                if fmt==format and once then
+                    once=false;fired=fired+1
+                    if order=='after' then put(self,fmt,value,...)end
+                    a.buttonInfo.auraInstanceID=e.secret(101)
+                    inNewer=true;e.tick(a,e.secret(66.2));inNewer=false
+                    newerText=label.text
+                    if order=='before' then return put(self,fmt,value,...)end
+                    return
+                end
+                return put(self,fmt,value,...)
+            end
+            e.tick(a,route=='public-guarded' and 2.83 or e.secret(2.83))
+            equal(fired,1,'older supported sink callback count')
+            equal(newerText,'66 s','newer unsupported source stays native')
+            equal(visible(a)..label.text,'66 s','older completion cannot revive decimals')
+            equal(newerSinkWrites,0,'unsupported remainder cannot reach an addon numeric sink')
+        end)
+    end
 end
 test('native seconds receipt preserves the calibrated public-identity duration route',function()
     local glyphs=encodedBuffDigits('coexist')
@@ -2212,17 +2312,18 @@ test('native seconds receipt preserves the calibrated public-identity duration r
     equal(a.Duration.text,glyphs['3']..'.'..glyphs['6'],'genuine object does not need a public seconds selector')
     equal(e.requests,1,'same native object reused')
 end)
-test('prepared whole seconds format keeps mixed-readable short timers on the same label',function()
+test('prepared short formats retain the native label and yield unsupported samples to stock',function()
     local guard='|TInterface\\AddOns\\bjarkiUI\\Media\\TimerSpacer:1:1:0:0|t'
     local glyphs={};for i=0,9 do glyphs[tostring(i)]=tostring(i)end
     for _,noAPI in ipairs({true,false})do
         local e,a,_,_,visible=realGlyphScene('Small',glyphs,{nativeSecondsSink=true,noAPI=noAPI,fixedSecondsFormat=guard..'%.1f'..guard})
         local preparations=e.secondsPreparations;e.remaining[101]=3.6;e.combat=true
-        for _,entry in ipairs({{3.7,'3.7'},{e.secret(3.6),'3.6'},{3.5,'3.5'},{9.999,'9.9'}})do
+        for _,entry in ipairs({{3.7,guard..'3.7'..guard},{e.secret(3.6),noAPI and '3 s' or guard..'3.6'..guard},
+                {3.5,guard..'3.5'..guard},{9.999,guard..'9.9'..guard}})do
             e.tick(a,entry[1]);equal(visible(a),'','one native presenter')
-            equal(a.Duration.text,guard..entry[2]..guard)
+            equal(a.Duration.text,entry[2])
             a.Duration:SetFontObject('Small');a.Duration:SetPoint('TOP',a.Icon,'BOTTOM',0,0)
-            equal(a.Duration.text,guard..entry[2]..guard,'later native setters preserve text')
+            equal(a.Duration.text,entry[2],'later native setters preserve text')
         end
         equal(e.secondsPreparations,preparations,'no timer-tick calibration')
         a.Duration.smoothScaling=true;e.tick(a,3.4)
@@ -2231,15 +2332,16 @@ test('prepared whole seconds format keeps mixed-readable short timers on the sam
         assert(a.Duration.text~=guard..'3.3'..guard,'narrowed label cannot use stale guard')
     end
 end)
-test('duration retry survives seconds-only fallback and recovers on a native update',function()
+test('duration retry preserves stock during backoff and recovers on a native update',function()
     local e=scenario({nativeSecondsSink=true});e.load()
     local get=e.C_UnitAuras.GetAuraDuration;local attempts=0;local fail=true
     e.C_UnitAuras.GetAuraDuration=function(...)
         attempts=attempts+1;if fail then error('temporary source refusal') end;return get(...)
     end
     local value=e.secret(3.6);e.tick(e.buff,value)
-    equal(e.buff.Duration.text,'3.6');assert(rawequal(e.buff.Duration.lastArgument,value));equal(attempts,1)
-    e.now=.1;e.tick(e.buff,e.secret(3.5));equal(attempts,1)
+    equal(e.buff.Duration.text,'3 s');equal(e.buff.Duration.lastFormat,e.SECOND_ONELETTER_ABBR)
+    assert(rawequal(e.buff.Duration.lastArgument,value));equal(attempts,1)
+    e.now=.1;e.tick(e.buff,e.secret(3.5));equal(attempts,1);equal(e.buff.Duration.text,'3 s')
     fail=false;e.now=.25;e.remaining[101]=3.4;e.tick(e.buff,e.secret(3.4))
     equal(attempts,2);equal(e.buff.Duration.text,'3.4');equal(e.buff.Duration.lastFormat,'%s')
 end)
@@ -2334,10 +2436,10 @@ test('public whole seconds retain readable replay when native text cannot be rea
     equal((visible(a)..a.Duration.text):gsub('|T.-|t',''),'3.7','public source remains a valid recovery')
 end)
 test('an unsupported sink call contract stays native and recovers at safe setup',function()
-    local e=scenario({nativeSecondsSink=true,noAPI=true});e.rejectSinkPreparation=true;e.load()
+    local e=scenario({nativeSecondsSink=true});e.rejectSinkPreparation=true;e.load()
     e.tick(e.buff,e.secret(2.83));equal(e.buff.Duration.text,'2 s')
-    e.rejectSinkPreparation=false;e.event('EDIT_MODE_LAYOUTS_UPDATED')
-    e.tick(e.buff,e.secret(1.7));equal(e.buff.Duration.text,'1.7')
+    e.rejectSinkPreparation=false;e.event('EDIT_MODE_LAYOUTS_UPDATED');e.remaining[101]=1.7
+    e.tick(e.buff,e.secret(1.7));equal(e.buff.Duration.text,'1.7');equal(e.buff.Duration.lastFormat,'%s')
 end)
 print(string.format('TOTAL: %d passed, %d failed',passed,failed))
 if failed>0 then error('regression suite failed') end

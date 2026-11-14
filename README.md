@@ -1,14 +1,14 @@
 # bjarkiUI
 
-**0.2.362-buff-format-consistency-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
+**0.2.363-buff-ten-second-threshold-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
 
 ## Latest test build
 
-**.362:** Repairs a reproduced buff route mismatch: readable `3.7`, plain opaque `3.6 s`, then readable `3.5` on the same label. A fresh current native update now prefers a genuine duration object when its aura identity is public. The seconds-only fallback uses bare decimals. An independently validated whole-string font profile lets public and opaque short samples retain the same native label; unsupported profiles keep the safe cell/plain route. Native object retries and later-writer ownership remain intact. Public/genuine-object short precision stays below ten; the opaque seconds-only fallback retains tenths throughout the native below-90-second band. .361 action behavior is retained, but both live reports remain open pending a new client observation. [Changes](CHANGELOG.md) · [Verification and live limits](docs/VERIFICATION_0.2.362.md)
+**.363:** Enforces the requested buff decimal threshold. The previous opaque seconds-only fallback could print `66.2`; that unconditional decimal write is removed. Public short timers and genuine native duration objects retain decimals below ten and their existing spacing. If neither supported source is available, the current native countdown stays visible, including whole seconds below ten. Existing action formatting and all other frame presentation remain. This corrects the over-ten decimal defect without claiming complete restricted-buff coverage. [Changes](CHANGELOG.md) · [Verification and limits](docs/VERIFICATION_0.2.363.md)
 
 ## Install
 
-1. Download the supplied `bjarkiUI-0.2.362-Buff-Format-Consistency.zip` test package. The stacked development PR does not trigger the workflow restricted to `main`.
+1. Download the supplied `bjarkiUI-0.2.363-Buff-Ten-Second-Threshold.zip` test package. The stacked development PR does not trigger the workflow restricted to `main`.
 2. Extract its `bjarkiUI` folder into the Forever client's `Interface/AddOns/` directory. Check that `Interface/AddOns/bjarkiUI/bjarkiUI.toc` exists.
 3. Enable the addon and reload the interface. Use `/bui help` for the main commands and `/bdark` for Soft Dark controls.
 
@@ -70,11 +70,11 @@ For action/cast reports, capture while the affected cooldown or cast is active. 
 
 The description **“Ultralight unit-frame presentation”** refers to the addon's narrow presentation role, native clock ownership and event-driven updates. It is not an FPS, startup-time or in-client memory guarantee. The .356 comparison measures real Lua presenter code against fixed native-boundary fixtures; live rendering, native formatter cost and client garbage collection remain separate checks. Soft Dark retains safe lifecycle discovery because it also recovers late-created or replaced native artwork.
 
-Start with [AGENTS.md](AGENTS.md), then the [code map](docs/CODE_MAP.md). The two manifests load **16 runtime modules**. Current verification runs **37 top-level Lua scripts** (36 behavioral suites plus the manifest syntax script) under Lua 5.1 and Lua 5.4; the aura suite contains 263 cases. See [testing and packaging](docs/TESTING.md) for commands and the boundary between offline and live evidence.
+Start with [AGENTS.md](AGENTS.md), then the [code map](docs/CODE_MAP.md). The two manifests load **16 runtime modules**. Current verification runs **37 top-level Lua scripts** (36 behavioral suites plus the manifest syntax script) under Lua 5.1 and Lua 5.4; the aura suite contains 271 cases. See [testing and packaging](docs/TESTING.md) for commands and the boundary between offline and live evidence.
 
 - [Timer sources, native writers, hooks and cleanup](docs/TIMER_LIFECYCLE.md)
 - [Default manifest](bjarkiUI.toc) · [Camelot manifest](bjarkiUI_Camelot.toc)
 - [Package workflow](.github/workflows/package-addon.yml) · [Changelog](CHANGELOG.md)
-- [Current verification and live evidence](docs/VERIFICATION_0.2.362.md)
+- [Current verification and live evidence](docs/VERIFICATION_0.2.363.md)
 
 `ARCHITECTURE.md` records implementation history, including retired experiments. The 0.2.309 audit documents, `tests/snapshot-0.2.309/` and `tools/audit/` are historical reproduction material, not the current test or packaging entry point. Reproduce that audit at its [pinned revision](https://github.com/bjoern-janson/bjarkiUI/tree/d1797e392e0eb466906632e4dc047eb830b2ac78). Current source and top-level tests take precedence over historical descriptions. [Architecture history](ARCHITECTURE.md) · [Audit baseline](docs/AUDIT_BASELINE.md)

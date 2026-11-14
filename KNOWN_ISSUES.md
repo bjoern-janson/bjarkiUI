@@ -1,8 +1,18 @@
 # Known issues and bugs
 
-Current test branch is **0.2.362-buff-format-consistency-test**, based on main 0.2.335-cast-recovery-test. The evidence below distinguishes source inspection, offline fixtures and the user's live observations. [Current verification evidence](docs/VERIFICATION_0.2.362.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
+Current test branch is **0.2.363-buff-ten-second-threshold-test**, based on main 0.2.335-cast-recovery-test. The evidence below distinguishes source inspection, offline fixtures and the user's live observations. [Current verification evidence](docs/VERIFICATION_0.2.363.md) · [Timer lifecycle and diagnostics](docs/TIMER_LIFECYCLE.md) · [Testing guide](docs/TESTING.md)
 
-## 0.2.362 buff consistency — live reports remain open
+## .363 strict buff threshold — supported precision, native fallback
+
+The new screenshot displays `66.2` without a build/version line. That is the exact output permitted by .362's broad opaque-seconds fallback. This fallback was a deliberate implementation compromise, not compliance with the user's below-ten requirement. .363 removes it.
+
+Readable public time and genuine native duration objects keep below-ten decimal formatting. Public temporary-enchant timing also keeps its existing path. Unsupported opaque timers stay native at every duration; this can mean whole seconds and an `s` below ten. The change closes the over-ten decimal defect in source and fixtures, but cannot honestly claim full decimal/spacing coverage on every restricted buff.
+
+A new cooldown widget would not fix the underlying scalar permission restriction in the inspected native API. No guessed duration, hidden-data inference, reconstructed opaque clock or additional public timing path is introduced. Current native source/owner, retry and later-writer protections remain. `seconds-sink-last=threshold-unavailable` identifies the missing safe threshold source; it is not a successful decimal-formatting receipt.
+
+Live .363 behavior remains unobserved. The action-bar stability report also remains open; .363 does not change that implementation. [Current verification](docs/VERIFICATION_0.2.363.md)
+
+## Historical .362 buff consistency attempt
 
 The latest user report says buffs are not always working: they sometimes wiggle and sometimes show `s`. That corrects the scope of the earlier .360 positive screenshot. No .362 client observation exists yet, and no new action observation has been supplied since .361 delivery.
 
@@ -12,7 +22,7 @@ The seconds-only fallback now prints bare `%.1f` output. A supported native dura
 
 The optional outside-guard format is qualified against complete public native text. It supports fonts with stable numeral advances/interior columns; it cannot turn a proportional or variably kerned native font into a tabular one. Unsupported, stale or refused preparation retains plain/cell fallback. Scalar acceptance is limited to native reported metrics, and a native format transition can move the centered group.
 
-`buff-seconds=fixed:N/unavailable:N last=...` reports cached font preparation. `seconds-sink-last=duration-object`, `accepted-fixed` or `accepted-plain` identifies the most recent accepted route, not active timers or a guaranteed rendering outcome. Live motion, taint behavior, initial preparation latency and frame time still require client evidence. [Current verification](docs/VERIFICATION_0.2.362.md)
+`buff-seconds=fixed:N/unavailable:N last=...` reports cached font preparation. `seconds-sink-last=duration-object`, `accepted-fixed` or `accepted-plain` identifies the most recent accepted route, not active timers or a guaranteed rendering outcome. Live motion, taint behavior, initial preparation latency and frame time still require client evidence. [Current verification](docs/VERIFICATION_0.2.363.md)
 
 ## Historical .361 observation — positive buff example, action report open
 
@@ -22,7 +32,7 @@ Action output shows `native-format-configured=0`, `native-handoff-pending=0`, fo
 
 The native character-area API is nullable, and its documentation does not guarantee immediate usable selection rectangles for transparent texture-marked samples. .361 adds independent scalar width validation for tabular fonts when the first character sample is unusable. It checks actual integer guard growth, repeated digit widths, complete emitted strings and every corresponding prefix/suffix, line height and widget fit. A successful initial character sample keeps the original route, including rejection of later contradictory metrics.
 
-Scalar validation is limited by native width resolution. It is not proof of exact optical ink or in-game stability. Source and modeled tests cannot establish the native cause of the failed sample or close this action report. The next build reports the width route as `last=fixed-widths`; configured formatter counts remain separate from active cooldown counts. [Verification](docs/VERIFICATION_0.2.362.md)
+Scalar validation is limited by native width resolution. It is not proof of exact optical ink or in-game stability. Source and modeled tests cannot establish the native cause of the failed sample or close this action report. The next build reports the width route as `last=fixed-widths`; configured formatter counts remain separate from active cooldown counts. [Verification](docs/VERIFICATION_0.2.363.md)
 
 ## 0.2.360 native action formatter — initial architecture and earlier evidence
 

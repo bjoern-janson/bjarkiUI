@@ -1,7 +1,7 @@
 -- Native aura presentation. Blizzard keeps discovery, duration calculation,
 -- layout, tooltips, cancellation, dispel colours and target/focus cooldowns.
--- Player rows: native mask/frame skin, no expiry pulse; public tenths <10s,
--- restricted native seconds-band tenths when its public unit selector permits.
+-- Player rows: native mask/frame skin, no expiry pulse; tenths below 10s
+-- through public time or a genuine duration object. Unsupported time stays native.
 -- Public ToT/ToF and cast icons share the skin. Already-native tracked icons stay native.
 -- Recovery: native target/focus rows are left alone. UnitAuraStyling.lua is
 -- a status-only compatibility stub, loaded first to prevent native scanning.
@@ -12,7 +12,7 @@ local targetHooks = setmetatable({}, { __mode = "k" })
 local settingCVars = false
 local nativeTimerHooks = setmetatable({}, { __mode = "k" })
 local secondsLabels = setmetatable({}, { __mode = "k" })
-local secondsUnitFormat, secondsDecimalFormat
+local secondsUnitFormat
 local currentSecondsOwner
 local captureSecondsReplay
 local secondsWriteToken=0
@@ -563,19 +563,7 @@ end
 
 local function prepareSecondsFormat()
     local source=member(_G,"SECOND_ONELETTER_ABBR")
-    if type(source)~="string" then return false end
-    if source==secondsUnitFormat then return secondsDecimalFormat~=nil end
-    secondsUnitFormat,secondsDecimalFormat=source,nil
-    local count,valid=0,true
-    source:gsub("%%(.)",function(code)
-        if code=="%" then return "%%" end
-        if code=="d" then count=count+1;return "%.1f" end
-        valid=false;return "%"..code
-    end)
-    -- Accept one native integer conversion and literal escaped percent signs.
-    -- Positional/width/multiple conversions require a separately proven locale.
-    if valid and count==1 and not source:gsub("%%%%",""):match("%%$") then secondsDecimalFormat="%.1f" end
-    return secondsDecimalFormat~=nil
+    if type(source)=="string" then secondsUnitFormat=source end
 end
 
 local function recordSecondsWrite(label,format,isText,writtenText,writeToken)
@@ -750,10 +738,9 @@ local function showNativeSeconds(button,state,label,timeLeft,receipt,serial,fres
         local text
         nativeResult,text,superseded,nativeFormatter=formatNativeDuration(button,label,receipt,serial)
         if nativeResult then format,argument="%s",text
-        elseif not superseded and sourceKind=="seconds" and secondsDecimalFormat then
-            prepared=preparedSecondsFormat(button,label)
-            format,argument=prepared or secondsDecimalFormat,timeLeft
         end
+        -- The native seconds selector proves only the below-90 band. Without
+        -- a genuine duration object it cannot authorize below-ten decimals.
     end
     -- A getter/formatter can change the native style without writing text.
     -- Refuse a stale prepared result before the final physical-writer gate.
@@ -786,7 +773,8 @@ local function showNativeSeconds(button,state,label,timeLeft,receipt,serial,fres
         state.sharedSecondsSink=not public or nil
         if nativeResult then state.durationRetryDelay=nil;noteNativeTimer(state) end
     elseif not format and current==serial then
-        timerStats.secondsSinkLast=sourceKind=="seconds" and "format-unavailable" or sourceKind
+        timerStats.secondsSinkLast=sourceKind=="seconds"
+            and (not public and not nativeResult and "threshold-unavailable" or "format-unavailable") or sourceKind
     else timerStats.secondsSinkLast=not wrote and "write-refused" or "superseded" end
     context.label,context.parent,context.replay,context.text,context.replaySerial,context.replayAssignment,context.expectedFormat=nil,nil,nil,nil,nil,nil,nil
     return true
