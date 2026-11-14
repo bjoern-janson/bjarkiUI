@@ -2,6 +2,15 @@
 
 This log covers the synchronized post-launch local test builds. Older implementation notes and audit history remain in [ARCHITECTURE.md](ARCHITECTURE.md). Entries describe intended code behavior, **not** independently verified in-game outcomes.
 
+## 0.2.363-buff-ten-second-threshold-test — enforce the requested threshold
+
+- The user screenshot shows `66.2`. The .360–.362 seconds-only fallback deliberately applied tenths throughout the native below-90-second band; that compromise did not satisfy the decimals-below-ten requirement.
+- Remove that unconditional opaque-number decimal write. A public seconds-format selector alone cannot prove that the timer is below ten.
+- Keep the existing public short, public temporary-enchant and genuine duration-object paths, including the 9.9 clamp and prepared spacing. At ten and above, those routes use the native whole-second/unit rules.
+- When no supported threshold source is available, retire previous cells and preserve the current native countdown. Retain duration-object retry/backoff, physical ownership and newer-writer replay. Expose `threshold-unavailable` in the existing diagnostics.
+- Keep former sink refusal, context and reentry tests active through supported sources. Add explicit 9.999/10/66.2/90 coverage and newer unsupported-stock handoff cases.
+- No new clock, timer loop, widget, source inference, font change or action-bar behavior. Fully restricted short buffs can still show whole seconds; their decimal and spacing coverage remains open.
+
 ## 0.2.362-buff-format-consistency-test — reconcile native buff routes
 
 - The user reports that buffs are still intermittently moving and displaying a seconds suffix. This supersedes treating the earlier pictured success as general coverage.
