@@ -1,14 +1,14 @@
 # bjarkiUI
 
-**0.2.369-plain-level-badges-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
+**0.2.370-combat-level-highlights-test for WoW: Forever** adjusts Blizzard's unit-frame labels, party layout, aura presentation and timers while retaining native artwork and fonts. Settings are saved per character in `bjarkiUISettings`. The addon does not install, replace or activate Edit Mode layouts.
 
 ## Latest test build
 
-**.369:** Removes the bright highlight layer from Player, Target and Focus level badges. Keeps the native nameplate dark background and normal border, the existing sixteen-unit side gap, native numeric text and visibility. Three reusable textures provide the badges; no combat-state query or polling is added. [Changes](CHANGELOG.md) · [Verification](docs/VERIFICATION_0.2.369.md)
+**.370:** Player keeps its plain level badge. Target and Focus each highlight only while their own represented unit is in combat, and only when the native numeric level is displayed. Prepared visibility updates handle combat entry/exit and target/focus switches during combat through unit events. Five reusable textures provide the three bases and two highlights; no polling or new clock is added. [Changes](CHANGELOG.md) · [Verification](docs/VERIFICATION_0.2.370.md)
 
 ## Install
 
-1. Download the supplied `bjarkiUI-0.2.369-Plain-Level-Badges.zip` test package. The stacked development PR does not trigger the workflow restricted to `main`.
+1. Download the supplied `bjarkiUI-0.2.370-Combat-Level-Highlights.zip` test package. The stacked development PR does not trigger the workflow restricted to `main`.
 2. Extract its `bjarkiUI` folder into the Forever client's `Interface/AddOns/` directory. Check that `Interface/AddOns/bjarkiUI/bjarkiUI.toc` exists.
 3. Enable the addon and reload the interface. Use `/bui help` for the main commands and `/bdark` for Soft Dark controls.
 
@@ -75,6 +75,6 @@ Start with [AGENTS.md](AGENTS.md), then the [code map](docs/CODE_MAP.md). The tw
 - [Timer sources, native writers, hooks and cleanup](docs/TIMER_LIFECYCLE.md)
 - [Default manifest](bjarkiUI.toc) · [Camelot manifest](bjarkiUI_Camelot.toc)
 - [Package workflow](.github/workflows/package-addon.yml) · [Changelog](CHANGELOG.md)
-- [Current verification and live evidence](docs/VERIFICATION_0.2.369.md)
+- [Current verification and live evidence](docs/VERIFICATION_0.2.370.md)
 
 `ARCHITECTURE.md` records implementation history, including retired experiments. The 0.2.309 audit documents, `tests/snapshot-0.2.309/` and `tools/audit/` are historical reproduction material, not the current test or packaging entry point. Reproduce that audit at its [pinned revision](https://github.com/bjoern-janson/bjarkiUI/tree/d1797e392e0eb466906632e4dc047eb830b2ac78). Current source and top-level tests take precedence over historical descriptions. [Architecture history](ARCHITECTURE.md) · [Audit baseline](docs/AUDIT_BASELINE.md)

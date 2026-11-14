@@ -1,4 +1,4 @@
-local BJARKI_UI_VERSION = "0.2.369-plain-level-badges-test"
+local BJARKI_UI_VERSION = "0.2.370-combat-level-highlights-test"
 -- Standalone PRD treatment is retained. Unit-frame resource bars stay native.
 local PRD_MANA_R, PRD_MANA_G, PRD_MANA_B = 0.10, 0.25, 1.00
 local WORLD_TEXT_SCREEN_Y = "0.0430"

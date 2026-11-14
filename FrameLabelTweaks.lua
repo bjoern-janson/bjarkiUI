@@ -15,6 +15,7 @@ local leaderIcons = setmetatable({}, { __mode = "k" })
 local counts = setmetatable({}, { __mode = "k" })
 local levelBadges = {}
 local LEVEL_VISIBILITY_METHODS = { "Show", "Hide", "SetShown", "SetAlpha" }
+local LEVEL_COMBAT_UNITS = { TargetFrame = "target", FocusFrame = "focus" }
 local refreshCombatIcon
 local prepareLevelBadge, syncLevelBadge
 
@@ -162,6 +163,7 @@ local function installLevel(text, portrait, nativeRelative, side, role, owner)
     if badge and (badge.text ~= text or badge.owner ~= owner) then
         badge.ready = false
         if badge.background then pcall(badge.background.Hide, badge.background) end
+        if badge.highlight then pcall(badge.highlight.Hide, badge.highlight) end
     end
     if not outsideCombat() or not accessible(text) then return end
     local state = levels[text]
@@ -178,6 +180,7 @@ local function installLevel(text, portrait, nativeRelative, side, role, owner)
                 state.requested = nil
             end
             moveLevel(self, state)
+            state.badgeRevision = (state.badgeRevision or 0) + 1
             syncLevelBadge(self)
             if state.side == "LEFT" and refreshCombatIcon then
                 refreshCombatIcon()
@@ -188,8 +191,9 @@ local function installLevel(text, portrait, nativeRelative, side, role, owner)
 end
 
 -- The nameplate's standalone level artwork, without its unit-data mixin.
--- The base includes its normal border; the bright selection overlay is omitted.
--- One reusable texture per role shares the native text's parent and sits below it.
+-- The base includes its normal border. Only Target/Focus receive an additional
+-- outline, driven by that unit's combat state rather than native selection.
+-- All artwork shares the native text's parent and sits below it.
 -- Parent visibility/fades are inherited; only local numeric visibility is mirrored.
 local function acceptedCall(object, method, ...)
     local fn = field(object, method)
@@ -212,10 +216,17 @@ local function sameBadgeBinding(badge, text, binding)
     return badge.text == text and badge.binding == binding
 end
 
+local function hideLevelHighlight(badge, text, binding)
+    if not sameBadgeBinding(badge, text, binding) then return end
+    badge.highlightPublic = nil
+    if badge.highlight then acceptedCall(badge.highlight, "Hide") end
+end
+
 local function hideLevelBadge(badge, text, binding)
     if not sameBadgeBinding(badge, text, binding) then return end
     badge.visibilityPublic = nil
     if badge.background then acceptedCall(badge.background, "Hide") end
+    hideLevelHighlight(badge, text, binding)
 end
 
 local function currentBadge(badge, text, state, binding)
@@ -237,6 +248,53 @@ local function badgePlacement(text, state, badge)
     if not ps or not ts or not os or ps / os ~= badge.scale then return false end
     return point[1] == "CENTER" and point[2] == state.portrait and point[3] == state.side
         and matchesNumber(point[4], state.dx * ps / ts, true) and point[5] == 0
+end
+
+local function syncLevelHighlight(badge, text, state, binding, revision, shown, publicShown, alpha)
+    if not badge.unit then return end -- No player outline or player combat query.
+    if not badge.highlightConfigured or type(UnitAffectingCombat) ~= "function" then
+        hideLevelHighlight(badge, text, binding); return
+    end
+    local ok, combat = pcall(UnitAffectingCombat, badge.unit)
+    local publicCombat = ok and readable(combat)
+    if not ok or (publicCombat and type(combat) ~= "boolean") then
+        hideLevelHighlight(badge, text, binding); return
+    end
+    local visibleAlpha = alpha
+    if publicShown then
+        if not shown then visibleAlpha = 0 end
+    else
+        -- The base's supported visibility sink already composed the native
+        -- shown value with local alpha. Forward its output; never inspect an
+        -- opaque number or combine two opaque booleans in addon Lua.
+        local getter = field(badge.background, "GetAlpha")
+        if type(getter) ~= "function" then hideLevelHighlight(badge, text, binding); return end
+        ok, visibleAlpha = pcall(getter, badge.background)
+        if not ok then hideLevelHighlight(badge, text, binding); return end
+    end
+    local publicAlpha = readable(visibleAlpha)
+    if publicAlpha and (not finite(visibleAlpha) or visibleAlpha < 0 or visibleAlpha > 1) then
+        hideLevelHighlight(badge, text, binding); return
+    end
+    if revision ~= state.badgeRevision then return end
+    if not currentBadge(badge, text, state, binding) or not badgePlacement(text, state, badge) then
+        hideLevelBadge(badge, text, binding); return
+    end
+    if revision ~= state.badgeRevision then return end
+    if publicCombat and publicAlpha and badge.highlightPublic
+        and badge.highlightCombat == combat and badge.highlightAlpha == visibleAlpha then return end
+    local painted = acceptedCall(badge.highlight, "SetAlphaFromBoolean", combat, visibleAlpha, 0)
+    if revision ~= state.badgeRevision or not sameBadgeBinding(badge, text, binding) then return end
+    if painted then painted = acceptedCall(badge.highlight, "Show") end
+    if revision ~= state.badgeRevision or not sameBadgeBinding(badge, text, binding) then return end
+    if not painted then hideLevelHighlight(badge, text, binding); return end
+    -- Only public accepted outputs are cached. Opaque inputs stay on this stack.
+    badge.highlightPublic = publicCombat and publicAlpha
+    if badge.highlightPublic then
+        badge.highlightCombat, badge.highlightAlpha = combat, visibleAlpha
+    else
+        badge.highlightCombat, badge.highlightAlpha = nil, nil
+    end
 end
 
 syncLevelBadge = function(text)
@@ -271,24 +329,26 @@ syncLevelBadge = function(text)
             break
         end
         if revision == state.badgeRevision then
-            if public and badge.visibilityPublic and badge.shown == shown and badge.alpha == alpha then break end
             if not sameBadgeBinding(badge, text, binding) then break end
-            local texture, displayed = badge.background
-            if public then
-                displayed = acceptedCall(texture, "SetAlpha", alpha)
-                    and acceptedCall(texture, "SetShown", shown)
-            else
-                -- IsShown can be opaque. This native sink explicitly permits
-                -- opaque booleans from addons; SetShown does not.
-                displayed = acceptedCall(texture, "SetAlphaFromBoolean", shown, alpha, 0)
-                    and acceptedCall(texture, "Show")
+            local texture, displayed = badge.background, true
+            if not (public and badge.visibilityPublic and badge.shown == shown and badge.alpha == alpha) then
+                if public then
+                    displayed = acceptedCall(texture, "SetAlpha", alpha)
+                        and acceptedCall(texture, "SetShown", shown)
+                else
+                    -- IsShown can be opaque. This native sink explicitly permits
+                    -- opaque booleans from addons; SetShown does not.
+                    displayed = acceptedCall(texture, "SetAlphaFromBoolean", shown, alpha, 0)
+                        and acceptedCall(texture, "Show")
+                end
             end
             if revision == state.badgeRevision then
                 if not displayed then hideLevelBadge(badge, text, binding)
                 elseif sameBadgeBinding(badge, text, binding) then
                     badge.visibilityPublic, badge.shown, badge.alpha = public, public and shown, alpha
+                    syncLevelHighlight(badge, text, state, binding, revision, shown, public, alpha)
                 end
-                break
+                if revision == state.badgeRevision then break end
             end
         end
         hideLevelBadge(badge, text, binding)
@@ -312,15 +372,34 @@ local function configureBadgeTexture(texture, owner, text, atlas, layer, subleve
         and acceptedCall(texture, "SetPoint", "CENTER", text, "CENTER", 0, y)
 end
 
+local function prepareLevelHighlight(badge, text, state, binding, scale, layer, sublevel)
+    if not badge.unit or badge.highlightConfigured or not outsideCombat() then return end
+    hideLevelHighlight(badge, text, binding)
+    if not badge.highlight then
+        local create = field(badge.owner, "CreateTexture")
+        if type(create) ~= "function" then return end
+        local ok, texture = pcall(create, badge.owner, nil, layer, nil, sublevel - 1)
+        if not ok or not readable(texture) or not texture then return end
+        badge.highlight = texture
+        acceptedCall(texture, "Hide")
+    end
+    if not currentBadge(badge, text, state, binding) or not outsideCombat() then return end
+    if not configureBadgeTexture(badge.highlight, badge.owner, text,
+        "ui-hud-nameplates-levelindicator-rectangle-selected", layer, sublevel - 1,
+        34 * scale, 23 * scale, -0.5 * scale) then return end
+    if currentBadge(badge, text, state, binding) and outsideCombat() then badge.highlightConfigured = true end
+end
+
 prepareLevelBadge = function(text, state, role, owner)
     if not outsideCombat() then return end
     local badge = levelBadges[role]
     if not badge then
-        badge = { role = role, binding = 0 }; levelBadges[role] = badge
+        badge = { role = role, unit = LEVEL_COMBAT_UNITS[role], binding = 0 }; levelBadges[role] = badge
     end
     if badge.text ~= text or badge.owner ~= owner then
         hideLevelBadge(badge, badge.text, badge.binding)
         badge.text, badge.owner, badge.configured = text, owner, false
+        badge.highlightConfigured = false
         badge.binding = badge.binding + 1
     end
     badge.ready = false
@@ -342,7 +421,7 @@ prepareLevelBadge = function(text, state, role, owner)
     local scale = ps / os
     if not finite(scale) or not currentBadge(badge, text, state, binding) or not outsideCombat() then return end
     if not badge.configured or badge.scale ~= scale or badge.layer ~= layer or badge.sublevel ~= sublevel then
-        badge.configured = false
+        badge.configured, badge.highlightConfigured = false, false
         hideLevelBadge(badge, text, binding)
         local create = field(owner, "CreateTexture")
         if type(create) ~= "function" then return end
@@ -357,6 +436,7 @@ prepareLevelBadge = function(text, state, role, owner)
         if not currentBadge(badge, text, state, binding) or not outsideCombat() then return end
         badge.scale, badge.layer, badge.sublevel, badge.configured = scale, layer, sublevel, true
     end
+    prepareLevelHighlight(badge, text, state, binding, scale, layer, sublevel)
     for _, method in ipairs(LEVEL_VISIBILITY_METHODS) do
         hookOnce(text, state, method, levelVisibilityChanged)
     end
@@ -678,7 +758,29 @@ for _, name in ipairs({
     "UI_SCALE_CHANGED", "DISPLAY_SIZE_CHANGED", "BAG_UPDATE_DELAYED", "ADDON_LOADED",
 }) do events:RegisterEvent(name) end
 
+-- Native unit filtering handles aliases too. Refresh both prepared roles on
+-- delivery; the payload spelling need not be the literal target/focus token.
+if not acceptedCall(events, "RegisterUnitEvent", "UNIT_FLAGS", "target", "focus") then
+    events:RegisterEvent("UNIT_FLAGS")
+end
+
+local function refreshCombatLevel(role)
+    local badge = levelBadges[role]
+    local text = badge and badge.text
+    local state = text and levels[text]
+    if not state then return end
+    state.badgeRevision = (state.badgeRevision or 0) + 1
+    syncLevelBadge(text)
+end
+
 events:SetScript("OnEvent", function(_, event, addon)
+    if event == "UNIT_FLAGS" then
+        refreshCombatLevel("TargetFrame")
+        refreshCombatLevel("FocusFrame")
+        return
+    end
+    if event == "PLAYER_TARGET_CHANGED" then refreshCombatLevel("TargetFrame")
+    elseif event == "PLAYER_FOCUS_CHANGED" then refreshCombatLevel("FocusFrame") end
     if event == "ADDON_LOADED" and addon ~= "Blizzard_UnitFrame"
         and addon ~= "Blizzard_MainMenuBarBagButtons" then return end
     apply()
